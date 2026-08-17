@@ -1,0 +1,12 @@
+.DS_Store
+.thumbs.db
+node_modules
+/dist
+.quasar
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env

@@ -1,0 +1,51 @@
+{
+  "name": "sistema-apontamento",
+  "version": "1.0.0",
+  "description": "Sistema de Apontamento com Histórico",
+  "productName": "Sistema de Apontamento",
+  "author": "CGB Engenharia",
+  "private": true,
+  "scripts": {
+    "dev": "quasar dev",
+    "dev:pwa": "quasar dev -m pwa",
+    "build": "quasar build",
+    "build:pwa": "quasar build -m pwa",
+    "setup": "bun run setup-supabase.js",
+    "postinstall": "node scripts/patch-quasar-bun.js"
+  },
+  "dependencies": {
+    "@quasar/extras": "^1.16.12",
+    "@supabase/supabase-js": "^2.43.0",
+    "gsap": "^3.15.0",
+    "pinia": "^2.1.7",
+    "quasar": "^2.16.0",
+    "vue": "^3.4.0",
+    "vue-router": "^4.3.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@quasar/app-vite": "^1.9.14",
+    "autoprefixer": "^10.4.2",
+    "pg": "^8.23.0",
+    "postgres": "^3.4.9",
+    "sass": "^1.32.12",
+    "workbox-build": "^7.0.0",
+    "workbox-cacheable-response": "^7.0.0",
+    "workbox-core": "^7.0.0",
+    "workbox-expiration": "^7.0.0",
+    "workbox-precaching": "^7.0.0",
+    "workbox-routing": "^7.0.0",
+    "workbox-strategies": "^7.0.0"
+  },
+  "engines": {
+    "node": "^18.0.0 || ^20.0.0 || >=22.0.0"
+  },
+  "browserslist": [
+    "last 10 Chrome versions",
+    "last 10 Firefox versions",
+    "last 4 Edge versions",
+    "last 7 Safari versions",
+    "last 8 Android versions",
+    "last 8 ChromeAndroid versions"
+  ]
+}

@@ -1,0 +1,113 @@
+// ── Reset ─────────────────────────────────────────────────────────
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  width: 100%; height: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+// ── Design tokens ────────────────────────────────────────────────
+:root {
+  --bg-page:       #f0f4f8;
+  --bg-card:       #ffffff;
+  --bg-card-alt:   #f8fafc;
+  --border:        rgba(0,0,0,0.07);
+  --text-primary:  #0f172a;
+  --text-secondary:#64748b;
+  --text-muted:    #94a3b8;
+  --accent:        #1565c0;
+  --accent-light:  #e8f0fe;
+  --shadow-sm:     0 1px 4px rgba(0,0,0,0.07);
+  --shadow-md:     0 4px 16px rgba(0,0,0,0.09);
+  --shadow-lg:     0 8px 32px rgba(0,0,0,0.13);
+  --radius:        12px;
+  --radius-sm:     8px;
+  --page-pad:      20px;
+}
+
+body.body--dark {
+  --bg-page:       #0d1117;
+  --bg-card:       #161b22;
+  --bg-card-alt:   #1c2128;
+  --border:        rgba(255,255,255,0.07);
+  --text-primary:  #e6edf3;
+  --text-secondary:#8b949e;
+  --text-muted:    #6e7681;
+  --accent:        #58a6ff;
+  --accent-light:  rgba(88,166,255,0.1);
+  --shadow-sm:     0 1px 4px rgba(0,0,0,0.35);
+  --shadow-md:     0 4px 16px rgba(0,0,0,0.45);
+  --shadow-lg:     0 8px 32px rgba(0,0,0,0.55);
+}
+
+// ── Page base ─────────────────────────────────────────────────────
+.q-page {
+  background: var(--bg-page) !important;
+  padding: var(--page-pad) !important;
+}
+
+@media (max-width: 599px) {
+  :root { --page-pad: 12px; }
+}
+
+// ── Cards ─────────────────────────────────────────────────────────
+.card-modern {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+// ── Section label ─────────────────────────────────────────────────
+.page-section-label,
+.section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 4px;
+  margin-bottom: 14px;
+}
+
+// ── Inputs ────────────────────────────────────────────────────────
+.q-field--outlined .q-field__control {
+  border-radius: var(--radius-sm) !important;
+}
+.q-field--outlined .q-field__control:before {
+  border-color: var(--border) !important;
+}
+.body--dark .q-field__native,
+.body--dark .q-field__input   { color: var(--text-primary) !important; }
+.body--dark .q-field__label   { color: var(--text-secondary) !important; }
+
+// ── Table ─────────────────────────────────────────────────────────
+.body--dark .q-table__container { background: var(--bg-card) !important; color: var(--text-primary) !important; }
+.body--dark .q-table thead th   { color: var(--text-secondary) !important; background: var(--bg-card-alt) !important; }
+.body--dark .q-table tbody td   { border-color: var(--border) !important; color: var(--text-primary) !important; }
+.body--dark .q-table tbody tr:hover td { background: var(--bg-card-alt) !important; }
+
+// ── Dialog ────────────────────────────────────────────────────────
+.body--dark .q-dialog .q-card {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+// ── Select / Dropdown ─────────────────────────────────────────────
+.body--dark .q-menu {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+}
+.body--dark .q-item { color: var(--text-primary) !important; }
+.body--dark .q-item:hover { background: var(--bg-card-alt) !important; }
+
+// ── Scrollbar ─────────────────────────────────────────────────────
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }

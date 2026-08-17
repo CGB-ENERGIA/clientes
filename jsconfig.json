@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": false,
+    "importHelpers": true,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "src/*": ["./src/*"],
+      "app/*": ["./*"],
+      "components/*": ["./src/components/*"],
+      "layouts/*": ["./src/layouts/*"],
+      "pages/*": ["./src/pages/*"],
+      "boot/*": ["./src/boot/*"],
+      "stores/*": ["./src/stores/*"]
+    }
+  },
+  "exclude": ["./dist", "./.quasar", "./node_modules", "./.git"]
+}
