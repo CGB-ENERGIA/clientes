@@ -21,13 +21,13 @@
         <nav class="header-nav row items-center gt-sm">
           <template v-for="(item, i) in navItems" :key="item.to">
             <div v-if="i > 0" class="nav-divider" />
-            <router-link :to="item.to" custom v-slot="{ isActive, navigate }">
-              <button class="nav-btn" :class="{ 'nav-btn--active': isActive }" @click="navigate">
+            <router-link :to="item.to" custom v-slot="{ isExactActive, navigate }">
+              <button class="nav-btn" :class="{ 'nav-btn--active': isExactActive }" @click="navigate">
                 <span class="nav-btn-inner">
                   <q-icon :name="item.icon" size="16px" />
                   <span>{{ item.label }}</span>
                 </span>
-                <span v-if="isActive" class="nav-indicator" />
+                <span v-if="isExactActive" class="nav-indicator" />
               </button>
             </router-link>
           </template>
@@ -129,9 +129,10 @@ async function logout () {
 }
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { to: '/historico', label: 'Histórico', icon: 'history' },
-  { to: '/', label: 'Apontamento', icon: 'assignment' }
+  { to: '/dashboard', label: 'Dashboard',   icon: 'dashboard' },
+  { to: '/',          label: 'Apontamento', icon: 'assignment' },
+  { to: '/historico', label: 'Histórico',   icon: 'history' },
+  { to: '/notas',     label: 'Notas',       icon: 'table_chart' }
 ]
 </script>
 

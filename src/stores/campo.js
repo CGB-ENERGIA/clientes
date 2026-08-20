@@ -25,6 +25,11 @@ export const useCampoStore = defineStore('campo', () => {
   window.addEventListener('online',  () => { online.value = true;  sincronizar() })
   window.addEventListener('offline', () => { online.value = false })
 
+  // Tenta sincronizar fila a cada 30s se online e houver pendências
+  setInterval(() => {
+    if (online.value && fila.value.length > 0) sincronizar()
+  }, 30_000)
+
   // ── Sessão ────────────────────────────────────────────────────
   function iniciarSessao (data) {
     sessao.value = data
@@ -101,6 +106,15 @@ export const useCampoStore = defineStore('campo', () => {
           fila.value = fila.value.filter(f => f.id !== r.id)
           const local = registros.value.find(l => l.id === r.id)
           if (local) { local.sync = true; local.foto_url = foto_url }
+
+          // Marca nota como "em andamento" (não rebaixa se já estiver concluída)
+          if (r.nota) {
+            await supabase
+              .from('notas_servico')
+              .update({ status: 'em_andamento' })
+              .eq('nota', r.nota)
+              .neq('status', 'concluido')
+          }
         }
       } catch (e) {
         console.warn('[Campo] sync error:', e)

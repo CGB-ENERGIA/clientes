@@ -11,6 +11,7 @@
     "build": "quasar build",
     "build:pwa": "quasar build -m pwa",
     "setup": "bun run setup-supabase.js",
+    "import-notas": "bun run import-notas.js",
     "postinstall": "node scripts/patch-quasar-bun.js"
   },
   "dependencies": {

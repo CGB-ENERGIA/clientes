@@ -61,6 +61,8 @@ export const useApontamentoStore = defineStore('apontamento', () => {
           nome: c.nome,
           padrao: c.padrao || '',
           conta_contrato: c.conta_contrato || null,
+          num_medidor: c.num_medidor || null,
+          foto_url: c.foto_url || null,
           apontamento_id: ap.id
         }))
       )
@@ -87,6 +89,8 @@ export const useApontamentoStore = defineStore('apontamento', () => {
           nome: c.nome,
           padrao: c.padrao || '',
           conta_contrato: c.conta_contrato || null,
+          num_medidor: c.num_medidor || null,
+          foto_url: c.foto_url || null,
           apontamento_id: id
         }))
       )
