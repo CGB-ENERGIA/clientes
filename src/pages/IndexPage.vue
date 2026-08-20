@@ -122,8 +122,8 @@
         <div class="lista-header">
           <div>NOTA</div>
           <div>PROJETO SAP</div>
-          <div>BASE</div>
           <div>PEP</div>
+          <div>BASE</div>
           <div>CLIENTE</div>
           <div>P / C</div>
           <div>STATUS</div>
@@ -145,8 +145,8 @@
             <template v-else>{{ n._notas?.[0]?.nota ?? n.nota }}</template>
           </div>
           <div class="lista-projeto">{{ n.projeto_info_sap || '—' }}</div>
-          <div class="lista-base"><span class="nc-badge-base">{{ n.base }}</span></div>
           <div class="lista-pep">{{ n.pep || '—' }}</div>
+          <div class="lista-base"><span class="nc-badge-base">{{ n.base }}</span></div>
           <div class="lista-cliente">
             <template v-if="n.clientes_planilha?.length">
               <span class="lista-cliente-nome">{{ n.clientes_planilha[0].nome }}</span>
@@ -1120,6 +1120,8 @@ notasStore.fetchNotas()
   font-size: 10px; font-weight: 700;
   background: #e3f2fd; color: #1565c0;
   border-radius: 6px; padding: 2px 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: inline-block; max-width: 100%;
 }
 
 .nc-status {
@@ -1176,7 +1178,7 @@ notasStore.fetchNotas()
 }
 .lista-header {
   display: grid;
-  grid-template-columns: 130px 120px 130px 1fr 1fr 100px 130px 90px;
+  grid-template-columns: 130px 110px 220px 150px 1fr 90px 130px 90px;
   gap: 12px;
   padding: 6px 16px;
   font-size: 10px;
@@ -1192,7 +1194,7 @@ notasStore.fetchNotas()
 .body--dark .lista-header { color: #b0bec5; border-bottom-color: rgba(255,255,255,0.15); }
 .lista-row {
   display: grid;
-  grid-template-columns: 130px 120px 130px 1fr 1fr 100px 130px 90px;
+  grid-template-columns: 130px 110px 220px 150px 1fr 90px 130px 90px;
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
@@ -1211,7 +1213,7 @@ notasStore.fetchNotas()
 
 .lista-num  { font-size: 15px; font-weight: 800; color: var(--text-primary, #0d1b2a); text-align: center; }
 .lista-base { text-align: center; }
-.lista-pep  { text-align: center; font-size: 12px; font-weight: 600; color: #7b1fa2; font-family: monospace; word-break: break-all; }
+.lista-pep  { text-align: center; font-size: 12px; font-weight: 600; color: #7b1fa2; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :root[data-theme="dark"] .lista-pep,
 .body--dark .lista-pep  { color: #ce93d8; }
 .lista-info { display: flex; gap: 10px; font-size: 12px; color: var(--text-muted, #607d8b); justify-content: center; }
