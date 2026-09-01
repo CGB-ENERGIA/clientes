@@ -774,12 +774,11 @@ const contadores = computed(() => {
 })
 
 const tabs = computed(() => [
-  { val: 'todas',          label: 'Geral',           icon: 'apps',          count: contadores.value.todas },
-  { val: 'pendente',       label: 'Não Iniciado',    icon: 'schedule',      count: contadores.value.pendente },
-  { val: 'em_andamento',   label: 'Andamento',       icon: 'construction',  count: contadores.value.em_andamento },
-  { val: 'ligar_campo',    label: 'Ligar - Campo',   icon: 'cable',         count: contadores.value.ligar_campo },
-  { val: 'baixar_medidor', label: 'Baixar Medidor',  icon: 'speed',         count: contadores.value.baixar_medidor },
-  { val: 'concluido',      label: 'Concluídos',      icon: 'check_circle',  count: contadores.value.concluido }
+  { val: 'todas',          label: 'Geral',          icon: 'apps',         count: contadores.value.todas },
+  { val: 'pendente',       label: 'Não Iniciado',   icon: 'schedule',     count: contadores.value.pendente },
+  { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', count: contadores.value.em_andamento },
+  { val: 'baixar_medidor', label: 'Baixar Medidor', icon: 'speed',        count: contadores.value.baixar_medidor },
+  { val: 'concluido',      label: 'Concluídos',     icon: 'check_circle', count: contadores.value.concluido }
 ])
 
 const notasFiltradas = computed(() => {
@@ -827,7 +826,6 @@ const semNotasMsg = computed(() => {
 const statusOpcoes = [
   { val: 'pendente',       label: 'Não Iniciado',   icon: 'schedule',     color: 'grey-6'  },
   { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', color: 'orange'  },
-  { val: 'ligar_campo',    label: 'Ligar - Campo',  icon: 'cable',        color: 'teal'    },
   { val: 'baixar_medidor', label: 'Baixar Medidor', icon: 'speed',        color: 'blue'    },
   { val: 'concluido',      label: 'Concluído',      icon: 'check_circle', color: 'positive'},
 ]

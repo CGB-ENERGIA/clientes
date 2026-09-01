@@ -59,11 +59,14 @@ const colProjetoSap = cab.find(c => norm(c).includes('PROJETOINFOSAP') || norm(c
 const colLigado     = cab.find(c => norm(c).includes('LIGADOEMCAMPO') || norm(c).includes('LIGADO')) || ''
 const colBaixado    = cab.find(c => norm(c).includes('BAIXADO')) || ''
 const colPoste      = cab.find(c => norm(c) === 'POSTE' || norm(c) === 'POSTES' || norm(c) === 'POSTESINSTALADOS') || ''
+const colRetorno    = cab.find(c => norm(c) === 'RETORNO') || ''
+const colStatusCcs  = cab.find(c => norm(c) === 'STATUSCCS' || norm(c) === 'STATUS_CCS' || norm(c).includes('STATUSCCS')) || ''
 
 console.log(`   PROJETO INFO SAP → coluna: "${colProjetoSap || '⚠️ NÃO ENCONTRADA'}"`)
 console.log(`   LIGADO EM CAMPO? → coluna: "${colLigado     || '⚠️ NÃO ENCONTRADA'}"`)
 console.log(`   BAIXADO?         → coluna: "${colBaixado    || '⚠️ NÃO ENCONTRADA'}"`)
 console.log(`   POSTE            → coluna: "${colPoste      || '⚠️ NÃO ENCONTRADA'}"`)
+console.log(`   RETORNO          → coluna: "${colRetorno    || '⚠️ NÃO ENCONTRADA'}"`)
 console.log(`   Todas as colunas: ${cab.filter(Boolean).map(c => `"${c}"`).join(' | ')}`)
 
 // Amostra de 3 linhas
@@ -89,15 +92,20 @@ for (const r of dados) {
   const nota = String(r['NOTA'] || '').trim()
   if (!nota || isNaN(Number(nota))) continue
 
+  // Só importa linhas com RETORNO = "NOTA VALIDADA"
+  const retorno = String(colRetorno ? (r[colRetorno] ?? '') : '').trim().toUpperCase()
+  if (colRetorno && retorno !== 'NOTA VALIDADA') continue
+
   const projetoSap = String(colProjetoSap ? (r[colProjetoSap] ?? '') : '').trim()
-  const ligado     = String(colLigado  ? (r[colLigado]  ?? '') : '').trim().toUpperCase() === 'SIM'
-  const baixado    = String(colBaixado ? (r[colBaixado] ?? '') : '').trim().toUpperCase() === 'SIM'
+  const ligado     = String(colLigado    ? (r[colLigado]    ?? '') : '').trim().toUpperCase() === 'SIM'
+  const baixado    = String(colBaixado   ? (r[colBaixado]   ?? '') : '').trim().toUpperCase() === 'SIM'
+  const statusCcs  = String(colStatusCcs ? (r[colStatusCcs] ?? '') : '').trim().toUpperCase()
 
   let statusPlanilha
-  if      (ligado  && baixado)  statusPlanilha = 'concluido'
-  else if (ligado  && !baixado) statusPlanilha = 'baixar_medidor'
-  else if (!ligado && baixado)  statusPlanilha = 'ligar_campo'
-  else                          statusPlanilha = 'pendente'
+  if      (statusCcs === 'FINL')        statusPlanilha = 'concluido'
+  else if (ligado  && baixado)          statusPlanilha = 'concluido'
+  else if (ligado  && !baixado)         statusPlanilha = 'baixar_medidor'
+  else                                  statusPlanilha = 'pendente'
 
   const postesVal = colPoste ? Number(r[colPoste] || 0) : 0
 

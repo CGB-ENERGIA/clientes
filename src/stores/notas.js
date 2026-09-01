@@ -57,25 +57,32 @@ export const useNotasStore = defineStore('notas', () => {
         // Detecta colunas por busca flexível
         const normCol2 = s => String(s).toUpperCase().replace(/[\s_\-\.]+/g, '')
         const cols2 = dados[0] ? Object.keys(dados[0]) : []
-        const colProjSap = cols2.find(c => normCol2(c).includes('PROJETOINFOSAP') || normCol2(c) === 'PROJETOSAP') || ''
-        const colLig     = cols2.find(c => normCol2(c).includes('LIGADOEMCAMPO')) || ''
-        const colBx      = cols2.find(c => normCol2(c).includes('BAIXADO')) || ''
-        const colPoste2  = cols2.find(c => normCol2(c) === 'POSTE' || normCol2(c) === 'POSTES' || normCol2(c) === 'POSTESINSTALADOS') || ''
+        const colProjSap  = cols2.find(c => normCol2(c).includes('PROJETOINFOSAP') || normCol2(c) === 'PROJETOSAP') || ''
+        const colLig      = cols2.find(c => normCol2(c).includes('LIGADOEMCAMPO')) || ''
+        const colBx       = cols2.find(c => normCol2(c).includes('BAIXADO')) || ''
+        const colPoste2    = cols2.find(c => normCol2(c) === 'POSTE' || normCol2(c) === 'POSTES' || normCol2(c) === 'POSTESINSTALADOS') || ''
+        const colRetorno2  = cols2.find(c => normCol2(c) === 'RETORNO') || ''
+        const colStatusCcs2 = cols2.find(c => normCol2(c) === 'STATUSCCS' || normCol2(c).includes('STATUSCCS')) || ''
 
         for (const r of dados) {
           const nota = String(r['NOTA'] || '').trim()
           if (!nota || isNaN(Number(nota))) continue
 
+          // Só importa linhas com RETORNO = "NOTA VALIDADA"
+          const retorno2 = String(colRetorno2 ? (r[colRetorno2] ?? '') : '').trim().toUpperCase()
+          if (colRetorno2 && retorno2 !== 'NOTA VALIDADA') continue
+
           const projetoSap = String(colProjSap ? (r[colProjSap] ?? '') : '').trim()
-          const ligado  = String(colLig ? (r[colLig] ?? '') : '').trim().toUpperCase() === 'SIM'
-          const baixado = String(colBx  ? (r[colBx]  ?? '') : '').trim().toUpperCase() === 'SIM'
-          const postesVal = colPoste2 ? Number(r[colPoste2] || 0) : 0
+          const ligado     = String(colLig       ? (r[colLig]        ?? '') : '').trim().toUpperCase() === 'SIM'
+          const baixado    = String(colBx        ? (r[colBx]         ?? '') : '').trim().toUpperCase() === 'SIM'
+          const statusCcs2 = String(colStatusCcs2 ? (r[colStatusCcs2] ?? '') : '').trim().toUpperCase()
+          const postesVal  = colPoste2 ? Number(r[colPoste2] || 0) : 0
 
           let statusPlanilha
-          if      (ligado  && baixado)  statusPlanilha = 'concluido'
-          else if (ligado  && !baixado) statusPlanilha = 'baixar_medidor'
-          else if (!ligado && baixado)  statusPlanilha = 'ligar_campo'
-          else                          statusPlanilha = 'pendente'
+          if      (statusCcs2 === 'FINL')   statusPlanilha = 'concluido'
+          else if (ligado  && baixado)       statusPlanilha = 'concluido'
+          else if (ligado  && !baixado)      statusPlanilha = 'baixar_medidor'
+          else                               statusPlanilha = 'pendente'
 
           if (!porNota2[nota]) {
             porNota2[nota] = {
