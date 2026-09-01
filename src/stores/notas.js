@@ -68,21 +68,20 @@ export const useNotasStore = defineStore('notas', () => {
           const nota = String(r['NOTA'] || '').trim()
           if (!nota || isNaN(Number(nota))) continue
 
-          // Rejeita apenas EXPURGO e SEM ACESSO — aceita NOTA VALIDADA e em branco
-          const retorno2 = String(colRetorno2 ? (r[colRetorno2] ?? '') : '').trim().toUpperCase()
-          if (colRetorno2 && (retorno2 === 'EXPURGO' || retorno2 === 'SEM ACESSO')) continue
-
-          const projetoSap = String(colProjSap ? (r[colProjSap] ?? '') : '').trim()
-          const ligado     = String(colLig       ? (r[colLig]        ?? '') : '').trim().toUpperCase() === 'SIM'
-          const baixado    = String(colBx        ? (r[colBx]         ?? '') : '').trim().toUpperCase() === 'SIM'
+          const retorno2   = String(colRetorno2   ? (r[colRetorno2]   ?? '') : '').trim().toUpperCase()
+          const projetoSap = String(colProjSap    ? (r[colProjSap]    ?? '') : '').trim()
+          const ligado     = String(colLig        ? (r[colLig]        ?? '') : '').trim().toUpperCase() === 'SIM'
+          const baixado    = String(colBx         ? (r[colBx]         ?? '') : '').trim().toUpperCase() === 'SIM'
           const statusCcs2 = String(colStatusCcs2 ? (r[colStatusCcs2] ?? '') : '').trim().toUpperCase()
           const postesVal  = colPoste2 ? Number(r[colPoste2] || 0) : 0
 
           let statusPlanilha
-          if      (statusCcs2 === 'FINL')   statusPlanilha = 'concluido'
-          else if (ligado  && baixado)       statusPlanilha = 'concluido'
-          else if (ligado  && !baixado)      statusPlanilha = 'baixar_medidor'
-          else                               statusPlanilha = 'pendente'
+          if      (retorno2 === 'EXPURGO')    statusPlanilha = 'expurgo'
+          else if (retorno2 === 'SEM ACESSO') statusPlanilha = 'sem_acesso'
+          else if (statusCcs2 === 'FINL')     statusPlanilha = 'concluido'
+          else if (ligado  && baixado)        statusPlanilha = 'concluido'
+          else if (ligado  && !baixado)       statusPlanilha = 'baixar_medidor'
+          else                                statusPlanilha = 'pendente'
 
           if (!porNota2[nota]) {
             porNota2[nota] = {
@@ -124,7 +123,9 @@ export const useNotasStore = defineStore('notas', () => {
           const { _statusPlanilha, ...rest } = r
           const statusAtual = statusMap[r.nota]
           let status
-          if (statusAtual === 'concluido') {
+          if (statusPlanilha === 'expurgo' || statusPlanilha === 'sem_acesso') {
+            status = statusPlanilha
+          } else if (statusAtual === 'concluido') {
             status = 'concluido'
           } else if (statusAtual === 'em_andamento' && statusPlanilha !== 'concluido') {
             status = 'em_andamento'

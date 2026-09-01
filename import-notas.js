@@ -92,17 +92,16 @@ for (const r of dados) {
   const nota = String(r['NOTA'] || '').trim()
   if (!nota || isNaN(Number(nota))) continue
 
-  // Rejeita apenas EXPURGO e SEM ACESSO — aceita NOTA VALIDADA e em branco
-  const retorno = String(colRetorno ? (r[colRetorno] ?? '') : '').trim().toUpperCase()
-  if (colRetorno && (retorno === 'EXPURGO' || retorno === 'SEM ACESSO')) continue
-
+  const retorno    = String(colRetorno    ? (r[colRetorno]    ?? '') : '').trim().toUpperCase()
   const projetoSap = String(colProjetoSap ? (r[colProjetoSap] ?? '') : '').trim()
   const ligado     = String(colLigado    ? (r[colLigado]    ?? '') : '').trim().toUpperCase() === 'SIM'
   const baixado    = String(colBaixado   ? (r[colBaixado]   ?? '') : '').trim().toUpperCase() === 'SIM'
   const statusCcs  = String(colStatusCcs ? (r[colStatusCcs] ?? '') : '').trim().toUpperCase()
 
   let statusPlanilha
-  if      (statusCcs === 'FINL')        statusPlanilha = 'concluido'
+  if      (retorno === 'EXPURGO')       statusPlanilha = 'expurgo'
+  else if (retorno === 'SEM ACESSO')    statusPlanilha = 'sem_acesso'
+  else if (statusCcs === 'FINL')        statusPlanilha = 'concluido'
   else if (ligado  && baixado)          statusPlanilha = 'concluido'
   else if (ligado  && !baixado)         statusPlanilha = 'baixar_medidor'
   else                                  statusPlanilha = 'pendente'
@@ -158,7 +157,9 @@ const records = Object.values(porNota).map(r => {
   const { _statusPlanilha, ...rest } = r
   const statusAtual = statusMap[r.nota]
   let status
-  if (statusAtual === 'concluido') {
+  if (statusPlanilha === 'expurgo' || statusPlanilha === 'sem_acesso') {
+    status = statusPlanilha  // planilha sempre prevalece para expurgo/sem_acesso
+  } else if (statusAtual === 'concluido') {
     status = 'concluido'
   } else if (statusAtual === 'em_andamento' && statusPlanilha !== 'concluido') {
     status = 'em_andamento'

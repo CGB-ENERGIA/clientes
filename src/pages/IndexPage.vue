@@ -96,6 +96,20 @@
           <q-tooltip>Limpar filtros</q-tooltip>
         </q-btn>
 
+        <q-btn
+          :outline="somenteValidadas"
+          :flat="!somenteValidadas"
+          dense
+          :color="somenteValidadas ? 'positive' : 'grey-6'"
+          size="sm"
+          class="q-px-sm"
+          @click="somenteValidadas = !somenteValidadas"
+        >
+          <q-icon name="verified" size="14px" class="q-mr-xs" />
+          VALIDADAS
+          <q-tooltip>Exibir apenas notas validadas (oculta Expurgo e Sem Acesso)</q-tooltip>
+        </q-btn>
+
         <div class="filtros-count text-grey-6 text-caption self-center q-ml-auto">
           {{ notasFiltradas.length }} de {{ notasStore.notas.length }}
         </div>
@@ -714,14 +728,15 @@ const basesOptions = computed(() =>
 )
 
 function limparFiltros () {
-  filtro.value         = ''
-  filtroBase.value     = null
-  filtroPostes.value   = null
-  filtroClientes.value = null
+  filtro.value          = ''
+  filtroBase.value      = null
+  filtroPostes.value    = null
+  filtroClientes.value  = null
+  somenteValidadas.value = false
 }
 
 // ── Prioridade de status (menor índice = mais urgente) ───────────
-const STATUS_PRIO = ['em_andamento', 'baixar_medidor', 'ligar_campo', 'pendente', 'concluido']
+const STATUS_PRIO = ['em_andamento', 'baixar_medidor', 'pendente', 'expurgo', 'sem_acesso', 'concluido']
 
 // ── Agrupa notas pelo PROJETO SAP (ou nota individual se não tiver) ─
 const todasAgrupadas = computed(() => {
@@ -761,15 +776,18 @@ const todasAgrupadas = computed(() => {
   return [...grupos.values()]
 })
 
+const somenteValidadas = ref(false)
+
 const contadores = computed(() => {
   const gs = todasAgrupadas.value
   return {
     todas:          gs.length,
     pendente:       gs.filter(g => g.status === 'pendente').length,
     em_andamento:   gs.filter(g => g.status === 'em_andamento').length,
-    ligar_campo:    gs.filter(g => g.status === 'ligar_campo').length,
     baixar_medidor: gs.filter(g => g.status === 'baixar_medidor').length,
-    concluido:      gs.filter(g => g.status === 'concluido').length
+    concluido:      gs.filter(g => g.status === 'concluido').length,
+    expurgo:        gs.filter(g => g.status === 'expurgo').length,
+    sem_acesso:     gs.filter(g => g.status === 'sem_acesso').length,
   }
 })
 
@@ -785,6 +803,10 @@ const notasFiltradas = computed(() => {
   let lista = tabAtual.value === 'todas'
     ? todasAgrupadas.value
     : todasAgrupadas.value.filter(g => g.status === tabAtual.value)
+
+  if (somenteValidadas.value) {
+    lista = lista.filter(g => g.status !== 'expurgo' && g.status !== 'sem_acesso')
+  }
 
   const q = filtro.value?.trim().toLowerCase()
   if (q) lista = lista.filter(g =>
@@ -816,9 +838,10 @@ const semNotasMsg = computed(() => {
   const labels = {
     pendente:       'Não Iniciadas',
     em_andamento:   'em Andamento',
-    ligar_campo:    'para Ligar - Campo',
     baixar_medidor: 'para Baixar Medidor',
-    concluido:      'Concluídas'
+    concluido:      'Concluídas',
+    expurgo:        'com Expurgo',
+    sem_acesso:     'Sem Acesso',
   }
   return `Nenhuma nota ${labels[tabAtual.value] ?? ''} no momento.`
 })
@@ -871,9 +894,10 @@ function labelStatus (s) {
   return {
     pendente:       'Não Iniciado',
     em_andamento:   'Andamento',
-    ligar_campo:    'Ligar - Campo',
     baixar_medidor: 'Baixar Medidor',
-    concluido:      'Concluído'
+    concluido:      'Concluído',
+    expurgo:        'Expurgo',
+    sem_acesso:     'Sem Acesso',
   }[s] ?? s
 }
 
@@ -1131,9 +1155,10 @@ notasStore.fetchNotas()
 .nc-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .nc-status--pendente       { background: #f5f5f5;  color: #757575; }
 .nc-status--em_andamento   { background: #fff3e0;  color: #e65100; }
-.nc-status--ligar_campo    { background: #e0f2f1;  color: #00695c; }
 .nc-status--baixar_medidor { background: #e3f2fd;  color: #1565c0; }
 .nc-status--concluido      { background: #e8f5e9;  color: #2e7d32; }
+.nc-status--expurgo        { background: #fce4ec;  color: #b71c1c; }
+.nc-status--sem_acesso     { background: #f3e5f5;  color: #6a1b9a; }
 
 .nc-info {
   display: flex; flex-wrap: wrap; gap: 6px 12px;
