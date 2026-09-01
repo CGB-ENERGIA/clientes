@@ -68,9 +68,9 @@ export const useNotasStore = defineStore('notas', () => {
           const nota = String(r['NOTA'] || '').trim()
           if (!nota || isNaN(Number(nota))) continue
 
-          // Só importa linhas com RETORNO = "NOTA VALIDADA"
+          // Rejeita apenas EXPURGO e SEM ACESSO — aceita NOTA VALIDADA e em branco
           const retorno2 = String(colRetorno2 ? (r[colRetorno2] ?? '') : '').trim().toUpperCase()
-          if (colRetorno2 && retorno2 !== 'NOTA VALIDADA') continue
+          if (colRetorno2 && (retorno2 === 'EXPURGO' || retorno2 === 'SEM ACESSO')) continue
 
           const projetoSap = String(colProjSap ? (r[colProjSap] ?? '') : '').trim()
           const ligado     = String(colLig       ? (r[colLig]        ?? '') : '').trim().toUpperCase() === 'SIM'

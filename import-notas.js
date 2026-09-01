@@ -92,9 +92,9 @@ for (const r of dados) {
   const nota = String(r['NOTA'] || '').trim()
   if (!nota || isNaN(Number(nota))) continue
 
-  // Só importa linhas com RETORNO = "NOTA VALIDADA"
+  // Rejeita apenas EXPURGO e SEM ACESSO — aceita NOTA VALIDADA e em branco
   const retorno = String(colRetorno ? (r[colRetorno] ?? '') : '').trim().toUpperCase()
-  if (colRetorno && retorno !== 'NOTA VALIDADA') continue
+  if (colRetorno && (retorno === 'EXPURGO' || retorno === 'SEM ACESSO')) continue
 
   const projetoSap = String(colProjetoSap ? (r[colProjetoSap] ?? '') : '').trim()
   const ligado     = String(colLigado    ? (r[colLigado]    ?? '') : '').trim().toUpperCase() === 'SIM'
