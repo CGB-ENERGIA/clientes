@@ -87,8 +87,20 @@
           <template #prepend><q-icon name="people" size="16px" /></template>
         </q-select>
 
+        <q-select
+          v-model="filtroStatus"
+          :options="statusOptions"
+          label="Status"
+          dense outlined
+          clearable
+          emit-value map-options
+          style="min-width:160px"
+        >
+          <template #prepend><q-icon name="flag" size="16px" /></template>
+        </q-select>
+
         <q-btn
-          v-if="filtro || filtroBase || filtroPostes || filtroClientes"
+          v-if="filtro || filtroBase || filtroPostes || filtroClientes || filtroStatus"
           flat dense icon="filter_alt_off"
           color="grey-6" size="sm"
           @click="limparFiltros"
@@ -708,6 +720,7 @@ const filtro         = ref('')
 const filtroBase     = ref(null)
 const filtroPostes   = ref(null)
 const filtroClientes = ref(null)
+const filtroStatus   = ref(null)
 const tabAtual       = ref('todas')
 const vista          = ref('list')
 
@@ -727,11 +740,21 @@ const basesOptions = computed(() =>
   [...new Set(notasStore.notas.map(n => n.base).filter(Boolean))].sort().map(b => ({ label: b, value: b }))
 )
 
+const statusOptions = [
+  { label: 'Não Iniciado',   value: 'pendente'       },
+  { label: 'Andamento',      value: 'em_andamento'   },
+  { label: 'Baixar Medidor', value: 'baixar_medidor' },
+  { label: 'Concluído',      value: 'concluido'      },
+  { label: 'Expurgo',        value: 'expurgo'        },
+  { label: 'Sem Acesso',     value: 'sem_acesso'     },
+]
+
 function limparFiltros () {
-  filtro.value          = ''
-  filtroBase.value      = null
-  filtroPostes.value    = null
-  filtroClientes.value  = null
+  filtro.value           = ''
+  filtroBase.value       = null
+  filtroPostes.value     = null
+  filtroClientes.value   = null
+  filtroStatus.value     = null
   somenteValidadas.value = false
 }
 
@@ -829,6 +852,8 @@ const notasFiltradas = computed(() => {
     if (filtroClientes.value === '3+') lista = lista.filter(g => g.qtd_clientes >= 3)
     else lista = lista.filter(g => String(g.qtd_clientes) === filtroClientes.value)
   }
+
+  if (filtroStatus.value) lista = lista.filter(g => g.status === filtroStatus.value)
 
   return lista
 })
