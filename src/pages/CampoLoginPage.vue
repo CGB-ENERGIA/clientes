@@ -44,19 +44,17 @@
           <button class="cl-btn-mini" @click="recarregar">Tentar novamente</button>
         </div>
 
-        <!-- Faixa de status de sync -->
-        <div v-if="!carregando && notas.length > 0" class="cl-sync-bar">
-          <div v-if="sincronizando" class="cl-sync-bar--loading">
-            <q-spinner size="11px" /> Atualizando notas…
-          </div>
-          <div v-else class="cl-sync-bar--ok">
-            <q-icon name="cloud_done" size="13px" />
-            {{ notas.length }} notas · sincronizado {{ ultimoSync }}
-          </div>
-        </div>
-
-        <!-- Busca com autocomplete -->
+        <!-- Notas carregadas: sync + busca -->
         <template v-else>
+          <div class="cl-sync-bar">
+            <div v-if="sincronizando" class="cl-sync-bar--loading">
+              <q-spinner size="11px" /> Atualizando notas…
+            </div>
+            <div v-else class="cl-sync-bar--ok">
+              <q-icon name="cloud_done" size="13px" />
+              {{ notas.length }} notas · sincronizado {{ ultimoSync }}
+            </div>
+          </div>
           <div class="cl-autocomplete" ref="autocompleteRef">
             <div class="cl-input-wrap" :class="{ 'cl-input-wrap--err': erros.nota }">
               <q-icon name="search" size="20px" class="cl-icon" />
