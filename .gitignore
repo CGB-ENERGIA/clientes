@@ -10,6 +10,8 @@ node_modules
 *.sln
 *.sw?
 .env
+.env.vercel
+.env.vercel.*
 
 .vercel
 .claude/
