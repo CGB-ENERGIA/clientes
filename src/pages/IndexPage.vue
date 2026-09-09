@@ -534,10 +534,15 @@
               <div class="pg-list">
                 <div v-for="r in registrosCampo" :key="r.id" class="pg-item">
                   <!-- Foto do poste -->
-                  <div class="pg-item-foto" @click="r.foto_url && verFoto(r.foto_url)">
+                  <div
+                    class="pg-item-foto"
+                    :class="{ 'pg-item-foto--clickable': !!r.foto_url }"
+                    @click="r.foto_url && verFoto(r.foto_url)"
+                  >
                     <img v-if="r.foto_url" :src="r.foto_url" class="pg-item-img" alt="foto poste" />
-                    <div v-else class="pg-item-sem-foto">
+                    <div v-else class="pg-item-sem-foto" title="Foto não enviada">
                       <q-icon name="photo_camera" size="18px" />
+                      <span>Sem foto</span>
                     </div>
                   </div>
                   <!-- Dados -->
@@ -1404,8 +1409,9 @@ notasStore.fetchNotas()
   width: 52px; height: 52px; border-radius: 7px;
   overflow: hidden; flex-shrink: 0;
   background: #ffe082;
-  cursor: pointer;
 }
+.pg-item-foto--clickable { cursor: zoom-in; }
+.pg-item-foto--clickable:hover .pg-item-img { opacity: 0.85; }
 .pg-item-img {
   width: 100%; height: 100%; object-fit: cover;
   transition: opacity 0.2s;
@@ -1413,8 +1419,9 @@ notasStore.fetchNotas()
 .pg-item-img:hover { opacity: 0.85; }
 .pg-item-sem-foto {
   width: 100%; height: 100%;
-  display: flex; align-items: center; justify-content: center;
-  color: #e65100; opacity: 0.5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; color: #e65100; opacity: 0.65; font-size: 8px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em;
 }
 
 .pg-item-info { flex: 1; min-width: 0; }

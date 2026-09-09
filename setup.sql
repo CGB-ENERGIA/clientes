@@ -170,6 +170,31 @@ VALUES (
 ON CONFLICT (id) DO UPDATE
   SET public = true, file_size_limit = 52428800;
 
+-- Políticas de storage (PWA campo envia fotos sem login)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'campo_fotos_public_read') THEN
+    CREATE POLICY campo_fotos_public_read ON storage.objects FOR SELECT TO public USING (bucket_id = 'campo-fotos');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'campo_fotos_public_insert') THEN
+    CREATE POLICY campo_fotos_public_insert ON storage.objects FOR INSERT TO public WITH CHECK (bucket_id = 'campo-fotos');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'campo_fotos_public_update') THEN
+    CREATE POLICY campo_fotos_public_update ON storage.objects FOR UPDATE TO public USING (bucket_id = 'campo-fotos');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'medidores_public_insert') THEN
+    CREATE POLICY medidores_public_insert ON storage.objects FOR INSERT TO public WITH CHECK (bucket_id = 'medidores');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'medidores_public_read') THEN
+    CREATE POLICY medidores_public_read ON storage.objects FOR SELECT TO public USING (bucket_id = 'medidores');
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'campo_registros' AND policyname = 'campo_update_anon') THEN
+    CREATE POLICY campo_update_anon ON public.campo_registros FOR UPDATE TO public USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
 -- 8. TABELA CLIENTES (coluna num_medidor e foto_url)
 -- (A tabela é criada pelo apontamento store; adicione as colunas se já existir)
 ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS num_medidor TEXT;

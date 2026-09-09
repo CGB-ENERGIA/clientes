@@ -88,7 +88,9 @@
           <img
             v-if="reg.foto_b64 || reg.foto_url"
             :src="reg.foto_url || reg.foto_b64"
-            class="cp-reg-thumb" alt=""
+            class="cp-reg-thumb"
+            alt="foto do poste"
+            @click="verFoto(reg.foto_url || reg.foto_b64)"
           />
           <div class="cp-reg-thumb cp-reg-thumb--empty" v-else>
             <q-icon name="image_not_supported" size="20px" />
@@ -155,6 +157,18 @@
       </div>
     </Teleport>
 
+    <!-- Visualizador de foto -->
+    <q-dialog v-model="fotoDialog">
+      <q-card style="max-width:95vw;background:#0a1628">
+        <q-card-section class="q-pa-sm">
+          <img :src="fotoDialogUrl" style="max-width:100%;max-height:80vh;display:block;margin:0 auto;border-radius:8px" alt="foto ampliada" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Fechar" color="white" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </div>
 </template>
 
@@ -183,10 +197,12 @@ onMounted(() => {
 })
 
 // ── Estado ──────────────────────────────────────────────────────
-const pg          = ref('')
-const fotoPreview = ref(null)
-const fotoB64     = ref(null)
-const salvando    = ref(false)
+const pg             = ref('')
+const fotoPreview    = ref(null)
+const fotoB64        = ref(null)
+const salvando       = ref(false)
+const fotoDialog     = ref(false)
+const fotoDialogUrl  = ref(null)
 
 // ── Câmera ──────────────────────────────────────────────────────
 const cameraAberta  = ref(false)
@@ -423,6 +439,12 @@ function formatarHora (iso) {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
+function verFoto (url) {
+  if (!url) return
+  fotoDialogUrl.value = url
+  fotoDialog.value = true
+}
+
 onUnmounted(() => {
   fecharCamera()
   window.removeEventListener('online', aoVoltarOnline)
@@ -596,7 +618,7 @@ onUnmounted(() => {
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 14px; padding: 12px 14px;
 }
-.cp-reg-thumb { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.05); }
+.cp-reg-thumb { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.05); cursor: pointer; }
 .cp-reg-thumb--empty { display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.2); }
 .cp-reg-info { flex: 1; min-width: 0; }
 .cp-reg-pg   { font-size: 16px; font-weight: 700; color: #fff; }

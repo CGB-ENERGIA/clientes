@@ -85,10 +85,13 @@ export const useCampoStore = defineStore('campo', () => {
             .from('campo-fotos')
             .upload(nome, blob, { contentType: 'image/jpeg', upsert: true })
 
-          if (!upErr) {
-            const { data: urlData } = supabase.storage.from('campo-fotos').getPublicUrl(nome)
-            foto_url = urlData.publicUrl
+          if (upErr) {
+            console.warn('[Campo] upload foto:', upErr.message)
+            continue
           }
+
+          const { data: urlData } = supabase.storage.from('campo-fotos').getPublicUrl(nome)
+          foto_url = urlData.publicUrl
         }
 
         const { error: dbErr } = await supabase.from('campo_registros').upsert({
@@ -103,6 +106,9 @@ export const useCampoStore = defineStore('campo', () => {
         })
 
         if (!dbErr) {
+          const fotoOk = !r.foto_b64 || !!foto_url
+          if (!fotoOk) continue
+
           fila.value = fila.value.filter(f => f.id !== r.id)
           const local = registros.value.find(l => l.id === r.id)
           if (local) { local.sync = true; local.foto_url = foto_url }
