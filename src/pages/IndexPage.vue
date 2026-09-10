@@ -516,54 +516,107 @@
             </div>
 
             <div v-else>
-              <div class="campo-resumo">
-                <div class="campo-resumo-item">
-                  <span class="campo-resumo-label">Equipes</span>
-                  <span class="campo-resumo-val">{{ equipesUnicas }}</span>
+              <div class="campo-stats-grid">
+                <div class="campo-stat-card">
+                  <div class="campo-stat-icon campo-stat-icon--total">
+                    <q-icon name="electrical_services" size="20px" />
+                  </div>
+                  <div class="campo-stat-body">
+                    <span class="campo-stat-val">{{ campoStats.total }}</span>
+                    <span class="campo-stat-label">Postes registrados</span>
+                  </div>
                 </div>
-                <div class="campo-resumo-item">
-                  <span class="campo-resumo-label">PGs registrados</span>
-                  <span class="campo-resumo-val">{{ registrosCampo.length }}</span>
+                <div class="campo-stat-card">
+                  <div class="campo-stat-icon campo-stat-icon--equipe">
+                    <q-icon name="groups" size="20px" />
+                  </div>
+                  <div class="campo-stat-body">
+                    <span class="campo-stat-val">{{ campoStats.equipes }}</span>
+                    <span class="campo-stat-label">{{ campoStats.equipes === 1 ? 'Equipe' : 'Equipes' }}</span>
+                  </div>
                 </div>
-                <div class="campo-resumo-item">
-                  <span class="campo-resumo-label">Último registro</span>
-                  <span class="campo-resumo-val">{{ formatarData(registrosCampo.at(-1)?.created_at) }}</span>
+                <div class="campo-stat-card">
+                  <div class="campo-stat-icon campo-stat-icon--foto">
+                    <q-icon name="photo_camera" size="20px" />
+                  </div>
+                  <div class="campo-stat-body">
+                    <span class="campo-stat-val">{{ campoStats.comFoto }}/{{ campoStats.total }}</span>
+                    <span class="campo-stat-label">Com foto</span>
+                  </div>
+                </div>
+                <div class="campo-stat-card">
+                  <div class="campo-stat-icon campo-stat-icon--hora">
+                    <q-icon name="schedule" size="20px" />
+                  </div>
+                  <div class="campo-stat-body">
+                    <span class="campo-stat-val campo-stat-val--sm">{{ campoStats.ultimoRegistro }}</span>
+                    <span class="campo-stat-label">Último registro</span>
+                  </div>
                 </div>
               </div>
 
-              <div class="pg-list">
-                <div v-for="r in registrosCampo" :key="r.id" class="pg-item">
-                  <!-- Foto do poste -->
-                  <div
-                    class="pg-item-foto"
-                    :class="{ 'pg-item-foto--clickable': !!r.foto_url }"
-                    @click="r.foto_url && verFoto(r.foto_url)"
-                  >
-                    <img v-if="r.foto_url" :src="r.foto_url" class="pg-item-img" alt="foto poste" />
-                    <div v-else class="pg-item-sem-foto" title="Foto não enviada">
-                      <q-icon name="photo_camera" size="18px" />
-                      <span>Sem foto</span>
-                    </div>
+              <div
+                v-for="grupo in registrosCampoPorEquipe"
+                :key="grupo.equipe"
+                class="campo-equipe-grupo"
+              >
+                <div class="campo-equipe-header">
+                  <div class="campo-equipe-title">
+                    <q-icon name="engineering" size="16px" />
+                    <span>{{ grupo.equipe }}</span>
                   </div>
-                  <!-- Dados -->
-                  <div class="pg-item-info">
-                    <div class="pg-item-pg">
-                      <q-icon name="electrical_services" size="12px" />
-                      {{ r.pg_numero }}
+                  <q-chip dense size="sm" color="orange-2" text-color="orange-10">
+                    {{ grupo.registros.length }} PG{{ grupo.registros.length > 1 ? 's' : '' }}
+                  </q-chip>
+                </div>
+
+                <div class="pg-list">
+                  <div v-for="(r, idx) in grupo.registros" :key="r.id" class="pg-item">
+                    <div class="pg-item-num">{{ idx + 1 }}</div>
+
+                    <div
+                      class="pg-item-foto"
+                      :class="{ 'pg-item-foto--clickable': !!r.foto_url }"
+                      @click="r.foto_url && verFoto(r.foto_url)"
+                    >
+                      <img v-if="r.foto_url" :src="r.foto_url" class="pg-item-img" alt="foto poste" />
+                      <div v-else class="pg-item-sem-foto" title="Foto não enviada">
+                        <q-icon name="hide_image" size="20px" />
+                        <span>Sem foto</span>
+                      </div>
                     </div>
-                    <div class="pg-item-meta">
-                      <span class="pg-item-equipe">{{ r.equipe }}</span>
-                      <span class="pg-item-hora">{{ formatarData(r.created_at) }}</span>
+
+                    <div class="pg-item-info">
+                      <div class="pg-item-pg">
+                        <q-icon name="electrical_services" size="14px" />
+                        PG {{ r.pg_numero }}
+                      </div>
+                      <div class="pg-item-meta">
+                        <span class="pg-item-hora">
+                          <q-icon name="event" size="11px" />
+                          {{ formatarDataCompleta(r.created_at) }}
+                        </span>
+                      </div>
                     </div>
+
+                    <q-btn
+                      v-if="r.foto_url"
+                      flat dense size="sm"
+                      icon="zoom_in"
+                      label="Ver foto"
+                      color="orange-9"
+                      class="pg-item-ver-foto"
+                      @click="verFoto(r.foto_url)"
+                    />
+
+                    <q-btn
+                      flat round dense
+                      icon="delete"
+                      color="negative"
+                      size="sm"
+                      @click="apagarRegistro(r)"
+                    />
                   </div>
-                  <!-- Deletar individual -->
-                  <q-btn
-                    flat round dense
-                    icon="delete"
-                    color="negative"
-                    size="xs"
-                    @click="apagarRegistro(r)"
-                  />
                 </div>
               </div>
             </div>
@@ -907,15 +960,20 @@ async function apagarRegistro (reg) {
 }
 
 async function apagarRegistrosCampo () {
+  const ids = registrosCampo.value.map(r => r.id)
+  if (!ids.length) return
+
   $q.dialog({
     title: 'Apagar todos os registros de campo?',
-    message: `Remove todos os ${registrosCampo.value.length} registros de campo desta nota. Esta ação não pode ser desfeita.`,
+    message: `Remove todos os ${ids.length} registros de campo desta nota. Esta ação não pode ser desfeita.`,
     cancel: true, ok: { label: 'Apagar tudo', color: 'negative' }
   }).onOk(async () => {
-    const { error } = await supabase.from('campo_registros').delete().eq('nota', notaAtiva.value.nota)
+    const { error } = await supabase.from('campo_registros').delete().in('id', ids)
     if (!error) {
       registrosCampo.value = []
       $q.notify({ type: 'positive', message: 'Registros de campo removidos.', position: 'top', timeout: 2000 })
+    } else {
+      $q.notify({ type: 'negative', message: `Erro ao apagar: ${error.message}`, position: 'top', timeout: 3000 })
     }
   })
 }
@@ -954,9 +1012,28 @@ const tentouSalvar     = ref(false)
 
 onUnmounted(() => objectUrls.forEach(u => URL.revokeObjectURL(u)))
 
-const equipesUnicas = computed(() =>
-  [...new Set(registrosCampo.value.map(r => r.equipe).filter(Boolean))].join(', ')
-)
+const campoStats = computed(() => {
+  const regs = registrosCampo.value
+  const ultimo = regs.length
+    ? [...regs].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+    : null
+  return {
+    total: regs.length,
+    comFoto: regs.filter(r => r.foto_url).length,
+    equipes: new Set(regs.map(r => r.equipe).filter(Boolean)).size,
+    ultimoRegistro: ultimo ? formatarData(ultimo.created_at) : '—'
+  }
+})
+
+const registrosCampoPorEquipe = computed(() => {
+  const grupos = {}
+  for (const r of [...registrosCampo.value].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))) {
+    const eq = r.equipe?.trim() || 'Sem equipe'
+    if (!grupos[eq]) grupos[eq] = []
+    grupos[eq].push(r)
+  }
+  return Object.entries(grupos).map(([equipe, registros]) => ({ equipe, registros }))
+})
 const totalAtendidos    = computed(() => clientes.filter(c => c.atendido).length)
 const totalNaoAtendidos = computed(() => clientes.filter(c => !c.atendido).length)
 
@@ -1095,6 +1172,14 @@ async function salvar () {
 function formatarData (iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+function formatarDataCompleta (iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  })
 }
 
 // Carrega ao montar
@@ -1309,10 +1394,52 @@ notasStore.fetchNotas()
 .etapa-section--campo .etapa-label { color: #e65100; }
 
 /* ── Campo resumo ── */
-.campo-resumo { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-.campo-resumo-item { display: flex; flex-direction: column; gap: 2px; }
-.campo-resumo-label { font-size: 10px; font-weight: 700; color: rgba(0,0,0,0.4); text-transform: uppercase; letter-spacing: 0.07em; }
-.campo-resumo-val { font-size: 15px; font-weight: 700; color: #333; }
+.campo-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+@media (min-width: 640px) {
+  .campo-stats-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.campo-stat-card {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border: 1px solid #ffe082;
+  border-radius: 12px; padding: 10px 12px;
+  min-width: 0;
+}
+.campo-stat-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.campo-stat-icon--total  { background: #fff3e0; color: #e65100; }
+.campo-stat-icon--equipe { background: #e3f2fd; color: #1565c0; }
+.campo-stat-icon--foto   { background: #e8f5e9; color: #2e7d32; }
+.campo-stat-icon--hora   { background: #f3e5f5; color: #7b1fa2; }
+.campo-stat-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.campo-stat-val { font-size: 18px; font-weight: 800; color: #1a1a1a; line-height: 1.1; }
+.campo-stat-val--sm { font-size: 13px; font-weight: 700; }
+.campo-stat-label {
+  font-size: 9px; font-weight: 700; color: #888;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.campo-equipe-grupo { margin-bottom: 14px; }
+.campo-equipe-grupo:last-child { margin-bottom: 0; }
+.campo-equipe-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 8px;
+  padding: 6px 10px; background: rgba(255,255,255,0.65);
+  border-radius: 8px; border: 1px solid #ffe082;
+}
+.campo-equipe-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 800; color: #bf360c;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
 
 .campo-vazio, .clientes-vazio {
   display: flex; align-items: center; gap: 8px;
@@ -1397,18 +1524,26 @@ notasStore.fetchNotas()
   white-space: nowrap;
 }
 
-.pg-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.pg-list { display: flex; flex-direction: column; gap: 8px; }
 
 .pg-item {
   display: flex; align-items: center; gap: 10px;
-  background: #fff8e1; border: 1px solid #ffcc02; border-radius: 10px;
-  padding: 6px 10px 6px 6px;
+  background: #fff; border: 1px solid #ffe082; border-radius: 12px;
+  padding: 8px 10px 8px 8px;
+  box-shadow: 0 1px 4px rgba(230, 81, 0, 0.06);
+}
+.pg-item-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #ffe082; color: #e65100;
+  font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
 
 .pg-item-foto {
-  width: 52px; height: 52px; border-radius: 7px;
+  width: 64px; height: 64px; border-radius: 10px;
   overflow: hidden; flex-shrink: 0;
-  background: #ffe082;
+  background: #fff8e1; border: 1px solid #ffe082;
 }
 .pg-item-foto--clickable { cursor: zoom-in; }
 .pg-item-foto--clickable:hover .pg-item-img { opacity: 0.85; }
@@ -1426,15 +1561,15 @@ notasStore.fetchNotas()
 
 .pg-item-info { flex: 1; min-width: 0; }
 .pg-item-pg {
-  display: flex; align-items: center; gap: 4px;
-  font-size: 13px; font-weight: 800; color: #e65100;
+  display: flex; align-items: center; gap: 5px;
+  font-size: 15px; font-weight: 800; color: #e65100;
 }
-.pg-item-meta {
-  display: flex; align-items: center; gap: 8px;
-  margin-top: 2px;
+.pg-item-meta { margin-top: 3px; }
+.pg-item-hora {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: #888; font-weight: 500;
 }
-.pg-item-equipe { font-size: 10px; font-weight: 600; color: #888; }
-.pg-item-hora   { font-size: 10px; color: #bbb; }
+.pg-item-ver-foto { flex-shrink: 0; font-size: 11px !important; }
 
 /* ── Clientes ── */
 .cliente-row {
