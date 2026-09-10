@@ -112,6 +112,33 @@
 
     </div>
 
+    <!-- Banner de fila pendente -->
+    <div v-if="store.fila.length > 0" class="cl-sync-pending">
+      <div class="cl-sync-pending-info">
+        <q-icon
+          :name="store.sincronizando ? 'sync' : 'cloud_upload'"
+          size="20px"
+          :class="{ 'spin': store.sincronizando }"
+        />
+        <div>
+          <div class="cl-sync-pending-title">
+            {{ store.fila.length }} {{ store.fila.length === 1 ? 'registro pendente' : 'registros pendentes' }}
+          </div>
+          <div class="cl-sync-pending-sub">
+            {{ store.online ? (store.sincronizando ? 'Sincronizando…' : 'Aguardando envio') : 'Sem conexão — será enviado quando online' }}
+          </div>
+        </div>
+      </div>
+      <button
+        class="cl-sync-btn"
+        :disabled="!store.online || store.sincronizando"
+        @click="store.sincronizar()"
+      >
+        <q-icon name="sync" size="16px" />
+        Sincronizar
+      </button>
+    </div>
+
     <!-- Rodapé -->
     <div class="cl-footer">© {{ ano }} CGB Energia</div>
   </div>
@@ -453,6 +480,60 @@ onUnmounted(() => {
   -webkit-tap-highlight-color: transparent;
 }
 .cl-btn:active { transform: scale(0.97); box-shadow: 0 2px 12px rgba(21,101,192,0.3); }
+
+/* ── Banner fila pendente ── */
+.cl-sync-pending {
+  max-width: 440px;
+  width: 100%;
+  margin: 0 auto 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(255,152,0,0.1);
+  border: 1px solid rgba(255,152,0,0.3);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.cl-sync-pending-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ffb74d;
+  flex: 1;
+  min-width: 0;
+}
+.cl-sync-pending-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffca28;
+}
+.cl-sync-pending-sub {
+  font-size: 11px;
+  color: rgba(255,183,77,0.7);
+  margin-top: 2px;
+}
+.cl-sync-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,152,0,0.4);
+  background: rgba(255,152,0,0.15);
+  color: #ffb74d;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.cl-sync-btn:hover:not(:disabled) { background: rgba(255,152,0,0.25); }
+.cl-sync-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Footer ── */
 .cl-footer {
