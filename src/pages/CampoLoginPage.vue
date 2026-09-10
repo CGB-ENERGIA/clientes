@@ -100,8 +100,29 @@
           <span class="cl-chip"><span class="cl-chip-label">SAP</span> {{ notaInfo.projeto_info_sap || notaInfo.nota }}</span>
           <span class="cl-chip"><span class="cl-chip-label">BASE</span> {{ notaInfo.base }}</span>
           <span class="cl-chip"><span class="cl-chip-label">PEP</span> {{ notaInfo.pep }}</span>
-          <span class="cl-chip"><span class="cl-chip-label">NOTAS</span> {{ notaInfo.postes }}</span>
+          <span class="cl-chip"><span class="cl-chip-label">POSTES</span> {{ notaInfo.postes }}</span>
         </div>
+      </div>
+
+      <!-- CLIENTE -->
+      <div class="cl-field" v-if="clientesNota.length > 0">
+        <label class="cl-label">Cliente <span class="cl-req">*</span></label>
+        <div class="cl-clientes-list">
+          <button
+            v-for="c in clientesNota"
+            :key="c.conta_contrato || c.nome"
+            class="cl-cliente-item"
+            :class="{ 'cl-cliente-item--ativo': form.cliente?.nome === c.nome }"
+            type="button"
+            @click="selecionarCliente(c)"
+          >
+            <div class="cl-cliente-nome">{{ c.nome }}</div>
+            <div v-if="c.endereco || c.bairro" class="cl-cliente-end">
+              {{ [c.endereco, c.bairro].filter(Boolean).join(', ') }}
+            </div>
+          </button>
+        </div>
+        <span v-if="erros.cliente" class="cl-err">{{ erros.cliente }}</span>
       </div>
 
       <!-- Botão -->
@@ -156,11 +177,12 @@ const notasStore = useNotasStore()
 const ano        = new Date().getFullYear()
 const carregando = ref(false)
 
-const form  = reactive({ equipe: '', nota: '' })
-const erros = reactive({ equipe: '', nota: '' })
+const form  = reactive({ equipe: '', nota: '', cliente: null })
+const erros = reactive({ equipe: '', nota: '', cliente: '' })
 
-const notas       = computed(() => notasStore.notas)
-const notaInfo    = computed(() => notasStore.getNota(form.nota))
+const notas        = computed(() => notasStore.notas)
+const notaInfo     = computed(() => notasStore.getNota(form.nota))
+const clientesNota = computed(() => notaInfo.value?.clientes_planilha ?? [])
 const sincronizando = ref(false)
 const ultimoSync    = ref('')
 let   syncInterval  = null
@@ -193,10 +215,20 @@ function onBusca () {
 
 function selecionarNota (n) {
   form.nota    = n.nota
+  form.cliente = null
+  erros.cliente = ''
   buscaNota.value = `${n.projeto_info_sap || n.nota} — ${n.base}`
   dropdownAberto.value = false
   itemDestacado.value  = -1
   erros.nota = ''
+  // Auto-seleciona se só houver 1 cliente
+  const cls = n.clientes_planilha ?? []
+  if (cls.length === 1) form.cliente = cls[0]
+}
+
+function selecionarCliente (c) {
+  form.cliente  = c
+  erros.cliente = ''
 }
 
 function moverSelecao (dir) {
@@ -228,20 +260,22 @@ function limparBusca () {
 }
 
 function validar () {
-  erros.equipe = form.equipe.trim() ? '' : 'Informe o nome da equipe'
-  erros.nota   = form.nota          ? '' : 'Selecione uma nota de serviço'
-  return !erros.equipe && !erros.nota
+  erros.equipe  = form.equipe.trim() ? '' : 'Informe o nome da equipe'
+  erros.nota    = form.nota          ? '' : 'Selecione uma nota de serviço'
+  erros.cliente = (clientesNota.value.length === 0 || form.cliente) ? '' : 'Selecione o cliente'
+  return !erros.equipe && !erros.nota && !erros.cliente
 }
 
 function iniciar () {
   if (!validar()) return
   const n = notaInfo.value
   store.iniciarSessao({
-    equipe: form.equipe.trim().toUpperCase(),
-    nota:   form.nota,
-    base:   n?.base  ?? '',
-    pep:    n?.pep   ?? '',
-    postes: n?.postes ?? 0
+    equipe:  form.equipe.trim().toUpperCase(),
+    nota:    form.nota,
+    base:    n?.base  ?? '',
+    pep:     n?.pep   ?? '',
+    postes:  n?.postes ?? 0,
+    cliente: form.cliente ?? null
   })
   router.push('/campo/registro')
 }
@@ -480,6 +514,42 @@ onUnmounted(() => {
   -webkit-tap-highlight-color: transparent;
 }
 .cl-btn:active { transform: scale(0.97); box-shadow: 0 2px 12px rgba(21,101,192,0.3); }
+
+/* ── Clientes da nota ── */
+.cl-clientes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cl-cliente-item {
+  width: 100%;
+  text-align: left;
+  padding: 13px 16px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #fff;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cl-cliente-item:active { transform: scale(0.98); }
+.cl-cliente-item--ativo {
+  border-color: #1976d2;
+  background: rgba(25,118,210,0.18);
+  box-shadow: 0 0 0 3px rgba(25,118,210,0.15);
+}
+.cl-cliente-nome {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+.cl-cliente-end {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 3px;
+}
 
 /* ── Banner fila pendente ── */
 .cl-sync-pending {

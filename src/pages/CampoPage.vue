@@ -9,6 +9,7 @@
           <span v-if="store.sessao?.pep">PEP: <strong>{{ store.sessao.pep }}</strong></span>
           <span v-if="store.sessao?.nota">NOTA: <strong>{{ store.sessao.nota }}</strong></span>
           <span>Equipe: <strong>{{ store.sessao?.equipe }}</strong></span>
+          <span v-if="store.sessao?.cliente?.nome">Cliente: <strong>{{ store.sessao.cliente.nome }}</strong></span>
         </div>
       </div>
 
