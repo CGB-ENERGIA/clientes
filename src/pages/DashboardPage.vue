@@ -14,47 +14,49 @@
 
     <div class="row q-col-gutter-sm">
 
-      <!-- Não atendidos -->
+      <!-- Distribuição por status -->
       <div class="col-12 col-md-5">
         <div class="card-modern q-pa-md h-card">
           <div class="section-title">
-            <q-icon name="person_off" size="15px" />
-            Clientes não atendidos
+            <q-icon name="donut_large" size="15px" />
+            Distribuição por Status
           </div>
-
-          <div v-if="naoAtendidos.length === 0" class="empty-state">
-            <q-icon name="check_circle" size="36px" class="text-positive" />
-            <div class="empty-txt">Todos os clientes foram atendidos</div>
+          <div v-if="!notasStore.notas.length" class="empty-state">
+            <q-icon name="cloud_download" size="36px" class="text-grey-4" />
+            <div class="empty-txt">Nenhuma nota importada ainda</div>
           </div>
-
-          <q-scroll-area v-else class="scroll-area-card">
-            <div v-for="(n, i) in naoAtendidos" :key="i" class="nao-item">
-              <div class="nao-avatar"><q-icon name="person_off" size="14px" /></div>
-              <div>
-                <div class="nao-nome">{{ n.cliente }}</div>
-                <div class="nao-motivo">{{ n.motivo }}</div>
-                <div class="nao-ref">{{ n.pep }} · {{ n.nota }} · {{ n.data }}</div>
+          <div v-else class="q-gutter-xs q-mt-sm">
+            <div v-for="s in distStatus" :key="s.val">
+              <div class="row items-center q-mb-xs no-wrap">
+                <span class="status-dot" :style="{ background: s.cor }" />
+                <span class="padrao-lbl">{{ s.label }}</span>
+                <q-space />
+                <span class="stat-txt">{{ s.total }} · {{ s.pct }}%</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" :style="{ width: s.pct + '%', background: s.cor }" />
               </div>
             </div>
-          </q-scroll-area>
+          </div>
         </div>
       </div>
 
-      <!-- Gráficos -->
+      <!-- Top Bases -->
       <div class="col-12 col-md-7">
         <div class="column q-gutter-sm">
 
           <div class="card-modern q-pa-md">
-            <div class="section-title"><q-icon name="bar_chart" size="15px" />Distribuição por Padrão</div>
-            <div v-if="!dados.totalClientes" class="empty-txt-sm">Sem dados ainda</div>
+            <div class="section-title"><q-icon name="location_on" size="15px" />Notas por Base</div>
+            <div v-if="!rankBase.length" class="empty-txt-sm">Sem dados ainda</div>
             <div v-else class="q-gutter-xs">
-              <div v-for="p in distPadrao" :key="p.label">
+              <div v-for="(r, i) in rankBase" :key="i">
                 <div class="row items-center q-mb-xs no-wrap">
-                  <div class="padrao-chip" :style="chipStyle(p.label)">{{ p.label }}</div>
-                  <q-space />
-                  <span class="stat-txt">{{ p.total }} · {{ p.pct }}%</span>
+                  <span class="pep-txt col ellipsis">{{ r.base }}</span>
+                  <span class="stat-txt q-ml-sm">{{ r.total }} nota{{ r.total !== 1 ? 's' : '' }}</span>
                 </div>
-                <div class="progress-track"><div class="progress-fill" :style="{ width: p.pct + '%', background: corHex(p.label) }" /></div>
+                <div class="progress-track">
+                  <div class="progress-fill" :style="{ width: (r.pct * 100) + '%', background: 'var(--accent)' }" />
+                </div>
               </div>
             </div>
           </div>
@@ -68,7 +70,9 @@
                   <span class="pep-txt col ellipsis">{{ r.pep }}</span>
                   <span class="stat-txt q-ml-sm">{{ r.total }}</span>
                 </div>
-                <div class="progress-track"><div class="progress-fill" :style="{ width: (r.pct * 100) + '%', background: 'var(--accent)' }" /></div>
+                <div class="progress-track">
+                  <div class="progress-fill" :style="{ width: (r.pct * 100) + '%', background: '#7b1fa2' }" />
+                </div>
               </div>
             </div>
           </div>
@@ -79,81 +83,88 @@
   </q-page>
 </template>
 
-<script>
-import { defineComponent, computed, onMounted } from 'vue'
-import { useApontamentoStore } from 'stores/apontamento'
+<script setup>
+import { computed, onMounted, ref } from 'vue'
+import { useNotasStore } from 'stores/notas'
+import { supabase } from 'boot/supabase'
 
-export default defineComponent({
-  name: 'DashboardPage',
-  setup: function () {
-    var store = useApontamentoStore()
-    onMounted(function () { if (!store.apontamentos.length) store.fetchApontamentos() })
+const notasStore      = useNotasStore()
+const totalCampo      = ref(0)
 
-    var dados = computed(function () {
-      var lista = store.apontamentos
-      var totalClientes = lista.reduce(function (s, a) { return s + (a.clientes || []).length }, 0)
-      var totalPrevisto = lista.reduce(function (s, a) { return s + (a.qtd_clientes_nota > 0 ? a.qtd_clientes_nota : (a.clientes || []).length) }, 0)
-      var naoCount = 0
-      lista.forEach(function (a) { if (a.todos_atendidos === false && Array.isArray(a.nao_atendidos)) naoCount += a.nao_atendidos.length })
-      var atendidos = Math.max(0, totalPrevisto - naoCount)
-      var aderencia = totalPrevisto > 0 ? Math.max(0, Math.round((atendidos / totalPrevisto) * 100)) : 0
-      return {
-        apontamentos: lista.length,
-        postes: lista.reduce(function (s, a) { return s + (a.postes || 0) }, 0),
-        totalClientes: totalClientes, totalPrevisto: totalPrevisto, atendidos: atendidos, aderencia: aderencia
-      }
-    })
+onMounted(async () => {
+  if (!notasStore.notas.length) await notasStore.fetchNotas()
+  // Conta registros de campo
+  const { count } = await supabase
+    .from('campo_registros')
+    .select('*', { count: 'exact', head: true })
+  totalCampo.value = count ?? 0
+})
 
-    var kpis = computed(function () {
-      var d = dados.value
-      var gradAde = d.aderencia >= 90 ? 'linear-gradient(135deg,#2e7d32,#43a047)' : d.aderencia >= 60 ? 'linear-gradient(135deg,#e65100,#f57c00)' : 'linear-gradient(135deg,#b71c1c,#c62828)'
-      return [
-        { label: 'Apontamentos', value: d.apontamentos, icon: 'assignment', grad: 'background:linear-gradient(135deg,#1565c0,#1976d2)' },
-        { label: 'Total de Postes', value: d.postes, icon: 'electrical_services', grad: 'background:linear-gradient(135deg,#00695c,#00897b)' },
-        { label: 'Total de Clientes', value: d.totalClientes, icon: 'people', grad: 'background:linear-gradient(135deg,#6a1b9a,#8e24aa)' },
-        { label: 'Nível de Aderência', value: d.aderencia + '%', icon: 'track_changes', grad: 'background:' + gradAde, sub: d.atendidos + '/' + d.totalPrevisto + ' previstos' }
-      ]
-    })
+const STATUS_CONFIG = [
+  { val: 'pendente',       label: 'Não Iniciado',   cor: '#9e9e9e' },
+  { val: 'em_andamento',   label: 'Em Andamento',   cor: '#e65100' },
+  { val: 'baixar_medidor', label: 'Baixar Medidor', cor: '#1565c0' },
+  { val: 'concluido',      label: 'Concluído',      cor: '#2e7d32' },
+  { val: 'expurgo',        label: 'Expurgo',        cor: '#b71c1c' },
+  { val: 'sem_acesso',     label: 'Sem Acesso',     cor: '#6a1b9a' },
+]
 
-    var distPadrao = computed(function () {
-      var total = dados.value.totalClientes || 1
-      var mapa = { PP: 0, '5 M': 0, '7 M': 0 }
-      store.apontamentos.forEach(function (a) { (a.clientes || []).forEach(function (c) { if (c.padrao in mapa) mapa[c.padrao]++ }) })
-      return Object.entries(mapa).map(function (e) { return { label: e[0], total: e[1], pct: Math.round((e[1] / total) * 100) } })
-    })
+const totais = computed(() => {
+  const notas   = notasStore.notas
+  const total   = notas.length
+  const postes  = notas.reduce((s, n) => s + (Number(n.postes) || 0), 0)
+  const clientes = notas.reduce((s, n) => s + (Number(n.qtd_clientes) || 0), 0)
+  const concluido = notas.filter(n => n.status === 'concluido').length
+  return { total, postes, clientes, concluido }
+})
 
-    var rankPep = computed(function () {
-      var mapa = {}
-      store.apontamentos.forEach(function (a) { mapa[a.pep] = (mapa[a.pep] || 0) + 1 })
-      var lista = Object.entries(mapa).map(function (e) { return { pep: e[0], total: e[1] } })
-      lista.sort(function (a, b) { return b.total - a.total })
-      lista = lista.slice(0, 8)
-      var max = lista.length ? lista[0].total : 1
-      return lista.map(function (r) { return { pep: r.pep, total: r.total, pct: r.total / max } })
-    })
+const kpis = computed(() => {
+  const { total, postes, clientes, concluido } = totais.value
+  const pctConcluido = total > 0 ? Math.round((concluido / total) * 100) : 0
+  const gradConc = pctConcluido >= 80 ? 'linear-gradient(135deg,#2e7d32,#43a047)'
+    : pctConcluido >= 40 ? 'linear-gradient(135deg,#e65100,#f57c00)'
+    : 'linear-gradient(135deg,#b71c1c,#c62828)'
+  return [
+    { label: 'Total de Notas',       value: total,           icon: 'assignment',          grad: 'background:linear-gradient(135deg,#1565c0,#1976d2)' },
+    { label: 'Postes Previstos',      value: postes,          icon: 'electrical_services', grad: 'background:linear-gradient(135deg,#00695c,#00897b)' },
+    { label: 'Clientes Previstos',    value: clientes,        icon: 'people',              grad: 'background:linear-gradient(135deg,#6a1b9a,#8e24aa)' },
+    { label: 'Concluídas',            value: concluido,       icon: 'check_circle',        grad: 'background:' + gradConc, sub: pctConcluido + '% do total' },
+  ]
+})
 
-    var naoAtendidos = computed(function () {
-      var rows = []
-      store.apontamentos.forEach(function (a) {
-        if (a.todos_atendidos === false && Array.isArray(a.nao_atendidos)) {
-          a.nao_atendidos.forEach(function (n) {
-            rows.push({ data: new Date(a.created_at).toLocaleDateString('pt-BR'), pep: a.pep, nota: a.nota, cliente: n.cliente, motivo: n.motivo })
-          })
-        }
-      })
-      return rows
-    })
+const distStatus = computed(() => {
+  const notas = notasStore.notas
+  const total = notas.length || 1
+  return STATUS_CONFIG.map(s => {
+    const count = notas.filter(n => n.status === s.val).length
+    return { ...s, total: count, pct: Math.round((count / total) * 100) }
+  }).filter(s => s.total > 0)
+})
 
-    function corHex (p) {
-      return p === 'PP' ? '#e64a19' : p === '5 M' ? '#1565c0' : p === '7 M' ? '#7b1fa2' : '#546e7a'
-    }
-    function chipStyle (p) {
-      var c = corHex(p)
-      return { background: c + '20', color: c, fontWeight: 700, fontSize: '11px', padding: '2px 10px', borderRadius: '99px' }
-    }
-
-    return { dados, kpis, distPadrao, rankPep, naoAtendidos, corHex, chipStyle }
+const rankBase = computed(() => {
+  const mapa = {}
+  for (const n of notasStore.notas) {
+    if (n.base) mapa[n.base] = (mapa[n.base] || 0) + 1
   }
+  const lista = Object.entries(mapa)
+    .map(([base, total]) => ({ base, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8)
+  const max = lista[0]?.total || 1
+  return lista.map(r => ({ ...r, pct: r.total / max }))
+})
+
+const rankPep = computed(() => {
+  const mapa = {}
+  for (const n of notasStore.notas) {
+    if (n.pep) mapa[n.pep] = (mapa[n.pep] || 0) + 1
+  }
+  const lista = Object.entries(mapa)
+    .map(([pep, total]) => ({ pep, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8)
+  const max = lista[0]?.total || 1
+  return lista.map(r => ({ ...r, pct: r.total / max }))
 })
 </script>
 
@@ -181,14 +192,9 @@ export default defineComponent({
 .card-modern { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow-sm); }
 .h-card { height:100%; }
 
-/* Não atendidos */
-.scroll-area-card { height: 280px; }
-.nao-item { display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
-.nao-item:last-child { border-bottom:none; }
-.nao-avatar { width:28px; height:28px; border-radius:50%; background:rgba(198,40,40,0.1); color:#c62828; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
-.nao-nome   { font-size:13px; font-weight:600; color:var(--text-primary); }
-.nao-motivo { font-size:11px; color:#c62828; margin-top:2px; }
-.nao-ref    { font-size:10px; color:var(--text-muted); margin-top:2px; }
+/* Status dist */
+.status-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-right:8px; }
+.padrao-lbl { font-size:12px; font-weight:600; color:var(--text-primary); }
 
 /* Progress */
 .progress-track { height:5px; border-radius:99px; background:var(--border); overflow:hidden; }
@@ -200,4 +206,12 @@ export default defineComponent({
 .empty-txt    { font-size:12px; color:var(--text-muted); margin-top:8px; }
 .empty-txt-sm { text-align:center; padding:16px; font-size:12px; color:var(--text-muted); }
 .empty-state  { display:flex; flex-direction:column; align-items:center; padding:32px 0; }
+
+/* Section title */
+.section-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted);
+  margin-bottom: 12px;
+}
 </style>
