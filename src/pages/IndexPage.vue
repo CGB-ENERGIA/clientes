@@ -257,14 +257,6 @@
                 @click.stop="abrirDialog(n)"
               />
               <q-btn
-                v-else-if="n.status === 'ligar_campo'"
-                label="Abrir"
-                icon="cable"
-                color="teal-6"
-                outline dense size="xs"
-                @click.stop="abrirDialog(n)"
-              />
-              <q-btn
                 v-else-if="n.status === 'concluido'"
                 label="Ver"
                 icon="visibility"
@@ -323,11 +315,14 @@
             <template v-else-if="n.status === 'em_andamento'">
               <q-icon name="construction" size="13px" /> Campo em andamento — postes sendo registrados
             </template>
-            <template v-else-if="n.status === 'ligar_campo'">
-              <q-icon name="cable" size="13px" /> Pendente de ligação em campo
-            </template>
             <template v-else-if="n.status === 'baixar_medidor'">
               <q-icon name="speed" size="13px" /> Registre o Nº do medidor e a foto
+            </template>
+            <template v-else-if="n.status === 'expurgo'">
+              <q-icon name="block" size="13px" /> Expurgo — nota não será executada
+            </template>
+            <template v-else-if="n.status === 'sem_acesso'">
+              <q-icon name="do_not_disturb_on" size="13px" /> Equipe sem acesso ao local
             </template>
             <template v-else>
               <q-icon name="check_circle" size="13px" /> Concluído
@@ -352,14 +347,6 @@
               color="blue-7"
               unelevated dense size="sm"
               text-color="white"
-              @click.stop="abrirDialog(n)"
-            />
-            <q-btn
-              v-else-if="n.status === 'ligar_campo'"
-              label="Abrir"
-              icon="cable"
-              color="teal-6"
-              outline dense size="sm"
               @click.stop="abrirDialog(n)"
             />
             <q-btn
@@ -486,10 +473,6 @@
           <q-chip v-if="notaAtiva?.status === 'baixar_medidor'" dense color="blue-1" text-color="blue-9" icon="speed">
             Preencha Nº medidor + foto de cada cliente para concluir
           </q-chip>
-          <q-chip v-if="notaAtiva?.status === 'ligar_campo'" dense color="teal-1" text-color="teal-9" icon="cable">
-            Aguardando ligação em campo
-          </q-chip>
-
           <!-- Alterar status manualmente -->
           <q-space />
           <q-btn-dropdown
@@ -971,7 +954,6 @@ const statusOpcoes = [
 const statusLegenda = [
   { val: 'pendente',       label: 'Não Iniciado',   icon: 'schedule',     color: 'grey-6',   desc: 'Nota importada, mas a equipe de campo ainda não registrou nenhum poste.' },
   { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', color: 'orange',   desc: 'A equipe já começou a registrar os postes (PG + foto) pelo app de campo.' },
-  { val: 'ligar_campo',    label: 'Ligar em Campo', icon: 'cable',        color: 'teal',     desc: 'Aguardando a ligação do cliente em campo.' },
   { val: 'baixar_medidor', label: 'Baixar Medidor', icon: 'speed',        color: 'blue',     desc: 'Cliente ligado em campo. Falta registrar o Nº do medidor e a foto de cada cliente.' },
   { val: 'concluido',      label: 'Concluído',      icon: 'check_circle', color: 'positive', desc: 'Ligado e medidor baixado (ou finalizado no CCS). Nenhuma ação pendente.' },
   { val: 'expurgo',        label: 'Expurgo',        icon: 'block',        color: 'negative', desc: 'Nota marcada como EXPURGO na planilha. Não será executada.' },
@@ -1279,7 +1261,6 @@ notasStore.fetchNotas()
 .stab--active.stab--todas          { border-color: #1976d2; background: #e3f2fd; color: #1565c0; }
 .stab--active.stab--pendente       { border-color: #9e9e9e; background: #f5f5f5; color: #424242; }
 .stab--active.stab--em_andamento   { border-color: #f57c00; background: #fff3e0; color: #e65100; }
-.stab--active.stab--ligar_campo    { border-color: #00796b; background: #e0f2f1; color: #004d40; }
 .stab--active.stab--baixar_medidor { border-color: #1565c0; background: #e3f2fd; color: #0d47a1; }
 .stab--active.stab--concluido      { border-color: #388e3c; background: #e8f5e9; color: #1b5e20; }
 
@@ -1304,7 +1285,6 @@ notasStore.fetchNotas()
 .nota-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
 .nota-card--pendente       { border-left: 4px solid #bdbdbd; }
 .nota-card--em_andamento   { border-left: 4px solid #f57c00; box-shadow: 0 2px 12px rgba(245,124,0,0.1); }
-.nota-card--ligar_campo    { border-left: 4px solid #00897b; box-shadow: 0 2px 12px rgba(0,137,123,0.1); }
 .nota-card--baixar_medidor { border-left: 4px solid #1976d2; box-shadow: 0 2px 12px rgba(25,118,210,0.1); }
 .nota-card--concluido      { border-left: 4px solid #43a047; }
 
@@ -1347,9 +1327,10 @@ notasStore.fetchNotas()
 }
 .nc-msg--pendente       { background: #f5f5f5;  color: #9e9e9e; }
 .nc-msg--em_andamento   { background: #fff8e1;  color: #e65100; }
-.nc-msg--ligar_campo    { background: #e0f2f1;  color: #00695c; }
 .nc-msg--baixar_medidor { background: #e3f2fd;  color: #1565c0; }
 .nc-msg--concluido      { background: #e8f5e9;  color: #2e7d32; }
+.nc-msg--expurgo        { background: #ffebee;  color: #c62828; }
+.nc-msg--sem_acesso     { background: #fbe9e7;  color: #d84315; }
 
 .nc-footer { display: flex; align-items: center; justify-content: flex-end; margin-top: 2px; }
 .nc-hint { font-size: 11px; color: var(--text-muted, #9e9e9e); }
@@ -1411,7 +1392,6 @@ notasStore.fetchNotas()
 .lista-row:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); border-color: #b0bec5; }
 .lista-row--pendente       { border-left: 4px solid #bdbdbd; }
 .lista-row--em_andamento   { border-left: 4px solid #f57c00; }
-.lista-row--ligar_campo    { border-left: 4px solid #00897b; }
 .lista-row--baixar_medidor { border-left: 4px solid #1976d2; }
 .lista-row--concluido      { border-left: 4px solid #43a047; }
 
@@ -1562,7 +1542,6 @@ notasStore.fetchNotas()
 .grupo-item:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.08); border-color: #b39ddb; }
 .grupo-item--em_andamento   { border-left: 4px solid #f57c00; }
 .grupo-item--baixar_medidor { border-left: 4px solid #1976d2; }
-.grupo-item--ligar_campo    { border-left: 4px solid #00897b; }
 .grupo-item--concluido      { border-left: 4px solid #43a047; }
 .grupo-item--pendente       { border-left: 4px solid #bdbdbd; }
 .grupo-item-left { flex: 1; min-width: 0; }
