@@ -19,6 +19,9 @@
           color="grey-6"
           toggle-color="primary"
         />
+        <q-btn icon="map" flat round dense color="primary" @click="mapaAberto = true">
+          <q-tooltip>Abrir mapa das notas ({{ notasFiltradas.length }} no filtro atual)</q-tooltip>
+        </q-btn>
         <q-btn icon="refresh" flat round dense color="grey-6" :loading="notasStore.loading" @click="notasStore.fetchNotas()">
           <q-tooltip>Atualizar notas</q-tooltip>
         </q-btn>
@@ -507,6 +510,8 @@
       </q-card>
     </q-dialog>
 
+    <MapaNotas v-model="mapaAberto" :grupos="notasFiltradas" @abrir="abrirDoMapa" />
+
     <!-- Dialog preview foto medidor -->
     <q-dialog v-model="fotoDialog">
       <q-card style="max-width:95vw">
@@ -939,6 +944,7 @@ import { useQuasar } from 'quasar'
 import { useNotasStore } from 'stores/notas'
 import { useApontamentoStore } from 'stores/apontamento'
 import { supabase } from 'boot/supabase'
+import MapaNotas from 'components/MapaNotas.vue'
 
 const $q         = useQuasar()
 const notasStore = useNotasStore()
@@ -1282,6 +1288,13 @@ const totalAtendidos    = computed(() => clientes.filter(c => c.atendido).length
 const totalNaoAtendidos = computed(() => clientes.filter(c => !c.atendido).length)
 
 // Abre diálogo correto: grupo (múltiplas notas) ou nota individual
+const mapaAberto = ref(false)
+
+function abrirDoMapa (nota) {
+  mapaAberto.value = false
+  abrirNotaDialog(nota)
+}
+
 function abrirDialog (g) {
   if (g._notas && g._notas.length > 1) {
     grupoAtivo.value = g

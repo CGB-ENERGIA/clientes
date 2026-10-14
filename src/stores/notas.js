@@ -89,6 +89,12 @@ export const useNotasStore = defineStore('notas', () => {
 
   // A mesclagem com o que já existe no sistema é feita no banco (função importar_notas),
   // numa única transação: status nunca regridem e notas com trabalho em andamento não são desativadas.
+  function lerCoordenada (v) {
+    if (v === '' || v == null) return null
+    const n = typeof v === 'number' ? v : Number(String(v).trim().replace(',', '.'))
+    return Number.isFinite(n) && n !== 0 ? n : null
+  }
+
   async function importarXlsx (file, { origem = 'upload', exigirBaseBi = false, forcar = false } = {}) {
     importando.value = true
     try {
@@ -155,8 +161,13 @@ export const useNotasStore = defineStore('notas', () => {
               postes:            postesVal || 1,
               qtd_clientes:      0,
               clientes_planilha: [],
-              status_planilha:   statusPlanilha
+              status_planilha:   statusPlanilha,
+              latitude:          lerCoordenada(r['LATITUDE']),
+              longitude:         lerCoordenada(r['LONGITUDE'])
             }
+          } else if (porNota2[nota].latitude == null) {
+            porNota2[nota].latitude  = lerCoordenada(r['LATITUDE'])
+            porNota2[nota].longitude = lerCoordenada(r['LONGITUDE'])
           }
 
           const nome   = String(r['NOME_CLIENTE']   || '').trim()

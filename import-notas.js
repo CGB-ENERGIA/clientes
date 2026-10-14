@@ -88,6 +88,12 @@ const dados = raw.slice(2).map(row => {
 // Agrupa por NOTA (1 linha por NOTA), capturando PROJETO INFO SAP como campo extra
 const porNota = {}
 
+function lerCoordenada (v) {
+  if (v === '' || v == null) return null
+  const n = typeof v === 'number' ? v : Number(String(v).trim().replace(',', '.'))
+  return Number.isFinite(n) && n !== 0 ? n : null
+}
+
 for (const r of dados) {
   const nota = String(r['NOTA'] || '').trim()
   if (!nota || isNaN(Number(nota))) continue
@@ -118,8 +124,13 @@ for (const r of dados) {
       postes:            postesVal || 1,
       qtd_clientes:      0,
       clientes_planilha: [],
-      status_planilha:   statusPlanilha
+      status_planilha:   statusPlanilha,
+      latitude:          lerCoordenada(r['LATITUDE']),
+      longitude:         lerCoordenada(r['LONGITUDE'])
     }
+  } else if (porNota[nota].latitude == null) {
+    porNota[nota].latitude  = lerCoordenada(r['LATITUDE'])
+    porNota[nota].longitude = lerCoordenada(r['LONGITUDE'])
   }
 
   const nome   = String(r['NOME_CLIENTE']   || '').trim()
