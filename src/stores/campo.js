@@ -8,6 +8,18 @@ const EQUIPE_KEY  = 'cgb_campo_equipe'
 const RESUMO_KEY  = 'cgb_campo_resumo'
 const HIST_PREFIX = 'cgb_campo_hist_'
 const PAUSA_KEY   = 'cgb_campo_pausadas'
+const IMPREV_KEY  = 'cgb_campo_imprevistos_fila'
+
+export const MOTIVOS_IMPREVISTO = [
+  'Sem acesso ao local',
+  'Cliente ausente',
+  'Condições climáticas',
+  'Falta de material',
+  'Problema no veículo/equipamento',
+  'Área de risco',
+  'Impedimento de terceiros',
+  'Outro'
+]
 
 function lerJson (key, padrao) { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? padrao } catch { return padrao } }
 function lerFila  () { return lerJson(QUEUE_KEY, []) }
@@ -32,7 +44,7 @@ export const useCampoStore = defineStore('campo', () => {
 
   // Tenta sincronizar fila a cada 30s se online e houver pendências
   setInterval(() => {
-    if (online.value && fila.value.length > 0) sincronizar()
+    if (online.value && (fila.value.length > 0 || filaImprevistos.value.length > 0)) sincronizar()
   }, 30_000)
 
   // Resumo por nota (postes já registrados, equipes, último registro) para retomar trabalho
@@ -130,7 +142,32 @@ export const useCampoStore = defineStore('campo', () => {
   }
 
   // ── Sincronizar fila com Supabase ─────────────────────────────
+  // ── Imprevistos (não execução) ────────────────────────────────
+  const filaImprevistos = ref(lerJson(IMPREV_KEY, []))
+
+  async function reportarImprevisto ({ nota, base, pep, equipe, motivo, observacao }) {
+    filaImprevistos.value.push({
+      id: crypto.randomUUID(),
+      nota, base, pep, equipe, motivo,
+      observacao: observacao || null,
+      created_at: new Date().toISOString()
+    })
+    localStorage.setItem(IMPREV_KEY, JSON.stringify(filaImprevistos.value))
+    if (online.value) await enviarImprevistos()
+    return { enviado: !filaImprevistos.value.length }
+  }
+
+  async function enviarImprevistos () {
+    for (const imp of [...filaImprevistos.value]) {
+      const { error } = await supabase.from('campo_imprevistos').insert(imp)
+      if (error && error.code !== '23505') { console.warn('[Campo] imprevisto:', error.message); continue }
+      filaImprevistos.value = filaImprevistos.value.filter(i => i.id !== imp.id)
+    }
+    localStorage.setItem(IMPREV_KEY, JSON.stringify(filaImprevistos.value))
+  }
+
   async function sincronizar () {
+    if (filaImprevistos.value.length) await enviarImprevistos()
     if (sincronizando.value || fila.value.length === 0) return
     sincronizando.value = true
 
@@ -174,14 +211,7 @@ export const useCampoStore = defineStore('campo', () => {
           const local = registros.value.find(l => l.id === r.id)
           if (local) { local.sync = true; local.foto_url = foto_url }
 
-          // Marca nota como "em andamento" (não rebaixa se já estiver concluída)
-          if (r.nota) {
-            await supabase
-              .from('notas_servico')
-              .update({ status: 'em_andamento' })
-              .eq('nota', r.nota)
-              .neq('status', 'concluido')
-          }
+          if (r.nota) await supabase.rpc('campo_marcar_em_andamento', { p_nota: r.nota })
         }
       } catch (e) {
         console.warn('[Campo] sync error:', e)
@@ -194,7 +224,8 @@ export const useCampoStore = defineStore('campo', () => {
 
   return {
     sessao, registros, fila, online, sincronizando,
-    resumoNotas, ultimaEquipe, carregandoHist, pausadas,
+    resumoNotas, ultimaEquipe, carregandoHist, pausadas, filaImprevistos,
+    reportarImprevisto,
     iniciarSessao, encerrarSessao, pausarSessao, salvarRegistro, sincronizar,
     carregarResumo, carregarRegistrosNota
   }

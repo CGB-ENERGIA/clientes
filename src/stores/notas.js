@@ -22,9 +22,36 @@ export const useNotasStore = defineStore('notas', () => {
   const notasViaPwa = ref(new Set())
   // Notas com Etapa 2 salva como rascunho ("continuar depois")
   const notasComRascunho = ref(new Set())
+  // Imprevistos em aberto reportados pelo PWA, agrupados por nota (mais recente primeiro)
+  const imprevistosAbertos = ref(new Map())
+
+  async function carregarImprevistos () {
+    const { data } = await fetchAll(() => supabase
+      .from('campo_imprevistos')
+      .select('*')
+      .eq('resolvido', false)
+      .order('created_at', { ascending: false })
+      .order('id'))
+    const mapa = new Map()
+    for (const i of (data || [])) {
+      if (!mapa.has(i.nota)) mapa.set(i.nota, [])
+      mapa.get(i.nota).push(i)
+    }
+    imprevistosAbertos.value = mapa
+  }
+
+  async function resolverImprevistos (ids) {
+    const { error } = await supabase
+      .from('campo_imprevistos')
+      .update({ resolvido: true, resolvido_em: new Date().toISOString() })
+      .in('id', ids)
+    if (!error) await carregarImprevistos()
+    return { error }
+  }
 
   async function fetchNotas () {
     loading.value = true
+    carregarImprevistos()
     const [{ data, error }, { data: regs }, { data: rascunhos }] = await Promise.all([
       fetchAll(() => supabase
         .from('notas_servico')
@@ -298,5 +325,5 @@ export const useNotasStore = defineStore('notas', () => {
     return data ?? []
   }
 
-  return { notas, notasViaPwa, notasComRascunho, loading, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo, apagarNotas, removerMarcaApagada }
+  return { notas, notasViaPwa, notasComRascunho, imprevistosAbertos, resolverImprevistos, loading, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo, apagarNotas, removerMarcaApagada }
 })

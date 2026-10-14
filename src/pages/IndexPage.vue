@@ -154,6 +154,21 @@
           <q-tooltip>Exibir apenas notas validadas (oculta Expurgo e Sem Acesso)</q-tooltip>
         </q-btn>
 
+        <q-btn
+          :outline="somenteImprevistos"
+          :flat="!somenteImprevistos"
+          dense
+          :color="somenteImprevistos ? 'deep-orange' : 'grey-6'"
+          size="sm"
+          class="q-px-sm"
+          @click="somenteImprevistos = !somenteImprevistos"
+        >
+          <q-icon name="report_problem" size="14px" class="q-mr-xs" />
+          IMPREVISTOS
+          <span v-if="totalImprevistos" class="q-ml-xs">({{ totalImprevistos }})</span>
+          <q-tooltip>Exibir apenas notas com imprevisto reportado pelo campo</q-tooltip>
+        </q-btn>
+
         <div class="filtros-count text-grey-6 text-caption self-center q-ml-auto">
           {{ notasFiltradas.length }} de {{ notasStore.notas.length }}
         </div>
@@ -240,6 +255,10 @@
           <div class="lista-status">
             <span class="nc-status" :class="'nc-status--' + n.status">
               <span class="nc-status-dot" />{{ labelStatus(n.status) }}
+            </span>
+            <span v-if="n._imprevistos.length" class="badge-imprevisto">
+              <q-icon name="report_problem" size="11px" /> Imprevisto
+              <q-tooltip class="text-body2">{{ resumoImprevisto(n._imprevistos[0]) }}</q-tooltip>
             </span>
             <span v-if="n._rascunho" class="badge-rascunho">
               Rascunho
@@ -332,6 +351,10 @@
               <span class="nc-status" :class="'nc-status--' + n.status">
                 <span class="nc-status-dot" />
                 {{ labelStatus(n.status) }}
+              </span>
+              <span v-if="n._imprevistos.length" class="badge-imprevisto">
+                <q-icon name="report_problem" size="11px" /> Imprevisto
+                <q-tooltip class="text-body2">{{ resumoImprevisto(n._imprevistos[0]) }}</q-tooltip>
               </span>
               <span v-if="n._rascunho" class="badge-rascunho">
                 Rascunho
@@ -560,6 +583,24 @@
 
         <!-- Conteúdo scrollável -->
         <q-card-section class="dialog-scroll">
+
+          <div v-for="imp in imprevistosNotaAtiva" :key="imp.id" class="imprevisto-banner">
+            <q-icon name="report_problem" size="22px" color="deep-orange" />
+            <div class="imprevisto-banner-txt">
+              <div class="imprevisto-banner-title">Imprevisto reportado pelo campo: {{ imp.motivo }}</div>
+              <div v-if="imp.observacao" class="imprevisto-banner-obs">{{ imp.observacao }}</div>
+              <div class="imprevisto-banner-meta">{{ imp.equipe }} · {{ formatarDataCompleta(imp.created_at) }}</div>
+            </div>
+            <q-btn
+              label="Resolvido"
+              icon="check"
+              color="deep-orange"
+              outline dense size="sm"
+              @click="resolverImprevisto(imp)"
+            >
+              <q-tooltip>Marcar imprevisto como resolvido (remove o selo)</q-tooltip>
+            </q-btn>
+          </div>
 
           <!-- ── Seção Campo (Etapa 1) ── -->
           <div class="etapa-section etapa-section--campo">
@@ -908,6 +949,7 @@ function limparFiltros () {
   filtroClientes.value   = null
   filtroStatus.value     = null
   somenteValidadas.value = false
+  somenteImprevistos.value = false
 }
 
 // ── Prioridade de status (menor índice = mais urgente) ───────────
@@ -953,11 +995,28 @@ const todasAgrupadas = computed(() => {
     g._viaPwa   = g._notas.some(n => viaPwa.has(n.nota))
     g._apagada  = g._notas.some(n => n.apagada)
     g._rascunho = g.status !== 'concluido' && g._notas.some(n => notasStore.notasComRascunho.has(n.nota))
+    g._imprevistos = g._notas.flatMap(n => notasStore.imprevistosAbertos.get(n.nota) || [])
   }
   return [...grupos.values()]
 })
 
 const somenteValidadas = ref(false)
+const somenteImprevistos = ref(false)
+const totalImprevistos = computed(() => todasAgrupadas.value.filter(g => g._imprevistos.length).length)
+
+const imprevistosNotaAtiva = computed(() =>
+  notaAtiva.value ? (notasStore.imprevistosAbertos.get(notaAtiva.value.nota) || []) : []
+)
+
+async function resolverImprevisto (imp) {
+  const { error } = await notasStore.resolverImprevistos([imp.id])
+  if (error) $q.notify({ type: 'negative', message: 'Erro ao resolver imprevisto: ' + error.message })
+  else $q.notify({ type: 'positive', message: 'Imprevisto marcado como resolvido.' })
+}
+
+function resumoImprevisto (i) {
+  return `${i.motivo}${i.observacao ? ' — ' + i.observacao : ''} · ${i.equipe} · ${formatarData(i.created_at)}`
+}
 
 // ── Origem dos concluídos: feitos pelo PWA x já concluídos na planilha ─
 const origemConcluidos = ref('todas')
@@ -1005,6 +1064,8 @@ const notasFiltradas = computed(() => {
   if (somenteValidadas.value) {
     lista = lista.filter(g => g.status !== 'expurgo' && g.status !== 'sem_acesso')
   }
+
+  if (somenteImprevistos.value) lista = lista.filter(g => g._imprevistos.length)
 
   const q = filtro.value?.trim().toLowerCase()
   if (q) lista = lista.filter(g =>
@@ -1438,6 +1499,38 @@ notasStore.fetchNotas()
 .stab--active.stab--em_andamento   { border-color: #f57c00; background: #fff3e0; color: #e65100; }
 .stab--active.stab--baixar_medidor { border-color: #1565c0; background: #e3f2fd; color: #0d47a1; }
 .stab--active.stab--concluido      { border-color: #388e3c; background: #e8f5e9; color: #1b5e20; }
+
+/* ── Imprevistos reportados pelo campo ── */
+.badge-imprevisto {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  padding: 1px 8px;
+  border-radius: 20px;
+  background: #fbe9e7;
+  border: 1px solid #ff8a65;
+  color: #d84315;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: default;
+}
+.lista-status .badge-imprevisto { margin-left: 0; }
+.imprevisto-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fbe9e7;
+  border: 1px solid #ffab91;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.imprevisto-banner-txt { flex: 1; min-width: 0; }
+.imprevisto-banner-title { font-weight: 700; color: #bf360c; font-size: 13px; }
+.imprevisto-banner-obs { font-size: 12px; color: #4e342e; margin-top: 2px; }
+.imprevisto-banner-meta { font-size: 11px; color: #8d6e63; margin-top: 2px; }
 
 /* ── Marca de rascunho (Etapa 2 para continuar depois) ── */
 .badge-rascunho {

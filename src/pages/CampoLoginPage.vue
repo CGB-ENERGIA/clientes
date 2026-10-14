@@ -160,10 +160,22 @@
         Iniciar Turno
       </button>
 
+      <button class="cl-btn-imprevisto" type="button" @click="abrirImprevisto">
+        <q-icon name="report_problem" size="18px" />
+        Reportar imprevisto
+      </button>
+
     </div>
 
+    <ImprevistoDialog
+      v-model="imprevistoAberto"
+      :equipe="form.equipe.trim().toUpperCase()"
+      :nota="notaInfo"
+      @enviado="onImprevistoEnviado"
+    />
+
     <!-- Banner de fila pendente -->
-    <div v-if="store.fila.length > 0" class="cl-sync-pending">
+    <div v-if="store.fila.length > 0 || store.filaImprevistos.length > 0" class="cl-sync-pending">
       <div class="cl-sync-pending-info">
         <q-icon
           :name="store.sincronizando ? 'sync' : 'cloud_upload'"
@@ -172,7 +184,13 @@
         />
         <div>
           <div class="cl-sync-pending-title">
-            {{ store.fila.length }} {{ store.fila.length === 1 ? 'registro pendente' : 'registros pendentes' }}
+            <template v-if="store.fila.length">
+              {{ store.fila.length }} {{ store.fila.length === 1 ? 'registro pendente' : 'registros pendentes' }}
+            </template>
+            <template v-if="store.fila.length && store.filaImprevistos.length"> · </template>
+            <template v-if="store.filaImprevistos.length">
+              {{ store.filaImprevistos.length }} {{ store.filaImprevistos.length === 1 ? 'imprevisto' : 'imprevistos' }}
+            </template>
           </div>
           <div class="cl-sync-pending-sub">
             {{ store.online ? (store.sincronizando ? 'Sincronizando…' : 'Aguardando envio') : 'Sem conexão — será enviado quando online' }}
@@ -199,7 +217,10 @@ import { reactive, ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCampoStore } from 'stores/campo'
 import { useNotasStore } from 'stores/notas'
+import { useQuasar } from 'quasar'
+import ImprevistoDialog from 'components/ImprevistoDialog.vue'
 
+const $q         = useQuasar()
 const router     = useRouter()
 const store      = useCampoStore()
 const notasStore = useNotasStore()
@@ -338,6 +359,24 @@ function iniciar () {
     cliente: form.cliente ?? null
   })
   router.push('/campo/registro')
+}
+
+const imprevistoAberto = ref(false)
+
+function abrirImprevisto () {
+  erros.equipe  = form.equipe.trim() ? '' : 'Informe o nome da equipe'
+  erros.nota    = form.nota          ? '' : 'Selecione uma nota de serviço'
+  erros.cliente = ''
+  if (erros.equipe || erros.nota) return
+  imprevistoAberto.value = true
+}
+
+function onImprevistoEnviado ({ enviado }) {
+  $q.notify({
+    type: enviado ? 'positive' : 'warning',
+    message: enviado ? 'Imprevisto registrado.' : 'Sem conexão: o imprevisto será enviado quando houver internet.',
+    position: 'top'
+  })
 }
 
 async function sincronizarNotas (silencioso = false) {
@@ -601,6 +640,19 @@ onUnmounted(() => {
   -webkit-tap-highlight-color: transparent;
 }
 .cl-btn:active { transform: scale(0.97); box-shadow: 0 2px 12px rgba(21,101,192,0.3); }
+
+.cl-btn-imprevisto {
+  width: 100%; padding: 14px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255,152,0,0.45);
+  background: rgba(255,152,0,0.08);
+  color: #ffb74d;
+  font-family: inherit; font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cl-btn-imprevisto:active { transform: scale(0.97); }
 
 /* ── Clientes da nota ── */
 .cl-clientes-list {

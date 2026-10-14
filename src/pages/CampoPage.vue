@@ -128,11 +128,22 @@
 
     <!-- ── RODAPÉ: pausar e retomar outro dia ─────────────────── -->
     <footer v-if="!fotoPreview" class="cp-footer">
+      <button class="cp-btn-imprevisto" @click="imprevistoAberto = true">
+        <q-icon name="report_problem" size="20px" />
+        Imprevisto
+      </button>
       <button class="cp-btn-depois" @click="concluirMaisTarde">
         <q-icon name="schedule" size="20px" />
         Concluir mais tarde
       </button>
     </footer>
+
+    <ImprevistoDialog
+      v-model="imprevistoAberto"
+      :equipe="store.sessao?.equipe"
+      :nota="notaSessao"
+      @enviado="onImprevistoEnviado"
+    />
 
     <!-- ── MODAL CÂMERA ──────────────────────────────────────── -->
     <Teleport to="body">
@@ -201,6 +212,7 @@ import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useCampoStore } from 'stores/campo'
 import { useNotasStore } from 'stores/notas'
+import ImprevistoDialog from 'components/ImprevistoDialog.vue'
 
 const router      = useRouter()
 const $q          = useQuasar()
@@ -458,6 +470,26 @@ async function gravar () {
   } finally {
     salvando.value = false
   }
+}
+
+const imprevistoAberto = ref(false)
+const notaSessao = computed(() => {
+  const s = store.sessao
+  if (!s) return null
+  return notasStore.getNota(s.nota) ?? { nota: s.nota, base: s.base, pep: s.pep }
+})
+
+function onImprevistoEnviado ({ enviado }) {
+  const nota = store.sessao?.nota
+  store.encerrarSessao()
+  $q.notify({
+    type: enviado ? 'positive' : 'warning',
+    message: enviado
+      ? `Imprevisto da nota ${nota} registrado. Turno encerrado.`
+      : `Sem conexão: o imprevisto da nota ${nota} será enviado quando houver internet.`,
+    position: 'top'
+  })
+  router.push('/campo')
 }
 
 function concluirMaisTarde () {
@@ -719,8 +751,22 @@ onUnmounted(() => {
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
   background: linear-gradient(180deg, rgba(6,13,26,0) 0%, #060d1a 35%);
 }
+.cp-footer { display: flex; gap: 10px; }
+.cp-btn-imprevisto {
+  flex: 0 0 auto;
+  padding: 15px 16px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(239,83,80,0.5);
+  background: rgba(239,83,80,0.12);
+  color: #ef9a9a;
+  font-family: inherit; font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cp-btn-imprevisto:active { transform: scale(0.97); }
 .cp-btn-depois {
-  width: 100%;
+  flex: 1;
   padding: 15px;
   border-radius: 14px;
   border: 1.5px solid rgba(255,152,0,0.5);
