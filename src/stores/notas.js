@@ -135,10 +135,14 @@ export const useNotasStore = defineStore('notas', () => {
         // Preserva status existente (concluido e em_andamento nunca regridem)
         const { data: existentes } = await fetchAll(() => supabase
           .from('notas_servico')
-          .select('nota, status')
+          .select('nota, status, apagada')
           .order('nota'))
         const statusMap = {}
-        for (const e of (existentes || [])) statusMap[e.nota] = e.status
+        const apagadas  = new Set()
+        for (const e of (existentes || [])) {
+          statusMap[e.nota] = e.status
+          if (e.apagada) apagadas.add(e.nota)
+        }
 
         records = Object.values(porNota2).map(r => {
           const statusPlanilha = r._statusPlanilha
@@ -147,6 +151,8 @@ export const useNotasStore = defineStore('notas', () => {
           let status
           if (statusPlanilha === 'expurgo' || statusPlanilha === 'sem_acesso') {
             status = statusPlanilha
+          } else if (apagadas.has(r.nota) && statusPlanilha === 'concluido') {
+            status = statusAtual
           } else if (statusAtual === 'concluido') {
             status = 'concluido'
           } else if (statusAtual === 'em_andamento' && statusPlanilha !== 'concluido') {
@@ -235,6 +241,45 @@ export const useNotasStore = defineStore('notas', () => {
     return { error }
   }
 
+  // Remove o trabalho feito na ferramenta e devolve as notas para "Não Iniciado"
+  async function apagarNotas (lista) {
+    const { data: aps, error: e1 } = await supabase.from('apontamentos').select('id').in('nota', lista)
+    if (e1) return { error: e1 }
+    const ids = (aps || []).map(a => a.id)
+    if (ids.length) {
+      const { error: e2 } = await supabase.from('clientes').delete().in('apontamento_id', ids)
+      if (e2) return { error: e2 }
+      const { error: e3 } = await supabase.from('apontamentos').delete().in('id', ids)
+      if (e3) return { error: e3 }
+    }
+    const { error: e4 } = await supabase.from('campo_registros').delete().in('nota', lista)
+    if (e4) return { error: e4 }
+
+    const apagada_em = new Date().toISOString()
+    const { error } = await supabase
+      .from('notas_servico')
+      .update({ status: 'pendente', apagada: true, apagada_em })
+      .in('nota', lista)
+    if (error) return { error }
+
+    const set = new Set(lista)
+    notas.value.forEach(n => { if (set.has(n.nota)) Object.assign(n, { status: 'pendente', apagada: true, apagada_em }) })
+    notasViaPwa.value = new Set([...notasViaPwa.value].filter(n => !set.has(n)))
+    return { error: null }
+  }
+
+  async function removerMarcaApagada (lista) {
+    const { error } = await supabase
+      .from('notas_servico')
+      .update({ apagada: false, apagada_em: null })
+      .in('nota', lista)
+    if (!error) {
+      const set = new Set(lista)
+      notas.value.forEach(n => { if (set.has(n.nota)) Object.assign(n, { apagada: false, apagada_em: null }) })
+    }
+    return { error }
+  }
+
   async function buscarRegistrosCampo (nota) {
     const { data } = await supabase
       .from('campo_registros')
@@ -244,5 +289,5 @@ export const useNotasStore = defineStore('notas', () => {
     return data ?? []
   }
 
-  return { notas, notasViaPwa, loading, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo }
+  return { notas, notasViaPwa, loading, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo, apagarNotas, removerMarcaApagada }
 })

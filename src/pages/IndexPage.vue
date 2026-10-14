@@ -241,6 +241,12 @@
             <span class="nc-status" :class="'nc-status--' + n.status">
               <span class="nc-status-dot" />{{ labelStatus(n.status) }}
             </span>
+            <span v-if="n._apagada" class="badge-apagada">
+              Apagada
+              <q-icon name="close" size="11px" class="badge-apagada-x" @click.stop="removerBadge(n)">
+                <q-tooltip>Remover marca "Apagada"</q-tooltip>
+              </q-icon>
+            </span>
           </div>
           <div class="lista-acao">
             <!-- Grupo com múltiplas notas -->
@@ -289,6 +295,15 @@
                 @click.stop="abrirDialog(n)"
               />
             </template>
+            <q-btn
+              v-if="n.status === 'concluido'"
+              icon="delete_outline"
+              color="negative"
+              flat round dense size="sm"
+              @click.stop="confirmarApagar(n)"
+            >
+              <q-tooltip>Apagar e devolver para Não Iniciado</q-tooltip>
+            </q-btn>
           </div>
         </div>
       </div>
@@ -313,6 +328,12 @@
               <span class="nc-status" :class="'nc-status--' + n.status">
                 <span class="nc-status-dot" />
                 {{ labelStatus(n.status) }}
+              </span>
+              <span v-if="n._apagada" class="badge-apagada">
+                Apagada
+                <q-icon name="close" size="11px" class="badge-apagada-x" @click.stop="removerBadge(n)">
+                  <q-tooltip>Remover marca "Apagada"</q-tooltip>
+                </q-icon>
               </span>
             </div>
           </div>
@@ -375,6 +396,16 @@
               @click.stop="abrirDialog(n)"
             />
             <span v-else class="nc-hint">Não iniciado</span>
+            <q-btn
+              v-if="n.status === 'concluido'"
+              icon="delete_outline"
+              color="negative"
+              flat round dense size="sm"
+              class="q-ml-auto"
+              @click.stop="confirmarApagar(n)"
+            >
+              <q-tooltip>Apagar e devolver para Não Iniciado</q-tooltip>
+            </q-btn>
           </div>
         </div>
       </div>
@@ -894,7 +925,10 @@ const todasAgrupadas = computed(() => {
     }
   }
   const viaPwa = notasStore.notasViaPwa
-  for (const g of grupos.values()) g._viaPwa = g._notas.some(n => viaPwa.has(n.nota))
+  for (const g of grupos.values()) {
+    g._viaPwa   = g._notas.some(n => viaPwa.has(n.nota))
+    g._apagada  = g._notas.some(n => n.apagada)
+  }
   return [...grupos.values()]
 })
 
@@ -1214,6 +1248,33 @@ function verFoto (url) {
 }
 function removerCliente (i) { clientes.splice(i, 1) }
 
+function confirmarApagar (g) {
+  const lista = g._notas.map(n => n.nota)
+  const alvo  = lista.length > 1 ? `as ${lista.length} notas do projeto ${g.projeto_info_sap}` : `a nota ${lista[0]}`
+  $q.dialog({
+    title: 'Apagar nota concluída',
+    message: `Isto vai apagar ${alvo}: postes registrados em campo, clientes, números de medidor e fotos. ` +
+             'Ela voltará para "Não Iniciado" com a marca "Apagada". Esta ação não pode ser desfeita.',
+    cancel: { label: 'Cancelar', flat: true, color: 'grey-7' },
+    ok: { label: 'Apagar', color: 'negative', unelevated: true },
+    persistent: true
+  }).onOk(async () => {
+    const { error } = await notasStore.apagarNotas(lista)
+    if (error) {
+      $q.notify({ type: 'negative', message: 'Erro ao apagar: ' + error.message })
+      return
+    }
+    apStore.fetchApontamentos()
+    $q.notify({ type: 'positive', message: lista.length > 1 ? 'Notas apagadas.' : `Nota ${lista[0]} apagada.`, icon: 'delete' })
+  })
+}
+
+async function removerBadge (g) {
+  const lista = g._notas.filter(n => n.apagada).map(n => n.nota)
+  const { error } = await notasStore.removerMarcaApagada(lista)
+  if (error) $q.notify({ type: 'negative', message: 'Erro ao remover marca: ' + error.message })
+}
+
 async function salvar () {
   const n = notaAtiva.value
 
@@ -1338,6 +1399,27 @@ notasStore.fetchNotas()
 .stab--active.stab--em_andamento   { border-color: #f57c00; background: #fff3e0; color: #e65100; }
 .stab--active.stab--baixar_medidor { border-color: #1565c0; background: #e3f2fd; color: #0d47a1; }
 .stab--active.stab--concluido      { border-color: #388e3c; background: #e8f5e9; color: #1b5e20; }
+
+/* ── Marca de nota apagada ── */
+.badge-apagada {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  padding: 1px 4px 1px 8px;
+  border-radius: 20px;
+  background: #e53935;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge-apagada-x {
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 1px;
+}
+.badge-apagada-x:hover { background: rgba(255,255,255,0.3); }
 
 /* ── Sub-abas de origem dos concluídos ── */
 .origem-tabs {
@@ -1470,7 +1552,7 @@ notasStore.fetchNotas()
 }
 .lista-header {
   display: grid;
-  grid-template-columns: 130px 110px 220px 150px 1fr 90px 130px 90px;
+  grid-template-columns: 130px 110px 220px 150px 1fr 90px 130px 110px;
   gap: 12px;
   padding: 6px 16px;
   font-size: 10px;
@@ -1493,7 +1575,7 @@ notasStore.fetchNotas()
 .body--dark .lista-header { color: #b0bec5; border-bottom-color: rgba(255,255,255,0.15); }
 .lista-row {
   display: grid;
-  grid-template-columns: 130px 110px 220px 150px 1fr 90px 130px 90px;
+  grid-template-columns: 130px 110px 220px 150px 1fr 90px 130px 110px;
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
@@ -1519,8 +1601,9 @@ notasStore.fetchNotas()
 .info-destaque { font-weight: 800; }
 .info-destaque--poste  { background: #fff3e0; color: #e65100; box-shadow: 0 0 6px rgba(230,81,0,0.35); }
 .info-destaque--cliente { background: #e8f5e9; color: #2e7d32; box-shadow: 0 0 6px rgba(46,125,50,0.3); }
-.lista-status { display: flex; justify-content: center; }
-.lista-acao { display: flex; justify-content: center; }
+.lista-status { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; }
+.lista-status .badge-apagada { margin-left: 0; }
+.lista-acao { display: flex; justify-content: center; align-items: center; gap: 2px; }
 
 @media (max-width: 700px) {
   .lista-row {
