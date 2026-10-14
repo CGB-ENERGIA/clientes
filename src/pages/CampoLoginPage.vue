@@ -232,11 +232,20 @@ const resumoPorNota = computed(() => new Map(store.resumoNotas.map(r => [r.nota,
 
 const emAndamento = computed(() => {
   const equipe = form.equipe.trim().toUpperCase()
+  const pausadas = new Map(store.pausadas.map(p => [p.nota, p]))
+  const pendentes = {}
+  for (const r of store.fila) pendentes[r.nota] = (pendentes[r.nota] || 0) + 1
   return notas.value
-    .filter(n => resumoPorNota.value.has(n.nota) && !['concluido', 'expurgo', 'sem_acesso'].includes(n.status))
+    .filter(n => (resumoPorNota.value.has(n.nota) || pausadas.has(n.nota) || pendentes[n.nota]) &&
+                 !['concluido', 'expurgo', 'sem_acesso'].includes(n.status))
     .map(n => {
       const r = resumoPorNota.value.get(n.nota)
-      return { nota: n, total: Number(r.total), ultimo: r.ultimo, equipes: r.equipes || [], daEquipe: !!equipe && (r.equipes || []).includes(equipe) }
+      const p = pausadas.get(n.nota)
+      const equipes = [...new Set([...(r?.equipes || []), ...(p ? [p.equipe] : [])])]
+      const enviados = Number(r?.total || 0)
+      const total = Math.max(enviados + (pendentes[n.nota] || 0), p?.registrados || 0)
+      const ultimo = [r?.ultimo, p?.em].filter(Boolean).sort().pop()
+      return { nota: n, total, ultimo, equipes, daEquipe: !!equipe && equipes.includes(equipe) }
     })
     .sort((a, b) => (b.daEquipe - a.daEquipe) || b.ultimo.localeCompare(a.ultimo))
     .slice(0, 6)

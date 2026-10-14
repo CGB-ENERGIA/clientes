@@ -126,6 +126,14 @@
       </template>
     </div>
 
+    <!-- ── RODAPÉ: pausar e retomar outro dia ─────────────────── -->
+    <footer v-if="!fotoPreview" class="cp-footer">
+      <button class="cp-btn-depois" @click="concluirMaisTarde">
+        <q-icon name="schedule" size="20px" />
+        Concluir mais tarde
+      </button>
+    </footer>
+
     <!-- ── MODAL CÂMERA ──────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="cameraAberta" class="cam-overlay">
@@ -452,6 +460,29 @@ async function gravar () {
   }
 }
 
+function concluirMaisTarde () {
+  const total = store.registros.length
+  const pend  = store.fila.filter(r => r.nota === store.sessao?.nota).length
+  const resumo = `${total} ${total === 1 ? 'poste registrado' : 'postes registrados'}` +
+    (postesPrevistos.value ? ` de ${postesPrevistos.value} previstos` : '') + '.'
+  const aviso = pend
+    ? ` ${pend} ainda ${pend === 1 ? 'aguarda' : 'aguardam'} envio e ${pend === 1 ? 'será enviado' : 'serão enviados'} quando houver internet — não desinstale o app.`
+    : ''
+  $q.dialog({
+    title: 'Concluir mais tarde?',
+    message: `${resumo}${aviso} Para continuar, escolha esta nota em "Continuar de onde parou".`,
+    cancel: { label: 'Voltar', flat: true },
+    ok: { label: 'Pausar turno', color: 'warning', unelevated: true }
+  }).onOk(async () => {
+    if (store.online && store.fila.length) await store.sincronizar()
+    const nota = store.sessao?.nota
+    store.pausarSessao()
+    store.carregarResumo()
+    $q.notify({ type: 'info', message: `Nota ${nota} pausada. Continue quando quiser.`, icon: 'schedule', position: 'top' })
+    router.push('/campo')
+  })
+}
+
 function encerrar () {
   $q.dialog({
     title: 'Encerrar turno?',
@@ -679,6 +710,29 @@ onUnmounted(() => {
 .cp-reg-status { flex-shrink: 0; }
 .cp-reg-status--ok   { color: #00c853; }
 .cp-reg-status--pend { color: #ff9800; }
+
+/* Rodapé */
+.cp-footer {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(6,13,26,0) 0%, #060d1a 35%);
+}
+.cp-btn-depois {
+  width: 100%;
+  padding: 15px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255,152,0,0.5);
+  background: rgba(255,152,0,0.12);
+  color: #ffb74d;
+  font-family: inherit; font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s, background 0.15s;
+}
+.cp-btn-depois:active { transform: scale(0.97); background: rgba(255,152,0,0.22); }
 
 /* Empty */
 .cp-empty {

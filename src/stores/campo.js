@@ -7,6 +7,7 @@ const SESSAO_KEY  = 'cgb_campo_sessao'
 const EQUIPE_KEY  = 'cgb_campo_equipe'
 const RESUMO_KEY  = 'cgb_campo_resumo'
 const HIST_PREFIX = 'cgb_campo_hist_'
+const PAUSA_KEY   = 'cgb_campo_pausadas'
 
 function lerJson (key, padrao) { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? padrao } catch { return padrao } }
 function lerFila  () { return lerJson(QUEUE_KEY, []) }
@@ -80,6 +81,21 @@ export const useCampoStore = defineStore('campo', () => {
       ...daSessao,
       ...remotos.filter(r => !vistos.has(r.id)).map(r => ({ ...r, nota, sync: true }))
     ].sort((a, b) => b.created_at.localeCompare(a.created_at))
+  }
+
+  // Notas pausadas neste aparelho com "Concluir mais tarde"
+  const pausadas = ref(lerJson(PAUSA_KEY, []))
+
+  function pausarSessao () {
+    const s = sessao.value
+    if (!s) return
+    const registrados = registros.value.length
+    pausadas.value = [
+      { nota: s.nota, equipe: s.equipe, em: new Date().toISOString(), registrados },
+      ...pausadas.value.filter(p => p.nota !== s.nota)
+    ].slice(0, 20)
+    localStorage.setItem(PAUSA_KEY, JSON.stringify(pausadas.value))
+    encerrarSessao()
   }
 
   function encerrarSessao () {
@@ -178,8 +194,8 @@ export const useCampoStore = defineStore('campo', () => {
 
   return {
     sessao, registros, fila, online, sincronizando,
-    resumoNotas, ultimaEquipe, carregandoHist,
-    iniciarSessao, encerrarSessao, salvarRegistro, sincronizar,
+    resumoNotas, ultimaEquipe, carregandoHist, pausadas,
+    iniciarSessao, encerrarSessao, pausarSessao, salvarRegistro, sincronizar,
     carregarResumo, carregarRegistrosNota
   }
 })
