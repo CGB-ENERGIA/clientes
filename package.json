@@ -18,6 +18,9 @@
   "dependencies": {
     "@quasar/extras": "^1.16.12",
     "@supabase/supabase-js": "^2.43.0",
+    "@turf/boolean-point-in-polygon": "^7.4.0",
+    "@turf/helpers": "^7.4.0",
+    "@turf/union": "^7.4.0",
     "gsap": "^3.15.0",
     "leaflet": "^1.9.4",
     "pinia": "^2.1.7",

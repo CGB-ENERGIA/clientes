@@ -32,6 +32,32 @@
           <template #prepend><q-icon name="search" /></template>
         </q-input>
 
+        <q-select
+          v-model="filtroBase"
+          :options="basesOpcoes"
+          dense outlined clearable
+          label="Base"
+          class="mapa-filtro"
+          options-dense
+        >
+          <template #prepend><q-icon name="business" size="18px" /></template>
+        </q-select>
+        <q-select
+          v-model="filtroMunicipio"
+          :options="municipiosOpcoesFiltradas"
+          dense outlined clearable
+          use-input input-debounce="0"
+          label="Município"
+          class="mapa-filtro mapa-filtro--mun"
+          options-dense
+          @filter="filtrarMunicipios"
+        >
+          <template #prepend><q-icon name="location_city" size="18px" /></template>
+          <template #no-option>
+            <q-item><q-item-section class="text-grey">Nenhum município</q-item-section></q-item>
+          </template>
+        </q-select>
+
         <div class="mapa-legenda">
           <button
             v-for="s in statusVisiveis"
@@ -67,6 +93,16 @@
       <div v-if="erroGps" class="mapa-offline">
         <q-icon name="location_disabled" size="16px" /> {{ erroGps }}
       </div>
+      <div v-if="avisoArea" class="mapa-offline">
+        <q-icon name="info" size="16px" /> {{ avisoArea }}
+      </div>
+      <div v-if="areaAtual" class="mapa-area">
+        <q-icon :name="filtroMunicipio ? 'location_city' : 'business'" size="18px" />
+        <div>
+          <b>{{ areaAtual.titulo }}</b>
+          <span>{{ areaAtual.sub }}</span>
+        </div>
+      </div>
 
       <div ref="mapaEl" class="mapa-el" />
     </q-card>
@@ -78,6 +114,8 @@ import { ref, computed, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { urlGoogleMaps, urlWaze, distanciaKm, formatarDistancia } from 'src/utils/rota'
+import { chaveMunicipio, limitesDe } from 'src/utils/limites'
+import { booleanPointInPolygon } from '@turf/boolean-point-in-polygon'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -87,7 +125,8 @@ const props = defineProps({
   // Nota a destacar ao abrir (centraliza e abre o popup)
   foco: { type: String, default: null },
   rotuloAbrir: { type: String, default: 'Abrir nota' },
-  permitirAbrir: { type: Boolean, default: true }
+  permitirAbrir: { type: Boolean, default: true },
+  baseInicial: { type: String, default: null }
 })
 const emit = defineEmits(['update:modelValue', 'abrir'])
 
@@ -124,15 +163,156 @@ const todasNotas = computed(() => props.grupos.flatMap(g => g._notas?.length ? g
 const comCoordenada = computed(() => todasNotas.value.filter(n => Number.isFinite(n.latitude) && Number.isFinite(n.longitude)))
 const semCoordenada = computed(() => todasNotas.value.filter(n => !Number.isFinite(n.latitude) || !Number.isFinite(n.longitude)))
 
+// ── Filtro por área (base / município) ───────────────────────────
+const filtroBase      = ref(null)
+const filtroMunicipio = ref(null)
+const avisoArea       = ref('')
+const areaAtual       = ref(null)
+const buscaMunicipio  = ref('')
+let camadaArea = null
+let geracaoArea = 0
+
+const basesOpcoes = computed(() =>
+  [...new Set(todasNotas.value.map(n => n.base).filter(Boolean))].sort()
+)
+const municipiosOpcoes = computed(() =>
+  [...new Set(todasNotas.value
+    .filter(n => !filtroBase.value || n.base === filtroBase.value)
+    .map(n => n.municipio).filter(Boolean))].sort()
+)
+const municipiosOpcoesFiltradas = computed(() => {
+  const q = chaveMunicipio(buscaMunicipio.value)
+  return q ? municipiosOpcoes.value.filter(m => chaveMunicipio(m).includes(q)) : municipiosOpcoes.value
+})
+function filtrarMunicipios (val, update) {
+  update(() => { buscaMunicipio.value = val })
+}
+
+const notasDaArea = computed(() => comCoordenada.value.filter(n =>
+  (!filtroBase.value || n.base === filtroBase.value) &&
+  (!filtroMunicipio.value || chaveMunicipio(n.municipio) === chaveMunicipio(filtroMunicipio.value))
+))
+
 const contagem = computed(() => {
   const c = {}
-  for (const n of comCoordenada.value) c[n.status] = (c[n.status] || 0) + 1
+  for (const n of notasDaArea.value) c[n.status] = (c[n.status] || 0) + 1
   return c
 })
 
 const statusVisiveis = computed(() => STATUS.filter(s => contagem.value[s.val] || ocultos.value.has(s.val)))
 
-const notasNoMapa = computed(() => comCoordenada.value.filter(n => !ocultos.value.has(n.status)))
+const notasNoMapa = computed(() => notasDaArea.value.filter(n => !ocultos.value.has(n.status)))
+
+function resumoArea (notas) {
+  const abertas = notas.filter(n => ['pendente', 'em_andamento', 'baixar_medidor'].includes(n.status)).length
+  return `${notas.length} ${notas.length === 1 ? 'nota' : 'notas'} · ${abertas} em aberto`
+}
+
+function limparArea () {
+  camadaArea?.remove()
+  camadaArea = null
+  areaAtual.value = null
+  avisoArea.value = ''
+}
+
+async function desenharArea () {
+  const geracao = ++geracaoArea
+  limparArea()
+  if (!mapa || (!filtroBase.value && !filtroMunicipio.value)) return
+
+  const municipios = filtroMunicipio.value
+    ? [filtroMunicipio.value]
+    : todasNotas.value.filter(n => n.base === filtroBase.value).map(n => n.municipio)
+
+  let res
+  try {
+    res = await limitesDe(municipios)
+  } catch {
+    if (geracao === geracaoArea) avisoArea.value = 'Não foi possível carregar os limites dos municípios.'
+    return
+  }
+  if (geracao !== geracaoArea || !mapa) return
+
+  const titulo = filtroMunicipio.value
+    ? filtroMunicipio.value
+    : `Base ${filtroBase.value}`
+  const sub = filtroMunicipio.value
+    ? resumoArea(notasDaArea.value)
+    : `${res.features.length} municípios · ${resumoArea(notasDaArea.value)}`
+  areaAtual.value = { titulo, sub }
+
+  if (res.naoEncontrados.length) {
+    avisoArea.value = `Sem limite oficial para: ${res.naoEncontrados.join(', ')}.`
+  }
+  if (!res.features.length) return
+
+  camadaArea = L.layerGroup().addTo(mapa)
+
+  // Escurece tudo fora da área: retângulo do mundo com "furos" nos polígonos da área
+  const contorno = res.contorno ?? res.features[0]
+  const poligonos = contorno.geometry.type === 'MultiPolygon'
+    ? contorno.geometry.coordinates
+    : [contorno.geometry.coordinates]
+  const furos = poligonos.map(p => p[0].map(([lng, lat]) => [lat, lng]))
+  L.polygon([[[-89, -179], [-89, 179], [89, 179], [89, -179]], ...furos], {
+    pane: 'mascara', stroke: false, fillColor: '#0a1628', fillOpacity: 0.35, interactive: false
+  }).addTo(camadaArea)
+
+  // Divisas internas dos municípios da base; o clique é tratado em aoClicarMapa
+  municipiosDaArea = []
+  if (!filtroMunicipio.value && res.features.length > 1) {
+    municipiosDaArea = res.features
+    L.geoJSON(featureCollectionDe(res.features), {
+      pane: 'contorno',
+      interactive: false,
+      style: { color: '#1565c0', weight: 1, opacity: 0.7, dashArray: '4 4', fillColor: '#1565c0', fillOpacity: 0.03 }
+    }).addTo(camadaArea)
+    for (const f of res.features) {
+      const centro = L.geoJSON(f).getBounds().getCenter()
+      L.tooltip({ permanent: true, direction: 'center', className: 'mapa-mun-label', pane: 'rotulos' })
+        .setLatLng(centro).setContent(f.properties.nome).addTo(camadaArea)
+    }
+  }
+
+  const linha = L.geoJSON(contorno, {
+    pane: 'contorno',
+    interactive: false,
+    style: { color: '#0d47a1', weight: 3.5, opacity: 0.95, fill: false }
+  }).addTo(camadaArea)
+
+  // A faixa com o nome da área muda a altura do mapa: recalcula antes de enquadrar
+  await nextTick()
+  if (!mapa) return
+  mapa.invalidateSize()
+  mapa.fitBounds(linha.getBounds(), { padding: [24, 24] })
+  atualizarRotulos()
+}
+
+function atualizarRotulos () {
+  const pane = mapa?.getPane('rotulos')
+  if (pane) pane.style.display = mapa.getZoom() >= 9 ? '' : 'none'
+}
+
+function featureCollectionDe (features) {
+  return { type: 'FeatureCollection', features }
+}
+
+let municipiosDaArea = []
+
+function aoClicarMapa (e) {
+  if (!municipiosDaArea.length) return
+  const ponto = [e.latlng.lng, e.latlng.lat]
+  const f = municipiosDaArea.find(m => booleanPointInPolygon(ponto, m))
+  if (!f) return
+  const alvo = municipiosOpcoes.value.find(m => chaveMunicipio(m) === chaveMunicipio(f.properties.nome))
+  if (alvo) filtroMunicipio.value = alvo
+}
+
+watch(filtroBase, () => {
+  if (filtroMunicipio.value && !municipiosOpcoes.value.includes(filtroMunicipio.value)) filtroMunicipio.value = null
+  else desenharArea()
+})
+watch(filtroMunicipio, () => desenharArea())
 
 function alternarStatus (s) {
   const novo = new Set(ocultos.value)
@@ -294,7 +474,7 @@ function desenharMarcadores () {
 async function montarMapa () {
   await nextTick()
   if (mapa || !mapaEl.value) return
-  mapa = L.map(mapaEl.value, { preferCanvas: true, zoomControl: true }).setView([-4.5, -44.8], 7)
+  mapa = L.map(mapaEl.value, { preferCanvas: true, zoomControl: true, zoomSnap: 0.25 }).setView([-4.5, -44.8], 7)
   camadasBase = {
     ruas: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, attribution: '&copy; OpenStreetMap'
@@ -304,7 +484,13 @@ async function montarMapa () {
     })
   }
   camadasBase[camada.value].addTo(mapa)
+  // Área filtrada fica abaixo dos pontos das notas (overlayPane = 400)
+  mapa.createPane('mascara').style.zIndex = 350
+  mapa.createPane('contorno').style.zIndex = 360
+  mapa.createPane('rotulos').style.zIndex = 370
   camadaMarcadores = L.layerGroup().addTo(mapa)
+  mapa.on('click', aoClicarMapa)
+  mapa.on('zoomend', atualizarRotulos)
 
   mapa.on('popupopen', e => {
     e.popup.getElement()?.querySelectorAll('[data-abrir]').forEach(btn => {
@@ -318,6 +504,8 @@ async function montarMapa () {
   ajustouVisao = false
   desenharMarcadores()
   setTimeout(() => mapa?.invalidateSize(), 150)
+  if (props.baseInicial && filtroBase.value !== props.baseInicial) filtroBase.value = props.baseInicial
+  else desenharArea()
 
   window.addEventListener('online', atualizarOnline)
   window.addEventListener('offline', atualizarOnline)
@@ -334,6 +522,8 @@ function desmontarMapa () {
   pararGps()
   marcadorEu = null
   circuloEu = null
+  camadaArea = null
+  municipiosDaArea = []
   mapa?.remove()
   mapa = null
 }
@@ -370,7 +560,20 @@ watch(camada, (nova, antiga) => {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
   padding: 8px 12px; border-bottom: 1px solid #e0e0e0; background: #fafafa;
 }
-.mapa-busca { width: 260px; }
+.mapa-busca { width: 240px; }
+.mapa-filtro { width: 190px; }
+.mapa-filtro--mun { width: 240px; }
+.mapa-area {
+  display: flex; align-items: center; gap: 10px;
+  background: #e3f2fd; color: #0d47a1; padding: 6px 12px; font-size: 13px;
+  border-bottom: 1px solid #bbdefb;
+}
+.mapa-area span { margin-left: 8px; color: #1565c0; opacity: 0.85; }
+:deep(.mapa-mun-label) {
+  background: rgba(255,255,255,0.8); border: none; box-shadow: none;
+  color: #0d47a1; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+}
+:deep(.mapa-mun-label::before) { display: none; }
 .mapa-legenda { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
 .mapa-leg-item {
   display: flex; align-items: center; gap: 6px;
@@ -387,6 +590,7 @@ watch(camada, (nova, antiga) => {
 }
 @media (max-width: 600px) {
   .mapa-busca { width: 100%; }
+  .mapa-filtro, .mapa-filtro--mun { width: calc(50% - 5px); }
   .mapa-legenda { order: 3; }
 }
 

@@ -510,7 +510,7 @@
       </q-card>
     </q-dialog>
 
-    <MapaNotas v-model="mapaAberto" :grupos="notasFiltradas" @abrir="abrirDoMapa" />
+    <MapaNotas v-model="mapaAberto" :grupos="notasFiltradas" :base-inicial="filtroBase" @abrir="abrirDoMapa" />
 
     <!-- Dialog preview foto medidor -->
     <q-dialog v-model="fotoDialog">
