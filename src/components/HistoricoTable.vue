@@ -167,7 +167,7 @@ function abrirEdicao (row) {
   editForm.value = {
     pep: row.pep, nota: row.nota, postes: n,
     pg_numeros: pg.length >= n ? pg.slice(0, n) : [...pg, ...Array(n - pg.length).fill('')],
-    clientes: (row.clientes || []).map(c => ({ nome: c.nome, padrao: c.padrao || '', conta_contrato: c.conta_contrato || '' }))
+    clientes: (row.clientes || []).map(c => ({ nome: c.nome, padrao: c.padrao || '', conta_contrato: c.conta_contrato || '', num_medidor: c.num_medidor || '', foto_url: c.foto_url, fotos_urls: c.fotos_urls || [] }))
   }
   editDialog.value = true
 }

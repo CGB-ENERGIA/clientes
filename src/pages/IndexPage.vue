@@ -500,7 +500,7 @@
         <q-separator />
 
         <!-- Input de foto (oculto) -->
-        <input ref="fotoInput" type="file" accept="image/*" hidden @change="onFotoSelecionada" />
+        <input ref="fotoInput" type="file" accept="image/*" multiple hidden @change="onFotoSelecionada" />
 
         <!-- Conteúdo scrollável -->
         <q-card-section class="dialog-scroll">
@@ -713,22 +713,29 @@
                 <div class="col-auto">
                   <q-btn
                     flat dense size="sm"
-                    :icon="c.foto_preview ? 'photo_camera' : 'add_a_photo'"
-                    :color="(tentouSalvar && !c.foto_medidor && !c.foto_url) ? 'negative' : (c.foto_preview ? 'blue-7' : 'grey-6')"
-                    :label="c.foto_preview ? 'Trocar foto' : 'Foto do medidor *'"
+                    icon="add_a_photo"
+                    :color="(tentouSalvar && !c.fotos.length) ? 'negative' : (c.fotos.length ? 'blue-7' : 'grey-6')"
+                    :label="c.fotos.length ? 'Adicionar foto' : 'Foto do medidor *'"
                     @click="selecionarFoto(i)"
                   />
-                  <div v-if="tentouSalvar && !c.foto_medidor && !c.foto_url" class="text-negative" style="font-size:11px;margin-top:2px">
+                  <div v-if="tentouSalvar && !c.fotos.length" class="text-negative" style="font-size:11px;margin-top:2px">
                     Foto obrigatória
                   </div>
                 </div>
-                <div v-if="c.foto_preview" class="col-auto">
+                <div v-for="(f, fi) in c.fotos" :key="f.preview" class="col-auto medidor-thumb-wrap">
                   <img
-                    :src="c.foto_preview"
+                    :src="f.preview"
                     class="medidor-thumb"
                     title="Ver foto ampliada"
-                    @click="verFoto(c.foto_preview)"
+                    @click="verFoto(f.preview)"
                   />
+                  <q-btn
+                    icon="close" round dense unelevated size="6px"
+                    color="negative" class="medidor-thumb-remove"
+                    @click="removerFoto(c, fi)"
+                  >
+                    <q-tooltip>Remover foto</q-tooltip>
+                  </q-btn>
                 </div>
               </div>
 
@@ -1102,9 +1109,7 @@ async function abrirNotaDialog (nota) {
     padrao: '',
     conta_contrato: c.conta_contrato || '',
     num_medidor: '',
-    foto_medidor: null,
-    foto_preview: null,
-    foto_url: null,
+    fotos: [],
     atendido: true,
     motivo: '',
     origem: 'planilha',
@@ -1118,7 +1123,7 @@ async function abrirNotaDialog (nota) {
 }
 
 function adicionarCliente () {
-  clientes.push({ nome: '', padrao: '', conta_contrato: '', num_medidor: '', foto_medidor: null, foto_preview: null, foto_url: null, atendido: true, motivo: '' })
+  clientes.push({ nome: '', padrao: '', conta_contrato: '', num_medidor: '', fotos: [], atendido: true, motivo: '' })
 }
 
 function selecionarFoto (i) {
@@ -1128,15 +1133,19 @@ function selecionarFoto (i) {
 }
 
 function onFotoSelecionada (e) {
-  const file = e.target.files[0]
-  if (!file || clienteIndexFoto.value === null) return
+  const files = Array.from(e.target.files || [])
+  if (!files.length || clienteIndexFoto.value === null) return
   const c = clientes[clienteIndexFoto.value]
-  if (c.foto_preview) URL.revokeObjectURL(c.foto_preview)
-  const url = URL.createObjectURL(file)
-  objectUrls.push(url)
-  c.foto_medidor = file
-  c.foto_preview = url
-  c.foto_url = null
+  for (const file of files) {
+    const url = URL.createObjectURL(file)
+    objectUrls.push(url)
+    c.fotos.push({ file, preview: url, url: null })
+  }
+}
+
+function removerFoto (c, fi) {
+  const [f] = c.fotos.splice(fi, 1)
+  if (f?.file) URL.revokeObjectURL(f.preview)
 }
 
 function verFoto (url) {
@@ -1153,7 +1162,7 @@ async function salvar () {
   else {
     if (clientes.some(c => !c.nome?.trim()))                            erros.push('nome de todos os clientes')
     if (clientes.some(c => !c.num_medidor?.trim()))                     erros.push('número do medidor de todos os clientes')
-    if (clientes.some(c => !c.foto_medidor && !c.foto_url))            erros.push('foto do medidor de todos os clientes')
+    if (clientes.some(c => !c.fotos.length))                           erros.push('foto do medidor de todos os clientes')
     if (clientes.filter(c => !c.atendido).some(c => !c.motivo?.trim())) erros.push('motivo dos não atendidos')
   }
 
@@ -1167,16 +1176,19 @@ async function salvar () {
 
   // Upload de fotos dos medidores
   for (const c of clientes) {
-    if (c.foto_medidor instanceof File) {
-      const ext  = c.foto_medidor.name.split('.').pop() || 'jpg'
+    for (const f of c.fotos) {
+      if (f.url || !(f.file instanceof File)) continue
+      const ext  = f.file.name.split('.').pop() || 'jpg'
       const path = `${n.nota}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
       const { error: ue } = await supabase.storage
         .from('medidores')
-        .upload(path, c.foto_medidor, { upsert: false })
-      if (!ue) {
-        const { data: pub } = supabase.storage.from('medidores').getPublicUrl(path)
-        c.foto_url = pub.publicUrl
+        .upload(path, f.file, { upsert: false })
+      if (ue) {
+        $q.notify({ type: 'negative', message: 'Erro ao enviar foto do medidor: ' + ue.message })
+        salvando.value = false
+        return
       }
+      f.url = supabase.storage.from('medidores').getPublicUrl(path).data.publicUrl
     }
   }
 
@@ -1190,7 +1202,7 @@ async function salvar () {
     nota:              n.nota,
     postes:            registrosCampo.value.length || Number(n.postes) || 0,
     pg_numeros:        registrosCampo.value.map(r => r.pg_numero),
-    clientes:          clientes.map(c => ({ nome: c.nome.trim(), padrao: c.padrao ?? '', conta_contrato: c.conta_contrato ?? '', num_medidor: c.num_medidor ?? '', foto_url: c.foto_url ?? null })),
+    clientes:          clientes.map(c => ({ nome: c.nome.trim(), padrao: c.padrao ?? '', conta_contrato: c.conta_contrato ?? '', num_medidor: c.num_medidor ?? '', fotos_urls: c.fotos.map(f => f.url) })),
     todos_atendidos:   clientes.every(c => c.atendido),
     nao_atendidos:     naoAtendidosList,
     qtd_clientes_nota: Number(n.qtd_clientes) || 0
@@ -1650,4 +1662,10 @@ notasStore.fetchNotas()
   transition: transform 0.15s, box-shadow 0.15s;
 }
 .medidor-thumb:hover { transform: scale(1.08); box-shadow: 0 3px 12px rgba(0,0,0,0.2); }
+.medidor-thumb-wrap { position: relative; }
+.medidor-thumb-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
 </style>

@@ -47,6 +47,19 @@ export const useApontamentoStore = defineStore('apontamento', () => {
     return { error }
   }
 
+  function linhaCliente (c, apontamentoId) {
+    const fotos = c.fotos_urls?.length ? c.fotos_urls : (c.foto_url ? [c.foto_url] : [])
+    return {
+      nome: c.nome,
+      padrao: c.padrao || '',
+      conta_contrato: c.conta_contrato || null,
+      num_medidor: c.num_medidor || null,
+      foto_url: fotos[0] || null,
+      fotos_urls: fotos,
+      apontamento_id: apontamentoId
+    }
+  }
+
   async function addApontamento ({ base, pep, nota, postes, pg_numeros, clientes, todos_atendidos, nao_atendidos, qtd_clientes_nota }) {
     const { data: ap, error } = await supabase
       .from('apontamentos')
@@ -57,17 +70,11 @@ export const useApontamentoStore = defineStore('apontamento', () => {
     if (error) return { error }
 
     if (clientes.length > 0) {
-      const { error: ce } = await supabase.from('clientes').insert(
-        clientes.map(c => ({
-          nome: c.nome,
-          padrao: c.padrao || '',
-          conta_contrato: c.conta_contrato || null,
-          num_medidor: c.num_medidor || null,
-          foto_url: c.foto_url || null,
-          apontamento_id: ap.id
-        }))
-      )
-      if (ce) return { error: ce }
+      const { error: ce } = await supabase.from('clientes').insert(clientes.map(c => linhaCliente(c, ap.id)))
+      if (ce) {
+        await supabase.from('apontamentos').delete().eq('id', ap.id)
+        return { error: ce }
+      }
     }
 
     await fetchApontamentos()
@@ -85,16 +92,7 @@ export const useApontamentoStore = defineStore('apontamento', () => {
     await supabase.from('clientes').delete().eq('apontamento_id', id)
 
     if (clientes.length > 0) {
-      await supabase.from('clientes').insert(
-        clientes.map(c => ({
-          nome: c.nome,
-          padrao: c.padrao || '',
-          conta_contrato: c.conta_contrato || null,
-          num_medidor: c.num_medidor || null,
-          foto_url: c.foto_url || null,
-          apontamento_id: id
-        }))
-      )
+      await supabase.from('clientes').insert(clientes.map(c => linhaCliente(c, id)))
     }
 
     await fetchApontamentos()
