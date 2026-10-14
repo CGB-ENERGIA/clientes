@@ -522,6 +522,13 @@ onUnmounted(() => {
   background: rgba(25,118,210,0.12); color: #90caf9; cursor: pointer;
 }
 .cl-desloc-btn:active, .cl-desloc-waze:active, .cl-desloc-mapa:active { transform: scale(0.97); }
+.cl-desloc-btn { min-width: 0; white-space: nowrap; }
+@media (max-width: 380px) {
+  .cl-desloc { gap: 6px; }
+  .cl-desloc-btn { font-size: 13px; padding: 12px 8px; gap: 5px; }
+  .cl-desloc-waze { padding: 0 10px; font-size: 13px; }
+  .cl-desloc-mapa { padding: 0 9px; }
+}
 .cl-desloc-sem { font-size: 12px; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 4px; }
 
 .cl-input-wrap, .cl-select-wrap {
