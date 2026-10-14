@@ -2,11 +2,15 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from 'boot/supabase'
 
-const QUEUE_KEY  = 'cgb_campo_fila'
-const SESSAO_KEY = 'cgb_campo_sessao'
+const QUEUE_KEY   = 'cgb_campo_fila'
+const SESSAO_KEY  = 'cgb_campo_sessao'
+const EQUIPE_KEY  = 'cgb_campo_equipe'
+const RESUMO_KEY  = 'cgb_campo_resumo'
+const HIST_PREFIX = 'cgb_campo_hist_'
 
-function lerFila  () { try { return JSON.parse(localStorage.getItem(QUEUE_KEY)  || '[]')  } catch { return [] } }
-function lerSessao() { try { return JSON.parse(localStorage.getItem(SESSAO_KEY) || 'null') } catch { return null } }
+function lerJson (key, padrao) { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? padrao } catch { return padrao } }
+function lerFila  () { return lerJson(QUEUE_KEY, []) }
+function lerSessao() { return lerJson(SESSAO_KEY, null) }
 
 function b64ToBlob (b64, mime) {
   const str = atob(b64.split(',')[1])
@@ -30,11 +34,52 @@ export const useCampoStore = defineStore('campo', () => {
     if (online.value && fila.value.length > 0) sincronizar()
   }, 30_000)
 
+  // Resumo por nota (postes já registrados, equipes, último registro) para retomar trabalho
+  const resumoNotas    = ref(lerJson(RESUMO_KEY, []))
+  const ultimaEquipe   = ref(localStorage.getItem(EQUIPE_KEY) || '')
+  const carregandoHist = ref(false)
+
+  async function carregarResumo () {
+    if (!navigator.onLine) return
+    const { data, error } = await supabase.rpc('campo_resumo_notas')
+    if (error || !data) return
+    resumoNotas.value = data
+    localStorage.setItem(RESUMO_KEY, JSON.stringify(data))
+  }
+
   // ── Sessão ────────────────────────────────────────────────────
   function iniciarSessao (data) {
     sessao.value = data
     registros.value = []
     localStorage.setItem(SESSAO_KEY, JSON.stringify(data))
+    ultimaEquipe.value = data.equipe
+    localStorage.setItem(EQUIPE_KEY, data.equipe)
+  }
+
+  // Junta os registros já enviados da nota (de qualquer dia/equipe) com os pendentes deste aparelho
+  async function carregarRegistrosNota () {
+    const nota = sessao.value?.nota
+    if (!nota) return
+    const key = HIST_PREFIX + nota
+    let remotos = lerJson(key, [])
+    if (navigator.onLine) {
+      carregandoHist.value = true
+      const { data, error } = await supabase.rpc('campo_registros_da_nota', { p_nota: nota })
+      carregandoHist.value = false
+      if (!error && data) {
+        remotos = data
+        localStorage.setItem(key, JSON.stringify(data))
+      }
+    }
+    const pendentes = fila.value.filter(r => r.nota === nota)
+    const ids = new Set(pendentes.map(r => r.id))
+    const daSessao = registros.value.filter(r => r.nota === nota && !ids.has(r.id))
+    const vistos = new Set([...ids, ...daSessao.map(r => r.id)])
+    registros.value = [
+      ...pendentes,
+      ...daSessao,
+      ...remotos.filter(r => !vistos.has(r.id)).map(r => ({ ...r, nota, sync: true }))
+    ].sort((a, b) => b.created_at.localeCompare(a.created_at))
   }
 
   function encerrarSessao () {
@@ -133,6 +178,8 @@ export const useCampoStore = defineStore('campo', () => {
 
   return {
     sessao, registros, fila, online, sincronizando,
-    iniciarSessao, encerrarSessao, salvarRegistro, sincronizar
+    resumoNotas, ultimaEquipe, carregandoHist,
+    iniciarSessao, encerrarSessao, salvarRegistro, sincronizar,
+    carregarResumo, carregarRegistrosNota
   }
 })

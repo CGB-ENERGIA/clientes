@@ -27,6 +27,32 @@
         <span v-if="erros.equipe" class="cl-err">{{ erros.equipe }}</span>
       </div>
 
+      <!-- CONTINUAR DE ONDE PAROU -->
+      <div v-if="emAndamento.length && !form.nota" class="cl-field">
+        <label class="cl-label">Continuar de onde parou</label>
+        <div class="cl-retomar-list">
+          <button
+            v-for="r in emAndamento"
+            :key="r.nota.nota"
+            type="button"
+            class="cl-retomar-item"
+            :class="{ 'cl-retomar-item--equipe': r.daEquipe }"
+            @click="selecionarNota(r.nota)"
+          >
+            <div class="cl-retomar-top">
+              <span class="cl-retomar-nota">{{ r.nota.projeto_info_sap || r.nota.nota }}</span>
+              <span class="cl-retomar-base">{{ r.nota.base }}</span>
+            </div>
+            <div class="cl-retomar-sub">
+              <q-icon name="electrical_services" size="12px" />
+              {{ r.total }}<template v-if="Number(r.nota.postes)"> de {{ r.nota.postes }}</template> postes
+              · último {{ formatarQuando(r.ultimo) }}
+              <template v-if="r.equipes.length"> · {{ r.equipes.join(', ') }}</template>
+            </div>
+          </button>
+        </div>
+      </div>
+
       <!-- NOTA -->
       <div class="cl-field">
         <label class="cl-label">Nota de serviço <span class="cl-req">*</span></label>
@@ -86,6 +112,9 @@
                 <span class="cl-di-sep">—</span>
                 <span class="cl-di-base">{{ n.base }}</span>
                 <span class="cl-di-pep">{{ n.pep }}</span>
+                <span v-if="resumoPorNota.has(n.nota)" class="cl-di-tag">
+                  {{ resumoPorNota.get(n.nota).total }} postes
+                </span>
               </div>
             </div>
             <div v-else-if="dropdownAberto && buscaNota && !notasFiltradas.length" class="cl-dropdown">
@@ -177,7 +206,7 @@ const notasStore = useNotasStore()
 const ano        = new Date().getFullYear()
 const carregando = ref(false)
 
-const form  = reactive({ equipe: '', nota: '', cliente: null })
+const form  = reactive({ equipe: store.ultimaEquipe || '', nota: '', cliente: null })
 const erros = reactive({ equipe: '', nota: '', cliente: '' })
 
 const notas        = computed(() => notasStore.notas)
@@ -190,6 +219,28 @@ let   syncInterval  = null
 function formatarSyncTime (d) {
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
+
+function formatarQuando (iso) {
+  const d = new Date(iso)
+  const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  if (d.toDateString() === new Date().toDateString()) return `hoje ${hora}`
+  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${hora}`
+}
+
+// ── Notas com postes já registrados e ainda não finalizadas ──────
+const resumoPorNota = computed(() => new Map(store.resumoNotas.map(r => [r.nota, r])))
+
+const emAndamento = computed(() => {
+  const equipe = form.equipe.trim().toUpperCase()
+  return notas.value
+    .filter(n => resumoPorNota.value.has(n.nota) && !['concluido', 'expurgo', 'sem_acesso'].includes(n.status))
+    .map(n => {
+      const r = resumoPorNota.value.get(n.nota)
+      return { nota: n, total: Number(r.total), ultimo: r.ultimo, equipes: r.equipes || [], daEquipe: !!equipe && (r.equipes || []).includes(equipe) }
+    })
+    .sort((a, b) => (b.daEquipe - a.daEquipe) || b.ultimo.localeCompare(a.ultimo))
+    .slice(0, 6)
+})
 
 // ── Autocomplete ──────────────────────────────────────────────────
 const buscaNota      = ref('')
@@ -284,7 +335,7 @@ async function sincronizarNotas (silencioso = false) {
   if (!navigator.onLine) return
   if (!silencioso) carregando.value = notas.value.length === 0
   sincronizando.value = true
-  await notasStore.fetchNotas()
+  await Promise.all([notasStore.fetchNotas(), store.carregarResumo()])
   sincronizando.value = false
   carregando.value    = false
   ultimoSync.value    = formatarSyncTime(new Date())
@@ -444,6 +495,33 @@ onUnmounted(() => {
   text-align: center;
   color: rgba(255,255,255,0.35);
   font-size: 13px;
+}
+
+.cl-di-tag {
+  font-size: 10px; font-weight: 700;
+  color: #ffb74d; background: rgba(255,152,0,0.15);
+  border-radius: 10px; padding: 1px 7px; white-space: nowrap;
+}
+
+/* ── Continuar de onde parou ── */
+.cl-retomar-list { display: flex; flex-direction: column; gap: 8px; }
+.cl-retomar-item {
+  width: 100%; text-align: left;
+  padding: 12px 14px; border-radius: 14px;
+  border: 1.5px solid rgba(255,152,0,0.25);
+  background: rgba(255,152,0,0.07);
+  color: #fff; font-family: inherit; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
+}
+.cl-retomar-item:active { transform: scale(0.98); }
+.cl-retomar-item--equipe { border-color: rgba(255,152,0,0.6); background: rgba(255,152,0,0.13); }
+.cl-retomar-top { display: flex; align-items: baseline; gap: 8px; }
+.cl-retomar-nota { font-size: 15px; font-weight: 800; }
+.cl-retomar-base { font-size: 12px; color: rgba(255,255,255,0.55); }
+.cl-retomar-sub {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  font-size: 11px; color: #ffb74d; margin-top: 4px;
 }
 
 /* ── Info da nota ── */

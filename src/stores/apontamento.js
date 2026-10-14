@@ -40,6 +40,7 @@ export const useApontamentoStore = defineStore('apontamento', () => {
     const { data, error } = await fetchAll(() => supabase
       .from('apontamentos')
       .select('*, clientes(*)')
+      .eq('rascunho', false)
       .order('created_at', { ascending: false })
       .order('id'))
     if (!error) apontamentos.value = data || []
@@ -60,10 +61,10 @@ export const useApontamentoStore = defineStore('apontamento', () => {
     }
   }
 
-  async function addApontamento ({ base, pep, nota, postes, pg_numeros, clientes, todos_atendidos, nao_atendidos, qtd_clientes_nota }) {
+  async function addApontamento ({ base, pep, nota, postes, pg_numeros, clientes, todos_atendidos, nao_atendidos, qtd_clientes_nota, rascunho = false }) {
     const { data: ap, error } = await supabase
       .from('apontamentos')
-      .insert({ base, pep, nota, postes, pg_numeros, todos_atendidos, nao_atendidos, qtd_clientes_nota })
+      .insert({ base, pep, nota, postes, pg_numeros, todos_atendidos, nao_atendidos, qtd_clientes_nota, rascunho })
       .select()
       .single()
 
@@ -78,13 +79,13 @@ export const useApontamentoStore = defineStore('apontamento', () => {
     }
 
     await fetchApontamentos()
-    return { error: null }
+    return { error: null, id: ap.id }
   }
 
-  async function updateApontamento (id, { base, pep, nota, postes, pg_numeros, clientes, todos_atendidos, nao_atendidos, qtd_clientes_nota }) {
+  async function updateApontamento (id, { base, pep, nota, postes, pg_numeros, clientes, todos_atendidos, nao_atendidos, qtd_clientes_nota, rascunho = false }) {
     const { error } = await supabase
       .from('apontamentos')
-      .update({ base, pep, nota, postes, pg_numeros, todos_atendidos, nao_atendidos, qtd_clientes_nota })
+      .update({ base, pep, nota, postes, pg_numeros, todos_atendidos, nao_atendidos, qtd_clientes_nota, rascunho, atualizado_em: new Date().toISOString() })
       .eq('id', id)
 
     if (error) return { error }
@@ -98,7 +99,7 @@ export const useApontamentoStore = defineStore('apontamento', () => {
     }
 
     await fetchApontamentos()
-    return { error: null }
+    return { error: null, id }
   }
 
   async function buscarPorNota (nota) {

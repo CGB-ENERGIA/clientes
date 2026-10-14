@@ -241,6 +241,10 @@
             <span class="nc-status" :class="'nc-status--' + n.status">
               <span class="nc-status-dot" />{{ labelStatus(n.status) }}
             </span>
+            <span v-if="n._rascunho" class="badge-rascunho">
+              Rascunho
+              <q-tooltip>Etapa 2 salva para continuar depois</q-tooltip>
+            </span>
             <span v-if="n._apagada" class="badge-apagada">
               Apagada
               <q-icon name="close" size="11px" class="badge-apagada-x" @click.stop="removerBadge(n)">
@@ -328,6 +332,10 @@
               <span class="nc-status" :class="'nc-status--' + n.status">
                 <span class="nc-status-dot" />
                 {{ labelStatus(n.status) }}
+              </span>
+              <span v-if="n._rascunho" class="badge-rascunho">
+                Rascunho
+                <q-tooltip>Etapa 2 salva para continuar depois</q-tooltip>
               </span>
               <span v-if="n._apagada" class="badge-apagada">
                 Apagada
@@ -814,15 +822,31 @@
         <q-separator />
 
         <q-card-actions align="right" class="q-pa-md">
+          <div v-if="rascunhoEm" class="rascunho-info q-mr-auto">
+            <q-icon name="edit_note" size="16px" />
+            Rascunho salvo em {{ formatarDataCompleta(rascunhoEm) }}
+          </div>
           <q-btn label="Cancelar" flat color="grey-7" @click="dialog = false" />
+          <q-btn
+            v-if="notaAtiva?.status !== 'concluido'"
+            label="Salvar e continuar depois"
+            icon="save"
+            color="primary"
+            outline
+            :loading="salvando === 'rascunho'"
+            :disable="!clientes.length || !!salvando"
+            @click="salvar(true)"
+          >
+            <q-tooltip>Guarda o que já foi preenchido sem concluir a nota</q-tooltip>
+          </q-btn>
           <q-btn
             label="Salvar e Concluir"
             icon="check_circle"
             color="positive"
             unelevated
-            :loading="salvando"
-            :disable="!clientes.length"
-            @click="salvar"
+            :loading="salvando === 'concluir'"
+            :disable="!clientes.length || !!salvando"
+            @click="salvar(false)"
           />
         </q-card-actions>
 
@@ -928,6 +952,7 @@ const todasAgrupadas = computed(() => {
   for (const g of grupos.values()) {
     g._viaPwa   = g._notas.some(n => viaPwa.has(n.nota))
     g._apagada  = g._notas.some(n => n.apagada)
+    g._rascunho = g.status !== 'concluido' && g._notas.some(n => notasStore.notasComRascunho.has(n.nota))
   }
   return [...grupos.values()]
 })
@@ -1128,6 +1153,7 @@ const fotoDialog       = ref(false)
 const objectUrls       = []
 const tentouSalvar     = ref(false)
 const apontamentoId    = ref(null)
+const rascunhoEm       = ref(null)
 
 onUnmounted(() => objectUrls.forEach(u => URL.revokeObjectURL(u)))
 
@@ -1173,6 +1199,7 @@ async function abrirNotaDialog (nota) {
   registrosCampo.value = []
   tentouSalvar.value = false
   apontamentoId.value = null
+  rascunhoEm.value = null
   dialog.value = true
 
   carregandoCampo.value = true
@@ -1185,6 +1212,7 @@ async function abrirNotaDialog (nota) {
 
   if (salvo) {
     apontamentoId.value = salvo.id
+    rascunhoEm.value = salvo.rascunho ? salvo.atualizado_em : null
     const motivos = new Map((salvo.nao_atendidos || []).map(x => [x.cliente, x.motivo]))
     ;(salvo.clientes || []).forEach(c => {
       const urls = c.fotos_urls?.length ? c.fotos_urls : (c.foto_url ? [c.foto_url] : [])
@@ -1275,7 +1303,7 @@ async function removerBadge (g) {
   if (error) $q.notify({ type: 'negative', message: 'Erro ao remover marca: ' + error.message })
 }
 
-async function salvar () {
+async function salvar (rascunho = false) {
   const n = notaAtiva.value
 
   const erros = []
@@ -1287,13 +1315,13 @@ async function salvar () {
     if (clientes.filter(c => !c.atendido).some(c => !c.motivo?.trim())) erros.push('motivo dos não atendidos')
   }
 
-  if (erros.length) {
+  if (erros.length && !rascunho) {
     tentouSalvar.value = true
     $q.notify({ type: 'warning', message: `Preencha: ${erros.join(', ')}.`, timeout: 5000 })
     return
   }
 
-  salvando.value = true
+  salvando.value = rascunho ? 'rascunho' : 'concluir'
 
   // Upload de fotos dos medidores
   for (const c of clientes) {
@@ -1323,12 +1351,13 @@ async function salvar () {
     nota:              n.nota,
     postes:            registrosCampo.value.length || Number(n.postes) || 0,
     pg_numeros:        registrosCampo.value.map(r => r.pg_numero),
+    rascunho,
     clientes:          clientes.map(c => ({ nome: c.nome.trim(), padrao: c.padrao ?? '', conta_contrato: c.conta_contrato ?? '', num_medidor: c.num_medidor ?? '', fotos_urls: c.fotos.map(f => f.url) })),
     todos_atendidos:   clientes.every(c => c.atendido),
     nao_atendidos:     naoAtendidosList,
     qtd_clientes_nota: Number(n.qtd_clientes) || 0
   }
-  const { error } = apontamentoId.value
+  const { error, id } = apontamentoId.value
     ? await apStore.updateApontamento(apontamentoId.value, dados)
     : await apStore.addApontamento(dados)
 
@@ -1338,8 +1367,18 @@ async function salvar () {
     return
   }
 
-  // Marca nota como concluída
+  if (rascunho) {
+    if (id) apontamentoId.value = id
+    rascunhoEm.value = new Date().toISOString()
+    notasStore.notasComRascunho = new Set([...notasStore.notasComRascunho, n.nota])
+    salvando.value = false
+    dialog.value = false
+    $q.notify({ type: 'info', message: `Nota ${n.nota}: rascunho salvo. Continue quando quiser.`, icon: 'save' })
+    return
+  }
+
   await notasStore.atualizarStatus(n.nota, 'concluido')
+  notasStore.notasComRascunho = new Set([...notasStore.notasComRascunho].filter(x => x !== n.nota))
 
   salvando.value = false
   dialog.value = false
@@ -1399,6 +1438,29 @@ notasStore.fetchNotas()
 .stab--active.stab--em_andamento   { border-color: #f57c00; background: #fff3e0; color: #e65100; }
 .stab--active.stab--baixar_medidor { border-color: #1565c0; background: #e3f2fd; color: #0d47a1; }
 .stab--active.stab--concluido      { border-color: #388e3c; background: #e8f5e9; color: #1b5e20; }
+
+/* ── Marca de rascunho (Etapa 2 para continuar depois) ── */
+.badge-rascunho {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  padding: 1px 8px;
+  border-radius: 20px;
+  background: #fff3e0;
+  border: 1px solid #ffb74d;
+  color: #e65100;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.lista-status .badge-rascunho { margin-left: 0; }
+.rascunho-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #e65100;
+}
 
 /* ── Marca de nota apagada ── */
 .badge-apagada {

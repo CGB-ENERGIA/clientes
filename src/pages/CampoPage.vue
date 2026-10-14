@@ -81,8 +81,17 @@
     <!-- ── LISTA DE REGISTROS ─────────────────────────────────── -->
     <section class="cp-list" v-if="store.registros.length > 0">
       <div class="cp-list-header">
-        <span>Registros desta sessão</span>
-        <span class="cp-list-count">{{ store.registros.length }}</span>
+        <span>Postes desta nota</span>
+        <span class="cp-list-count">
+          {{ store.registros.length }}<template v-if="postesPrevistos"> de {{ postesPrevistos }}</template>
+        </span>
+      </div>
+      <div v-if="postesPrevistos" class="cp-progress">
+        <div class="cp-progress-bar" :style="{ width: Math.min(100, store.registros.length / postesPrevistos * 100) + '%' }" />
+      </div>
+      <div v-if="anteriores" class="cp-retomada">
+        <q-icon name="history" size="16px" />
+        Continuando: {{ anteriores }} {{ anteriores === 1 ? 'poste registrado' : 'postes registrados' }} em turnos anteriores
       </div>
       <div class="cp-list-scroll">
         <div v-for="reg in store.registros" :key="reg.id" class="cp-reg-item">
@@ -98,7 +107,9 @@
           </div>
           <div class="cp-reg-info">
             <div class="cp-reg-pg">{{ reg.pg_numero }}</div>
-            <div class="cp-reg-time">{{ formatarHora(reg.created_at) }}</div>
+            <div class="cp-reg-time">
+              {{ formatarQuando(reg.created_at) }}<template v-if="reg.equipe && reg.equipe !== store.sessao?.equipe"> · {{ reg.equipe }}</template>
+            </div>
           </div>
           <div class="cp-reg-status" :class="reg.sync ? 'cp-reg-status--ok' : 'cp-reg-status--pend'">
             <q-icon :name="reg.sync ? 'cloud_done' : 'cloud_upload'" size="18px" />
@@ -108,8 +119,11 @@
     </section>
 
     <div class="cp-empty" v-else-if="!fotoPreview">
-      <q-icon name="camera_alt" size="48px" class="cp-empty-icon" />
-      <p>Nenhum registro nesta sessão.<br />Cadastre o primeiro poste acima.</p>
+      <q-spinner v-if="store.carregandoHist" size="32px" color="grey-6" />
+      <template v-else>
+        <q-icon name="camera_alt" size="48px" class="cp-empty-icon" />
+        <p>Nenhum poste registrado nesta nota.<br />Cadastre o primeiro poste acima.</p>
+      </template>
     </div>
 
     <!-- ── MODAL CÂMERA ──────────────────────────────────────── -->
@@ -174,7 +188,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useCampoStore } from 'stores/campo'
@@ -190,12 +204,21 @@ if (!store.sessao) router.replace('/campo')
 // Sincroniza notas ao voltar online durante sessão ativa
 function aoVoltarOnline () {
   notasStore.fetchNotas()
+  store.carregarRegistrosNota()
 }
 
 onMounted(() => {
   window.addEventListener('online', aoVoltarOnline)
   if (navigator.onLine) notasStore.fetchNotas()
+  store.carregarRegistrosNota()
 })
+
+const postesPrevistos = computed(() => Number(store.sessao?.postes) || 0)
+
+const inicioTurno = new Date().toDateString()
+const anteriores  = computed(() =>
+  store.registros.filter(r => new Date(r.created_at).toDateString() !== inicioTurno).length
+)
 
 // ── Estado ──────────────────────────────────────────────────────
 const pg             = ref('')
@@ -403,8 +426,20 @@ function refazerFoto () {
   abrirCamera()
 }
 
-async function salvar () {
+function salvar () {
   if (!pg.value.trim() || !fotoB64.value) return
+  const alvo = pg.value.trim().toUpperCase()
+  const repetido = store.registros.find(r => String(r.pg_numero).trim().toUpperCase() === alvo)
+  if (!repetido) return gravar()
+  $q.dialog({
+    title: 'PG já registrado',
+    message: `O PG ${pg.value.trim()} já foi registrado em ${formatarQuando(repetido.created_at)}. Registrar novamente?`,
+    cancel: { label: 'Cancelar', flat: true },
+    ok: { label: 'Registrar mesmo assim', color: 'warning' }
+  }).onOk(gravar)
+}
+
+async function gravar () {
   salvando.value = true
   try {
     await store.salvarRegistro({ pg: pg.value.trim(), fotoB64: fotoB64.value, fotoMime: 'image/jpeg' })
@@ -420,7 +455,7 @@ async function salvar () {
 function encerrar () {
   $q.dialog({
     title: 'Encerrar turno?',
-    message: 'Você será redirecionado para a tela inicial.',
+    message: 'Os postes registrados ficam salvos. Para continuar outro dia, inicie um turno com a mesma nota.',
     cancel: true, ok: 'Encerrar', color: 'negative'
   }).onOk(() => {
     store.encerrarSessao()
@@ -436,8 +471,11 @@ function formatarDataHora (d) {
   })
 }
 
-function formatarHora (iso) {
-  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+function formatarQuando (iso) {
+  const d = new Date(iso)
+  const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  if (d.toDateString() === new Date().toDateString()) return `hoje ${hora}`
+  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${hora}`
 }
 
 function verFoto (url) {
@@ -613,6 +651,20 @@ onUnmounted(() => {
 }
 .cp-list-count { background: rgba(255,255,255,0.1); border-radius: 20px; padding: 2px 10px; font-size: 12px; color: rgba(255,255,255,0.6); }
 .cp-list-scroll { display: flex; flex-direction: column; gap: 10px; }
+.cp-progress {
+  height: 6px; border-radius: 6px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden; margin: -4px 0 12px;
+}
+.cp-progress-bar { height: 100%; background: linear-gradient(90deg, #1976d2, #00c853); transition: width 0.3s; }
+.cp-retomada {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: #90caf9;
+  background: rgba(25,118,210,0.12);
+  border: 1px solid rgba(25,118,210,0.25);
+  border-radius: 12px; padding: 8px 12px;
+  margin-bottom: 12px;
+}
 .cp-reg-item {
   display: flex; align-items: center; gap: 12px;
   background: #0e1e35;

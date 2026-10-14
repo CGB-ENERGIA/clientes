@@ -20,10 +20,12 @@ export const useNotasStore = defineStore('notas', () => {
 
   // Notas que receberam ao menos um registro de campo pelo PWA
   const notasViaPwa = ref(new Set())
+  // Notas com Etapa 2 salva como rascunho ("continuar depois")
+  const notasComRascunho = ref(new Set())
 
   async function fetchNotas () {
     loading.value = true
-    const [{ data, error }, { data: regs }] = await Promise.all([
+    const [{ data, error }, { data: regs }, { data: rascunhos }] = await Promise.all([
       fetchAll(() => supabase
         .from('notas_servico')
         .select('*')
@@ -32,9 +34,15 @@ export const useNotasStore = defineStore('notas', () => {
       fetchAll(() => supabase
         .from('campo_registros')
         .select('nota')
+        .order('id')),
+      fetchAll(() => supabase
+        .from('apontamentos')
+        .select('nota')
+        .eq('rascunho', true)
         .order('id'))
     ])
     if (regs) notasViaPwa.value = new Set(regs.map(r => r.nota))
+    if (rascunhos) notasComRascunho.value = new Set(rascunhos.map(r => r.nota))
     if (!error && data) {
       // Corrige status inválidos no banco (valores legados como 'ligar_campo')
       const invalidos = data.filter(n => !VALID_STATUSES.has(n.status))
@@ -265,6 +273,7 @@ export const useNotasStore = defineStore('notas', () => {
     const set = new Set(lista)
     notas.value.forEach(n => { if (set.has(n.nota)) Object.assign(n, { status: 'pendente', apagada: true, apagada_em }) })
     notasViaPwa.value = new Set([...notasViaPwa.value].filter(n => !set.has(n)))
+    notasComRascunho.value = new Set([...notasComRascunho.value].filter(n => !set.has(n)))
     return { error: null }
   }
 
@@ -289,5 +298,5 @@ export const useNotasStore = defineStore('notas', () => {
     return data ?? []
   }
 
-  return { notas, notasViaPwa, loading, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo, apagarNotas, removerMarcaApagada }
+  return { notas, notasViaPwa, notasComRascunho, loading, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo, apagarNotas, removerMarcaApagada }
 })
