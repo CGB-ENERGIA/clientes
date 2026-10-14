@@ -1057,6 +1057,7 @@ const fotoDialogUrl    = ref(null)
 const fotoDialog       = ref(false)
 const objectUrls       = []
 const tentouSalvar     = ref(false)
+const apontamentoId    = ref(null)
 
 onUnmounted(() => objectUrls.forEach(u => URL.revokeObjectURL(u)))
 
@@ -1101,7 +1102,34 @@ async function abrirNotaDialog (nota) {
   clientes.splice(0, clientes.length)
   registrosCampo.value = []
   tentouSalvar.value = false
+  apontamentoId.value = null
   dialog.value = true
+
+  carregandoCampo.value = true
+  const [regs, salvo] = await Promise.all([
+    notasStore.buscarRegistrosCampo(nota.nota),
+    apStore.buscarPorNota(nota.nota)
+  ])
+  registrosCampo.value = regs
+  carregandoCampo.value = false
+
+  if (salvo) {
+    apontamentoId.value = salvo.id
+    const motivos = new Map((salvo.nao_atendidos || []).map(x => [x.cliente, x.motivo]))
+    ;(salvo.clientes || []).forEach(c => {
+      const urls = c.fotos_urls?.length ? c.fotos_urls : (c.foto_url ? [c.foto_url] : [])
+      clientes.push({
+        nome: c.nome || '',
+        padrao: c.padrao || '',
+        conta_contrato: c.conta_contrato || '',
+        num_medidor: c.num_medidor || '',
+        fotos: urls.map(u => ({ file: null, preview: u, url: u })),
+        atendido: !motivos.has(c.nome),
+        motivo: motivos.get(c.nome) || ''
+      })
+    })
+    return
+  }
 
   const da_planilha = Array.isArray(nota.clientes_planilha) ? nota.clientes_planilha : []
   da_planilha.forEach(c => clientes.push({
@@ -1116,10 +1144,6 @@ async function abrirNotaDialog (nota) {
     _endereco: c.endereco || '',
     _bairro: c.bairro || ''
   }))
-
-  carregandoCampo.value = true
-  registrosCampo.value = await notasStore.buscarRegistrosCampo(nota.nota)
-  carregandoCampo.value = false
 }
 
 function adicionarCliente () {
@@ -1196,7 +1220,7 @@ async function salvar () {
     .filter(c => !c.atendido)
     .map(c => ({ cliente: c.nome, motivo: c.motivo }))
 
-  const { error } = await apStore.addApontamento({
+  const dados = {
     base:              n.base,
     pep:               n.pep,
     nota:              n.nota,
@@ -1206,7 +1230,10 @@ async function salvar () {
     todos_atendidos:   clientes.every(c => c.atendido),
     nao_atendidos:     naoAtendidosList,
     qtd_clientes_nota: Number(n.qtd_clientes) || 0
-  })
+  }
+  const { error } = apontamentoId.value
+    ? await apStore.updateApontamento(apontamentoId.value, dados)
+    : await apStore.addApontamento(dados)
 
   if (error) {
     $q.notify({ type: 'negative', message: 'Erro ao salvar: ' + error.message })

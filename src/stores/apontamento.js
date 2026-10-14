@@ -89,14 +89,26 @@ export const useApontamentoStore = defineStore('apontamento', () => {
 
     if (error) return { error }
 
-    await supabase.from('clientes').delete().eq('apontamento_id', id)
+    const { error: de } = await supabase.from('clientes').delete().eq('apontamento_id', id)
+    if (de) return { error: de }
 
     if (clientes.length > 0) {
-      await supabase.from('clientes').insert(clientes.map(c => linhaCliente(c, id)))
+      const { error: ce } = await supabase.from('clientes').insert(clientes.map(c => linhaCliente(c, id)))
+      if (ce) return { error: ce }
     }
 
     await fetchApontamentos()
     return { error: null }
+  }
+
+  async function buscarPorNota (nota) {
+    const { data } = await supabase
+      .from('apontamentos')
+      .select('*, clientes(*)')
+      .eq('nota', nota)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    return data?.[0] ?? null
   }
 
   async function deleteApontamento (id) {
@@ -114,6 +126,7 @@ export const useApontamentoStore = defineStore('apontamento', () => {
     fetchApontamentos,
     addApontamento,
     updateApontamento,
+    buscarPorNota,
     deleteApontamento
   }
 })
