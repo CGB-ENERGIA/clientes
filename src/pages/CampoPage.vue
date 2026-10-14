@@ -22,6 +22,9 @@
           <q-icon name="sync" size="14px" :class="{ 'spin': store.sincronizando }" />
           {{ store.fila.length }}
         </div>
+        <button v-if="notaSessao && temCoordenada(notaSessao)" class="cp-mapa" @click="mapaAberto = true">
+          <q-icon name="navigation" size="20px" />
+        </button>
         <button class="cp-exit" @click="encerrar">
           <q-icon name="logout" size="20px" />
         </button>
@@ -162,6 +165,14 @@
       </button>
     </footer>
 
+    <MapaNotas
+      v-model="mapaAberto"
+      modo="campo"
+      :grupos="notasParaMapa"
+      :foco="store.sessao?.nota"
+      :permitir-abrir="false"
+    />
+
     <ImprevistoDialog
       v-model="imprevistoAberto"
       :equipe="store.sessao?.equipe"
@@ -244,6 +255,8 @@ import { useQuasar } from 'quasar'
 import { useCampoStore } from 'stores/campo'
 import { useNotasStore } from 'stores/notas'
 import ImprevistoDialog from 'components/ImprevistoDialog.vue'
+import MapaNotas from 'components/MapaNotas.vue'
+import { temCoordenada } from 'src/utils/rota'
 
 const router      = useRouter()
 const $q          = useQuasar()
@@ -534,6 +547,12 @@ const notaSessao = computed(() => {
   return notasStore.getNota(s.nota) ?? { nota: s.nota, base: s.base, pep: s.pep }
 })
 
+const mapaAberto = ref(false)
+const notasParaMapa = computed(() => {
+  const atual = store.sessao?.nota
+  return notasStore.notas.filter(n => n.nota === atual || ['pendente', 'em_andamento'].includes(n.status))
+})
+
 function onImprevistoEnviado ({ enviado }) {
   const nota = store.sessao?.nota
   store.encerrarSessao()
@@ -705,6 +724,14 @@ onUnmounted(() => {
   -webkit-tap-highlight-color: transparent;
 }
 .cp-exit:active { background: rgba(255,255,255,0.14); }
+.cp-mapa {
+  border: none; background: rgba(46,125,50,0.25);
+  color: #81c784;
+  border-radius: 10px; padding: 8px;
+  cursor: pointer; display: flex; align-items: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.cp-mapa:active { background: rgba(46,125,50,0.4); }
 
 /* ── Main ── */
 .cp-main { padding: 20px 16px; flex-shrink: 0; }

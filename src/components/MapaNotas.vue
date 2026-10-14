@@ -34,7 +34,7 @@
 
         <div class="mapa-legenda">
           <button
-            v-for="s in STATUS"
+            v-for="s in statusVisiveis"
             :key="s.val"
             class="mapa-leg-item"
             :class="{ 'mapa-leg-item--off': ocultos.has(s.val) }"
@@ -46,6 +46,11 @@
           </button>
         </div>
 
+        <template v-if="modo === 'campo'">
+          <q-btn dense unelevated no-caps color="blue-7" icon="my_location" label="Onde estou" @click="centralizarEmMim" />
+          <q-btn dense unelevated no-caps color="teal-7" icon="near_me" label="Mais próxima" :disable="!minhaPos" @click="irParaMaisProxima" />
+        </template>
+
         <q-btn-toggle
           v-model="camada"
           dense unelevated no-caps
@@ -53,6 +58,14 @@
           color="grey-3" text-color="grey-8"
           :options="[{ value: 'ruas', label: 'Ruas' }, { value: 'satelite', label: 'Satélite' }]"
         />
+      </div>
+
+      <div v-if="!online" class="mapa-offline">
+        <q-icon name="cloud_off" size="16px" />
+        Sem internet: o fundo do mapa pode não carregar, mas os pontos e a rota continuam disponíveis.
+      </div>
+      <div v-if="erroGps" class="mapa-offline">
+        <q-icon name="location_disabled" size="16px" /> {{ erroGps }}
       </div>
 
       <div ref="mapaEl" class="mapa-el" />
@@ -64,10 +77,17 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { urlGoogleMaps, urlWaze, distanciaKm, formatarDistancia } from 'src/utils/rota'
 
 const props = defineProps({
   modelValue: Boolean,
-  grupos: { type: Array, default: () => [] }
+  grupos: { type: Array, default: () => [] },
+  // 'sistema': escritório | 'campo': PWA, com localização da equipe e botões de rota
+  modo: { type: String, default: 'sistema' },
+  // Nota a destacar ao abrir (centraliza e abre o popup)
+  foco: { type: String, default: null },
+  rotuloAbrir: { type: String, default: 'Abrir nota' },
+  permitirAbrir: { type: Boolean, default: true }
 })
 const emit = defineEmits(['update:modelValue', 'abrir'])
 
@@ -86,10 +106,19 @@ const mapaEl = ref(null)
 const busca  = ref('')
 const camada = ref('ruas')
 const ocultos = ref(new Set())
+const online = ref(navigator.onLine)
+const minhaPos = ref(null)
+const erroGps  = ref('')
 let mapa = null
 let camadaMarcadores = null
 let camadasBase = {}
 let ajustouVisao = false
+let marcadorEu = null
+let circuloEu = null
+let gpsWatch = null
+let seguirPrimeiraPosicao = false
+
+function atualizarOnline () { online.value = navigator.onLine }
 
 const todasNotas = computed(() => props.grupos.flatMap(g => g._notas?.length ? g._notas : [g]))
 const comCoordenada = computed(() => todasNotas.value.filter(n => Number.isFinite(n.latitude) && Number.isFinite(n.longitude)))
@@ -100,6 +129,8 @@ const contagem = computed(() => {
   for (const n of comCoordenada.value) c[n.status] = (c[n.status] || 0) + 1
   return c
 })
+
+const statusVisiveis = computed(() => STATUS.filter(s => contagem.value[s.val] || ocultos.value.has(s.val)))
 
 const notasNoMapa = computed(() => comCoordenada.value.filter(n => !ocultos.value.has(n.status)))
 
@@ -115,6 +146,18 @@ function escapar (t) {
 
 function popupHtml (notas) {
   const { latitude: lat, longitude: lng } = notas[0]
+  const dist = minhaPos.value ? formatarDistancia(distanciaKm(minhaPos.value, { lat, lng })) : ''
+  const botaoAbrir = n => props.permitirAbrir
+    ? `<button class="mp-btn" data-abrir="${escapar(n.nota)}">${escapar(props.rotuloAbrir)}</button>`
+    : ''
+  const rodape = props.modo === 'campo'
+    ? `
+      ${dist ? `<div class="mp-dist">A ${dist} de você (em linha reta)</div>` : ''}
+      <div class="mp-rotas">
+        <a class="mp-rota-btn mp-rota-btn--google" href="${urlGoogleMaps(lat, lng)}" target="_blank" rel="noopener">Iniciar deslocamento</a>
+        <a class="mp-rota-btn mp-rota-btn--waze" href="${urlWaze(lat, lng)}" target="_blank" rel="noopener">Waze</a>
+      </div>`
+    : `<a class="mp-rota" href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" target="_blank" rel="noopener">Abrir no Google Maps</a>`
   const itens = notas.map(n => `
     <div class="mp-nota">
       <div class="mp-nota-top">
@@ -124,14 +167,88 @@ function popupHtml (notas) {
       ${n.projeto_info_sap ? `<div class="mp-linha">SAP ${escapar(n.projeto_info_sap)}</div>` : ''}
       <div class="mp-linha">${escapar(n.base)}${n.municipio ? ' · ' + escapar(n.municipio) : ''}</div>
       <div class="mp-linha">${Number(n.postes) || 0} postes · ${Number(n.qtd_clientes) || 0} clientes</div>
-      <button class="mp-btn" data-abrir="${escapar(n.nota)}">Abrir nota</button>
+      ${botaoAbrir(n)}
     </div>`).join('')
   return `
     ${notas.length > 1 ? `<div class="mp-titulo">${notas.length} notas neste ponto</div>` : ''}
     <div class="mp-lista">${itens}</div>
-    <a class="mp-rota" href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" target="_blank" rel="noopener">
-      Abrir no Google Maps
-    </a>`
+    ${rodape}`
+}
+
+function abrirPopupEm (lat, lng) {
+  camadaMarcadores?.eachLayer(m => {
+    const p = m.getLatLng()
+    if (Math.abs(p.lat - lat) < 1e-6 && Math.abs(p.lng - lng) < 1e-6) m.openPopup()
+  })
+}
+
+// O popup só reposiciona o mapa para caber na tela se abrir depois que o movimento terminou
+function moverEAbrir (mover, n) {
+  mapa.once('moveend', () => setTimeout(() => abrirPopupEm(n.latitude, n.longitude), 50))
+  mover()
+}
+
+function irParaNota (n, zoom = 16) {
+  if (!mapa || !n) return
+  moverEAbrir(() => mapa.setView([n.latitude, n.longitude], zoom), n)
+}
+
+// ── Localização da equipe (modo campo) ──────────────────────────
+function iniciarGps () {
+  if (props.modo !== 'campo' || gpsWatch != null) return
+  if (!navigator.geolocation) { erroGps.value = 'Este aparelho não informa a localização.'; return }
+  gpsWatch = navigator.geolocation.watchPosition(
+    pos => {
+      erroGps.value = ''
+      minhaPos.value = { lat: pos.coords.latitude, lng: pos.coords.longitude, precisao: pos.coords.accuracy }
+      desenharEu()
+      if (seguirPrimeiraPosicao) { seguirPrimeiraPosicao = false; centralizarEmMim() }
+    },
+    err => {
+      erroGps.value = err.code === 1
+        ? 'Localização bloqueada. Permita o acesso à localização para ver onde você está.'
+        : 'Não foi possível obter sua localização agora.'
+    },
+    { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+  )
+}
+
+function pararGps () {
+  if (gpsWatch != null) navigator.geolocation.clearWatch(gpsWatch)
+  gpsWatch = null
+}
+
+function desenharEu () {
+  if (!mapa || !minhaPos.value) return
+  const { lat, lng, precisao } = minhaPos.value
+  if (!marcadorEu) {
+    circuloEu = L.circle([lat, lng], { radius: precisao, color: '#1e88e5', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(mapa)
+    marcadorEu = L.circleMarker([lat, lng], { radius: 8, color: '#fff', weight: 3, fillColor: '#1e88e5', fillOpacity: 1 })
+      .bindTooltip('Você está aqui', { direction: 'top', offset: [0, -6] })
+      .addTo(mapa)
+  } else {
+    marcadorEu.setLatLng([lat, lng])
+    circuloEu.setLatLng([lat, lng]).setRadius(precisao)
+  }
+}
+
+function centralizarEmMim () {
+  if (!minhaPos.value) { seguirPrimeiraPosicao = true; iniciarGps(); return }
+  mapa?.setView([minhaPos.value.lat, minhaPos.value.lng], Math.max(mapa.getZoom(), 14))
+}
+
+function irParaMaisProxima () {
+  if (!minhaPos.value || !notasNoMapa.value.length) return
+  let melhor = null, menor = Infinity
+  for (const n of notasNoMapa.value) {
+    const d = distanciaKm(minhaPos.value, { lat: n.latitude, lng: n.longitude })
+    if (d < menor) { menor = d; melhor = n }
+  }
+  if (!melhor) return
+  moverEAbrir(() => mapa.fitBounds(
+    L.latLngBounds([[minhaPos.value.lat, minhaPos.value.lng], [melhor.latitude, melhor.longitude]]),
+    { padding: [60, 60], maxZoom: 16 }
+  ), melhor)
 }
 
 function desenharMarcadores () {
@@ -157,12 +274,19 @@ function desenharMarcadores () {
       fillOpacity: 0.95
     })
       .bindTooltip(notas.length > 1 ? `${notas.length} notas` : `Nota ${principal.nota}`, { direction: 'top', offset: [0, -6] })
-      .bindPopup(() => popupHtml(notas), { maxWidth: 280, maxHeight: 320 })
+      .bindPopup(() => popupHtml(notas), {
+        maxWidth: Math.min(280, window.innerWidth - 90),
+        minWidth: Math.min(220, window.innerWidth - 90),
+        maxHeight: 320,
+        autoPanPadding: [16, 16]
+      })
       .addTo(camadaMarcadores)
   }
 
   if (!ajustouVisao && notasNoMapa.value.length) {
-    mapa.fitBounds(L.latLngBounds(notasNoMapa.value.map(n => [n.latitude, n.longitude])), { padding: [30, 30] })
+    const alvo = props.foco && notasNoMapa.value.find(n => n.nota === props.foco)
+    if (alvo) irParaNota(alvo, 15)
+    else mapa.fitBounds(L.latLngBounds(notasNoMapa.value.map(n => [n.latitude, n.longitude])), { padding: [30, 30] })
     ajustouVisao = true
   }
 }
@@ -194,9 +318,22 @@ async function montarMapa () {
   ajustouVisao = false
   desenharMarcadores()
   setTimeout(() => mapa?.invalidateSize(), 150)
+
+  window.addEventListener('online', atualizarOnline)
+  window.addEventListener('offline', atualizarOnline)
+  atualizarOnline()
+  if (props.modo === 'campo') {
+    iniciarGps()
+    desenharEu()
+  }
 }
 
 function desmontarMapa () {
+  window.removeEventListener('online', atualizarOnline)
+  window.removeEventListener('offline', atualizarOnline)
+  pararGps()
+  marcadorEu = null
+  circuloEu = null
   mapa?.remove()
   mapa = null
 }
@@ -211,12 +348,7 @@ function irParaBusca () {
   )
   if (!achadas.length) return
   if (achadas.length === 1) {
-    const n = achadas[0]
-    mapa.setView([n.latitude, n.longitude], 16)
-    camadaMarcadores.eachLayer(m => {
-      const p = m.getLatLng()
-      if (Math.abs(p.lat - n.latitude) < 1e-6 && Math.abs(p.lng - n.longitude) < 1e-6) m.openPopup()
-    })
+    irParaNota(achadas[0])
   } else {
     mapa.fitBounds(L.latLngBounds(achadas.map(n => [n.latitude, n.longitude])), { padding: [40, 40], maxZoom: 15 })
   }
@@ -249,6 +381,14 @@ watch(camada, (nova, antiga) => {
 .mapa-leg-item--off { opacity: 0.4; text-decoration: line-through; }
 .mapa-leg-dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.2); }
 .mapa-el { flex: 1; min-height: 300px; }
+.mapa-offline {
+  display: flex; align-items: center; gap: 6px;
+  background: #fff3e0; color: #e65100; font-size: 12px; padding: 6px 12px;
+}
+@media (max-width: 600px) {
+  .mapa-busca { width: 100%; }
+  .mapa-legenda { order: 3; }
+}
 
 :deep(.mp-titulo) { font-weight: 700; margin-bottom: 6px; color: #37474f; }
 :deep(.mp-lista) { display: flex; flex-direction: column; gap: 8px; }
@@ -261,4 +401,12 @@ watch(camada, (nova, antiga) => {
   background: #1976d2; color: #fff; font-size: 12px; font-weight: 600; padding: 4px 10px;
 }
 :deep(.mp-rota) { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; }
+:deep(.mp-dist) { margin-top: 10px; font-size: 12px; font-weight: 700; color: #00695c; }
+:deep(.mp-rotas) { display: flex; gap: 6px; margin-top: 8px; }
+:deep(.mp-rota-btn) {
+  flex: 1; text-align: center; text-decoration: none;
+  border-radius: 8px; padding: 9px 8px; font-size: 13px; font-weight: 700; color: #fff !important;
+}
+:deep(.mp-rota-btn--google) { background: #2e7d32; }
+:deep(.mp-rota-btn--waze) { flex: 0 0 auto; background: #33ccff; color: #0d2b3e !important; }
 </style>

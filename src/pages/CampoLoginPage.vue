@@ -55,7 +55,12 @@
 
       <!-- NOTA -->
       <div class="cl-field">
-        <label class="cl-label">Nota de serviço <span class="cl-req">*</span></label>
+        <div class="cl-label-row">
+          <label class="cl-label">Nota de serviço <span class="cl-req">*</span></label>
+          <button v-if="notas.length" type="button" class="cl-btn-mapa" @click="abrirMapa(null)">
+            <q-icon name="map" size="16px" /> Ver no mapa
+          </button>
+        </div>
 
         <!-- Loading -->
         <div v-if="carregando" class="cl-input-wrap">
@@ -131,6 +136,19 @@
           <span class="cl-chip"><span class="cl-chip-label">PEP</span> {{ notaInfo.pep }}</span>
           <span class="cl-chip"><span class="cl-chip-label">POSTES</span> {{ notaInfo.postes }}</span>
         </div>
+
+        <div v-if="notaInfo && temCoordenada(notaInfo)" class="cl-desloc">
+          <button type="button" class="cl-desloc-btn" @click="iniciarDeslocamento(notaInfo)">
+            <q-icon name="navigation" size="20px" /> Iniciar deslocamento
+          </button>
+          <button type="button" class="cl-desloc-waze" @click="iniciarDeslocamento(notaInfo, 'waze')">Waze</button>
+          <button type="button" class="cl-desloc-mapa" @click="abrirMapa(notaInfo.nota)">
+            <q-icon name="map" size="20px" />
+          </button>
+        </div>
+        <div v-else-if="notaInfo" class="cl-desloc-sem">
+          <q-icon name="location_off" size="14px" /> Esta nota não tem coordenadas na planilha.
+        </div>
       </div>
 
       <!-- CLIENTE -->
@@ -166,6 +184,15 @@
       </button>
 
     </div>
+
+    <MapaNotas
+      v-model="mapaAberto"
+      modo="campo"
+      :grupos="notasParaMapa"
+      :foco="mapaFoco"
+      rotulo-abrir="Selecionar esta nota"
+      @abrir="selecionarDoMapa"
+    />
 
     <ImprevistoDialog
       v-model="imprevistoAberto"
@@ -222,6 +249,8 @@ import { useCampoStore } from 'stores/campo'
 import { useNotasStore } from 'stores/notas'
 import { useQuasar } from 'quasar'
 import ImprevistoDialog from 'components/ImprevistoDialog.vue'
+import MapaNotas from 'components/MapaNotas.vue'
+import { temCoordenada, iniciarDeslocamento } from 'src/utils/rota'
 
 const $q         = useQuasar()
 const router     = useRouter()
@@ -297,6 +326,23 @@ function onBusca () {
   form.nota = ''
   dropdownAberto.value = true
   itemDestacado.value = -1
+}
+
+// ── Mapa: notas que ainda têm trabalho de campo ──────────────────
+const mapaAberto = ref(false)
+const mapaFoco   = ref(null)
+const notasParaMapa = computed(() =>
+  notas.value.filter(n => ['pendente', 'em_andamento'].includes(n.status) || n.nota === form.nota)
+)
+
+function abrirMapa (foco) {
+  mapaFoco.value = foco
+  mapaAberto.value = true
+}
+
+function selecionarDoMapa (n) {
+  mapaAberto.value = false
+  selecionarNota(n)
 }
 
 function selecionarNota (n) {
@@ -452,6 +498,31 @@ onUnmounted(() => {
 .cl-field { display: flex; flex-direction: column; gap: 7px; }
 .cl-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); letter-spacing: 0.08em; text-transform: uppercase; }
 .cl-req   { color: #ef9a9a; }
+.cl-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cl-btn-mapa {
+  display: flex; align-items: center; gap: 4px;
+  border: 1px solid rgba(100,181,246,0.45); background: rgba(25,118,210,0.12);
+  color: #90caf9; border-radius: 20px; padding: 4px 12px;
+  font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.cl-desloc { display: flex; gap: 8px; margin-top: 4px; }
+.cl-desloc-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  border: none; border-radius: 12px; padding: 13px;
+  background: linear-gradient(135deg, #2e7d32, #43a047); color: #fff;
+  font-family: inherit; font-size: 15px; font-weight: 800; cursor: pointer;
+}
+.cl-desloc-waze {
+  border: none; border-radius: 12px; padding: 0 14px;
+  background: #33ccff; color: #0d2b3e;
+  font-family: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
+}
+.cl-desloc-mapa {
+  border: 1px solid rgba(100,181,246,0.45); border-radius: 12px; padding: 0 12px;
+  background: rgba(25,118,210,0.12); color: #90caf9; cursor: pointer;
+}
+.cl-desloc-btn:active, .cl-desloc-waze:active, .cl-desloc-mapa:active { transform: scale(0.97); }
+.cl-desloc-sem { font-size: 12px; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 4px; }
 
 .cl-input-wrap, .cl-select-wrap {
   display: flex; align-items: center; gap: 10px;
