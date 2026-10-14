@@ -512,13 +512,20 @@
       <q-card style="max-width:95vw">
         <q-bar style="background:#0a1628;color:#fff;min-height:42px">
           <q-icon name="photo_camera" size="16px" />
-          <span class="q-ml-sm text-weight-bold" style="font-size:13px">Foto do Medidor</span>
+          <span class="q-ml-sm text-weight-bold" style="font-size:13px">{{ fotoDialogTitulo }}</span>
           <q-space />
           <q-btn icon="close" flat dense round color="white" v-close-popup />
         </q-bar>
         <q-card-section class="q-pa-sm">
-          <img :src="fotoDialogUrl" style="max-width:100%;max-height:75vh;display:block;margin:0 auto;border-radius:8px" />
+          <img :src="fotoDialogLista[fotoDialogIdx]" style="max-width:100%;max-height:75vh;display:block;margin:0 auto;border-radius:8px" />
         </q-card-section>
+        <q-card-actions v-if="fotoDialogLista.length > 1" align="between" class="items-center q-pt-none">
+          <q-btn flat round icon="chevron_left" :disable="fotoDialogIdx === 0" @click="fotoDialogIdx--" />
+          <span class="text-caption text-grey-8">
+            {{ fotoDialogIdx === 0 ? 'Foto principal' : `Adicional ${fotoDialogIdx}` }} · {{ fotoDialogIdx + 1 }} de {{ fotoDialogLista.length }}
+          </span>
+          <q-btn flat round icon="chevron_right" :disable="fotoDialogIdx >= fotoDialogLista.length - 1" @click="fotoDialogIdx++" />
+        </q-card-actions>
       </q-card>
     </q-dialog>
 
@@ -689,9 +696,10 @@
                     <div
                       class="pg-item-foto"
                       :class="{ 'pg-item-foto--clickable': !!r.foto_url }"
-                      @click="r.foto_url && verFoto(r.foto_url)"
+                      @click="r.foto_url && verFotosPoste(r)"
                     >
                       <img v-if="r.foto_url" :src="r.foto_url" class="pg-item-img" alt="foto poste" />
+                      <span v-if="r.fotos_extras?.length" class="pg-item-foto-count">+{{ r.fotos_extras.length }}</span>
                       <div v-else class="pg-item-sem-foto" title="Foto não enviada">
                         <q-icon name="hide_image" size="20px" />
                         <span>Sem foto</span>
@@ -715,10 +723,10 @@
                       v-if="r.foto_url"
                       flat dense size="sm"
                       icon="zoom_in"
-                      label="Ver foto"
+                      :label="r.fotos_extras?.length ? `Ver ${r.fotos_extras.length + 1} fotos` : 'Ver foto'"
                       color="orange-9"
                       class="pg-item-ver-foto"
-                      @click="verFoto(r.foto_url)"
+                      @click="verFotosPoste(r)"
                     />
 
                     <q-btn
@@ -1209,7 +1217,9 @@ const padraoOptions   = ['PP', '5 M', '7 M']
 // Foto medidor
 const fotoInput        = ref(null)
 const clienteIndexFoto = ref(null)
-const fotoDialogUrl    = ref(null)
+const fotoDialogLista  = ref([])
+const fotoDialogIdx    = ref(0)
+const fotoDialogTitulo = ref('Foto do Medidor')
 const fotoDialog       = ref(false)
 const objectUrls       = []
 const tentouSalvar     = ref(false)
@@ -1332,7 +1342,16 @@ function removerFoto (c, fi) {
 }
 
 function verFoto (url) {
-  fotoDialogUrl.value = url
+  fotoDialogLista.value = [url]
+  fotoDialogIdx.value = 0
+  fotoDialogTitulo.value = 'Foto do Medidor'
+  fotoDialog.value = true
+}
+
+function verFotosPoste (r) {
+  fotoDialogLista.value = [r.foto_url, ...(r.fotos_extras || [])].filter(Boolean)
+  fotoDialogIdx.value = 0
+  fotoDialogTitulo.value = `Fotos do PG ${r.pg_numero}`
   fotoDialog.value = true
 }
 function removerCliente (i) { clientes.splice(i, 1) }
@@ -1939,8 +1958,14 @@ notasStore.fetchNotas()
 
 .pg-item-foto {
   width: 64px; height: 64px; border-radius: 10px;
-  overflow: hidden; flex-shrink: 0;
+  overflow: hidden; flex-shrink: 0; position: relative;
   background: #fff8e1; border: 1px solid #ffe082;
+}
+.pg-item-foto-count {
+  position: absolute; right: 3px; bottom: 3px;
+  background: rgba(0,0,0,0.65); color: #fff;
+  font-size: 10px; font-weight: 800;
+  border-radius: 8px; padding: 1px 5px;
 }
 .pg-item-foto--clickable { cursor: zoom-in; }
 .pg-item-foto--clickable:hover .pg-item-img { opacity: 0.85; }

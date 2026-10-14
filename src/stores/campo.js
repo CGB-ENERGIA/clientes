@@ -22,8 +22,35 @@ export const MOTIVOS_IMPREVISTO = [
 ]
 
 function lerJson (key, padrao) { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? padrao } catch { return padrao } }
-function lerFila  () { return lerJson(QUEUE_KEY, []) }
 function lerSessao() { return lerJson(SESSAO_KEY, null) }
+
+// A fila de postes (com fotos em base64) fica no IndexedDB: o localStorage tem só ~5 MB,
+// o que não comporta um dia inteiro offline com várias fotos por poste.
+const IDB_NOME = 'cgb_campo'
+const IDB_STORE = 'fila'
+
+function abrirIdb () {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NOME, 1)
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE, { keyPath: 'id' })
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function idb (modo, fn) {
+  const db = await abrirIdb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, modo)
+    const req = fn(tx.objectStore(IDB_STORE))
+    tx.oncomplete = () => { db.close(); resolve(req?.result) }
+    tx.onerror = () => { db.close(); reject(tx.error) }
+  })
+}
+
+const idbTodos   = () => idb('readonly', s => s.getAll())
+const idbSalvar  = rec => idb('readwrite', s => s.put(rec))
+const idbRemover = id => idb('readwrite', s => s.delete(id))
 
 function b64ToBlob (b64, mime) {
   const str = atob(b64.split(',')[1])
@@ -35,9 +62,24 @@ function b64ToBlob (b64, mime) {
 export const useCampoStore = defineStore('campo', () => {
   const sessao       = ref(lerSessao())
   const registros    = ref([])
-  const fila         = ref(lerFila())
+  const fila         = ref([])
   const online       = ref(navigator.onLine)
   const sincronizando = ref(false)
+
+  // Carrega a fila do IndexedDB e migra a fila antiga que ficava no localStorage
+  const filaPronta = (async () => {
+    try {
+      const legado = lerJson(QUEUE_KEY, [])
+      for (const r of legado) await idbSalvar(r)
+      if (legado.length) localStorage.removeItem(QUEUE_KEY)
+      const todos = await idbTodos()
+      fila.value = (todos || []).sort((a, b) => a.created_at.localeCompare(b.created_at))
+    } catch (e) {
+      console.warn('[Campo] IndexedDB indisponível:', e)
+      fila.value = lerJson(QUEUE_KEY, [])
+    }
+    if (online.value && fila.value.length) sincronizar()
+  })()
 
   window.addEventListener('online',  () => { online.value = true;  sincronizar() })
   window.addEventListener('offline', () => { online.value = false })
@@ -84,6 +126,7 @@ export const useCampoStore = defineStore('campo', () => {
         localStorage.setItem(key, JSON.stringify(data))
       }
     }
+    await filaPronta
     const pendentes = fila.value.filter(r => r.nota === nota)
     const ids = new Set(pendentes.map(r => r.id))
     const daSessao = registros.value.filter(r => r.nota === nota && !ids.has(r.id))
@@ -117,7 +160,7 @@ export const useCampoStore = defineStore('campo', () => {
   }
 
   // ── Salvar registro (online ou offline) ───────────────────────
-  async function salvarRegistro ({ pg, fotoB64, fotoMime }) {
+  async function salvarRegistro ({ pg, fotoB64, extrasB64 = [] }) {
     const id = crypto.randomUUID()
     const rec = {
       id,
@@ -127,18 +170,29 @@ export const useCampoStore = defineStore('campo', () => {
       equipe:     sessao.value.equipe,
       pg_numero:  pg,
       foto_b64:   fotoB64,
-      foto_mime:  fotoMime,
+      extras_b64: extrasB64,
       foto_url:   null,
+      fotos_extras: [],
       created_at: new Date().toISOString(),
       sync:       false
     }
 
+    // Grava no aparelho antes de qualquer envio: se falhar aqui, o poste não é dado como salvo
+    await filaPronta
+    await idbSalvar(rec)
     registros.value.unshift(rec)
     fila.value.push(rec)
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(fila.value))
 
-    if (online.value) await sincronizar()
+    if (online.value) sincronizar()
     return rec
+  }
+
+  async function enviarFoto (b64, nome) {
+    const { error } = await supabase.storage
+      .from('campo-fotos')
+      .upload(nome, b64ToBlob(b64, 'image/jpeg'), { contentType: 'image/jpeg', upsert: true })
+    if (error) { console.warn('[Campo] upload foto:', error.message); return null }
+    return supabase.storage.from('campo-fotos').getPublicUrl(nome).data.publicUrl
   }
 
   // ── Sincronizar fila com Supabase ─────────────────────────────
@@ -174,23 +228,20 @@ export const useCampoStore = defineStore('campo', () => {
     const pendentes = [...fila.value]
     for (const r of pendentes) {
       try {
+        // Só remove da fila quando a foto principal e todas as extras foram enviadas
         let foto_url = null
-
         if (r.foto_b64) {
-          const blob = b64ToBlob(r.foto_b64, r.foto_mime || 'image/jpeg')
-          const nome = `${r.id}.jpg`
-          const { error: upErr } = await supabase.storage
-            .from('campo-fotos')
-            .upload(nome, blob, { contentType: 'image/jpeg', upsert: true })
-
-          if (upErr) {
-            console.warn('[Campo] upload foto:', upErr.message)
-            continue
-          }
-
-          const { data: urlData } = supabase.storage.from('campo-fotos').getPublicUrl(nome)
-          foto_url = urlData.publicUrl
+          foto_url = await enviarFoto(r.foto_b64, `${r.id}.jpg`)
+          if (!foto_url) continue
         }
+        const extras = r.extras_b64 || []
+        const fotos_extras = []
+        for (let i = 0; i < extras.length; i++) {
+          const url = await enviarFoto(extras[i], `${r.id}_${i + 1}.jpg`)
+          if (!url) break
+          fotos_extras.push(url)
+        }
+        if (fotos_extras.length < extras.length) continue
 
         const { error: dbErr } = await supabase.from('campo_registros').upsert({
           id:         r.id,
@@ -200,25 +251,22 @@ export const useCampoStore = defineStore('campo', () => {
           equipe:     r.equipe,
           pg_numero:  r.pg_numero,
           foto_url,
+          fotos_extras,
           created_at: r.created_at
         })
+        if (dbErr) { console.warn('[Campo] registro:', dbErr.message); continue }
 
-        if (!dbErr) {
-          const fotoOk = !r.foto_b64 || !!foto_url
-          if (!fotoOk) continue
+        await idbRemover(r.id).catch(() => {})
+        fila.value = fila.value.filter(f => f.id !== r.id)
+        const local = registros.value.find(l => l.id === r.id)
+        if (local) Object.assign(local, { sync: true, foto_url, fotos_extras })
 
-          fila.value = fila.value.filter(f => f.id !== r.id)
-          const local = registros.value.find(l => l.id === r.id)
-          if (local) { local.sync = true; local.foto_url = foto_url }
-
-          if (r.nota) await supabase.rpc('campo_marcar_em_andamento', { p_nota: r.nota })
-        }
+        if (r.nota) await supabase.rpc('campo_marcar_em_andamento', { p_nota: r.nota })
       } catch (e) {
         console.warn('[Campo] sync error:', e)
       }
     }
 
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(fila.value))
     sincronizando.value = false
   }
 

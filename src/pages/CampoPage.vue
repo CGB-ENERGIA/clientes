@@ -31,12 +31,14 @@
     <!-- ── ÁREA DE REGISTRO ───────────────────────────────────── -->
     <main class="cp-main">
 
-      <!-- CARD de novo registro -->
-      <div class="cp-card" v-if="!fotoPreview">
+      <div class="cp-card">
 
-        <h2 class="cp-card-title">Registrar Poste</h2>
+        <h2 class="cp-card-title">
+          {{ fotoPrincipal ? 'Poste em registro' : 'Registrar Poste' }}
+          <span v-if="fotoPrincipal" class="cp-card-step">{{ 1 + extras.length }} {{ extras.length ? 'fotos' : 'foto' }}</span>
+        </h2>
 
-        <!-- PG input -->
+        <!-- 1. PG -->
         <div class="cp-pg-wrap">
           <label class="cp-pg-label">Número do PG</label>
           <input
@@ -46,34 +48,55 @@
             type="text"
             inputmode="text"
             maxlength="20"
-            @keyup.enter="abrirCamera"
+            @keyup.enter="!fotoPrincipal && abrirCamera('principal')"
           />
         </div>
 
-        <!-- Botão câmera -->
-        <button class="cp-camera-btn" @click="abrirCamera" :disabled="!pg.trim()">
+        <!-- 2. Foto principal -->
+        <button v-if="!fotoPrincipal" class="cp-camera-btn" @click="abrirCamera('principal')" :disabled="!pg.trim()">
           <div class="cp-camera-icon">
             <q-icon name="photo_camera" size="40px" />
           </div>
-          <span>{{ pg.trim() ? 'Tirar Foto do Poste' : 'Digite o PG primeiro' }}</span>
+          <span>{{ pg.trim() ? 'Tirar foto principal do poste' : 'Digite o PG primeiro' }}</span>
         </button>
 
-      </div>
+        <template v-else>
+          <div class="cp-fotos-label">Foto principal</div>
+          <div class="cp-principal">
+            <img :src="fotoPrincipal" class="cp-principal-img" alt="foto principal do poste" @click="verFotos(fotosPosteAtual, 0)" />
+            <button class="cp-principal-refazer" @click="abrirCamera('principal')">
+              <q-icon name="replay" size="16px" /> Refazer
+            </button>
+          </div>
 
-      <!-- PREVIEW da foto -->
-      <div class="cp-preview-card" v-else>
-        <div class="cp-preview-pg">PG: <strong>{{ pg }}</strong></div>
-        <img :src="fotoPreview" class="cp-preview-img" alt="foto do poste" />
-        <div class="cp-preview-actions">
-          <button class="cp-btn-refazer" @click="refazerFoto">
-            <q-icon name="replay" size="20px" /> Refazer
-          </button>
-          <button class="cp-btn-salvar" @click="salvar" :disabled="salvando">
-            <q-circular-progress v-if="salvando" indeterminate size="20px" color="white" />
-            <q-icon v-else name="check_circle" size="20px" />
-            {{ salvando ? 'Salvando…' : 'Salvar' }}
-          </button>
-        </div>
+          <!-- 3. Fotos adicionais -->
+          <div class="cp-fotos-label">Fotos adicionais <span class="cp-fotos-opc">(opcional)</span></div>
+          <div class="cp-extras">
+            <div v-for="(f, i) in extras" :key="i" class="cp-extra">
+              <img :src="f" alt="foto adicional" @click="verFotos(fotosPosteAtual, i + 1)" />
+              <button class="cp-extra-x" @click="extras.splice(i, 1)">
+                <q-icon name="close" size="14px" />
+              </button>
+            </div>
+            <button class="cp-extra-add" @click="abrirCamera('extra')">
+              <q-icon name="add_a_photo" size="24px" />
+              <span>Adicionar</span>
+            </button>
+          </div>
+
+          <!-- 4. Salvar e partir para o próximo -->
+          <div class="cp-preview-actions">
+            <button class="cp-btn-refazer" @click="descartarPoste">
+              <q-icon name="delete_outline" size="20px" /> Descartar
+            </button>
+            <button class="cp-btn-salvar" @click="salvar" :disabled="salvando || !pg.trim()">
+              <q-circular-progress v-if="salvando" indeterminate size="20px" color="white" />
+              <q-icon v-else name="check_circle" size="20px" />
+              {{ salvando ? 'Salvando…' : 'Salvar poste' }}
+            </button>
+          </div>
+        </template>
+
       </div>
 
     </main>
@@ -95,13 +118,10 @@
       </div>
       <div class="cp-list-scroll">
         <div v-for="reg in store.registros" :key="reg.id" class="cp-reg-item">
-          <img
-            v-if="reg.foto_b64 || reg.foto_url"
-            :src="reg.foto_url || reg.foto_b64"
-            class="cp-reg-thumb"
-            alt="foto do poste"
-            @click="verFoto(reg.foto_url || reg.foto_b64)"
-          />
+          <div v-if="fotosDe(reg).length" class="cp-reg-thumb-wrap" @click="verFotos(fotosDe(reg), 0)">
+            <img :src="fotosDe(reg)[0]" class="cp-reg-thumb" alt="foto do poste" />
+            <span v-if="fotosDe(reg).length > 1" class="cp-reg-thumb-count">+{{ fotosDe(reg).length - 1 }}</span>
+          </div>
           <div class="cp-reg-thumb cp-reg-thumb--empty" v-else>
             <q-icon name="image_not_supported" size="20px" />
           </div>
@@ -118,7 +138,7 @@
       </div>
     </section>
 
-    <div class="cp-empty" v-else-if="!fotoPreview">
+    <div class="cp-empty" v-else-if="!fotoPrincipal">
       <q-spinner v-if="store.carregandoHist" size="32px" color="grey-6" />
       <template v-else>
         <q-icon name="camera_alt" size="48px" class="cp-empty-icon" />
@@ -127,7 +147,7 @@
     </div>
 
     <!-- ── RODAPÉ: pausar e retomar outro dia ─────────────────── -->
-    <footer v-if="!fotoPreview" class="cp-footer">
+    <footer v-if="!fotoPrincipal" class="cp-footer">
       <button class="cp-btn-imprevisto" @click="imprevistoAberto = true">
         <q-icon name="report_problem" size="20px" />
         Imprevisto
@@ -171,7 +191,7 @@
         </div>
 
         <!-- Indicador de câmera traseira -->
-        <div class="cam-pg-label">PG: {{ pg }}</div>
+        <div class="cam-pg-label">PG: {{ pg }} · {{ modoCaptura === 'extra' ? `Foto adicional ${extras.length + 1}` : 'Foto principal' }}</div>
 
         <!-- Controles -->
         <div class="cam-controls">
@@ -193,11 +213,18 @@
 
     <!-- Visualizador de foto -->
     <q-dialog v-model="fotoDialog">
-      <q-card style="max-width:95vw;background:#0a1628">
+      <q-card style="width:95vw;max-width:520px;background:#0a1628;color:#fff">
         <q-card-section class="q-pa-sm">
-          <img :src="fotoDialogUrl" style="max-width:100%;max-height:80vh;display:block;margin:0 auto;border-radius:8px" alt="foto ampliada" />
+          <img :src="fotoDialogLista[fotoDialogIdx]" style="max-width:100%;max-height:70vh;display:block;margin:0 auto;border-radius:8px" alt="foto ampliada" />
         </q-card-section>
-        <q-card-actions align="right">
+        <q-card-actions align="between" class="items-center">
+          <q-btn flat round icon="chevron_left" color="white" :disable="fotoDialogIdx === 0" @click="fotoDialogIdx--" />
+          <span class="text-caption">
+            {{ fotoDialogIdx === 0 ? 'Foto principal' : `Adicional ${fotoDialogIdx}` }} · {{ fotoDialogIdx + 1 }} de {{ fotoDialogLista.length }}
+          </span>
+          <q-btn flat round icon="chevron_right" color="white" :disable="fotoDialogIdx >= fotoDialogLista.length - 1" @click="fotoDialogIdx++" />
+        </q-card-actions>
+        <q-card-actions align="right" class="q-pt-none">
           <q-btn flat label="Fechar" color="white" v-close-popup />
         </q-card-actions>
       </q-card>
@@ -242,11 +269,38 @@ const anteriores  = computed(() =>
 
 // ── Estado ──────────────────────────────────────────────────────
 const pg             = ref('')
-const fotoPreview    = ref(null)
-const fotoB64        = ref(null)
+const fotoPrincipal  = ref(null)
+const extras         = ref([])
+const modoCaptura    = ref('principal')
 const salvando       = ref(false)
 const fotoDialog     = ref(false)
-const fotoDialogUrl  = ref(null)
+const fotoDialogLista = ref([])
+const fotoDialogIdx  = ref(0)
+
+const fotosPosteAtual = computed(() => fotoPrincipal.value ? [fotoPrincipal.value, ...extras.value] : [])
+
+function fotosDe (reg) {
+  const principal = reg.foto_url || reg.foto_b64
+  const adicionais = reg.fotos_extras?.length ? reg.fotos_extras : (reg.extras_b64 || [])
+  return [principal, ...adicionais].filter(Boolean)
+}
+
+function aplicarFoto (b64) {
+  if (modoCaptura.value === 'extra') extras.value.push(b64)
+  else fotoPrincipal.value = b64
+}
+
+function descartarPoste () {
+  $q.dialog({
+    title: 'Descartar este poste?',
+    message: `As ${fotosPosteAtual.value.length} foto(s) do PG ${pg.value.trim()} serão perdidas.`,
+    cancel: { label: 'Voltar', flat: true },
+    ok: { label: 'Descartar', color: 'negative' }
+  }).onOk(() => {
+    fotoPrincipal.value = null
+    extras.value = []
+  })
+}
 
 // ── Câmera ──────────────────────────────────────────────────────
 const cameraAberta  = ref(false)
@@ -300,8 +354,9 @@ async function iniciarStream () {
   }
 }
 
-function abrirCamera () {
+function abrirCamera (modo = 'principal') {
   if (!pg.value.trim()) return
+  modoCaptura.value = modo
   gps.value = null
   cameraAberta.value = true
   iniciarRelogio()
@@ -344,10 +399,7 @@ function capturar () {
   // ── Watermark ─────────────────────────────────────────────────
   desenharWatermark(ctx, w, h)
 
-  const b64 = canvas.toDataURL('image/jpeg', 0.88)
-  fotoB64.value     = b64
-  fotoPreview.value = b64
-
+  aplicarFoto(canvas.toDataURL('image/jpeg', 0.88))
   fecharCamera()
 }
 
@@ -428,9 +480,7 @@ function abrirCameraFallback () {
         const ctx = c.getContext('2d')
         ctx.drawImage(img, 0, 0, w, h)
         desenharWatermark(ctx, w, h)
-        const b64 = c.toDataURL('image/jpeg', 0.88)
-        fotoB64.value     = b64
-        fotoPreview.value = b64
+        aplicarFoto(c.toDataURL('image/jpeg', 0.88))
       }
       img.src = ev.target.result
     }
@@ -439,15 +489,9 @@ function abrirCameraFallback () {
   inp.click()
 }
 
-// ── Refazer / salvar ────────────────────────────────────────────
-function refazerFoto () {
-  fotoPreview.value = null
-  fotoB64.value     = null
-  abrirCamera()
-}
-
+// ── Salvar poste ────────────────────────────────────────────────
 function salvar () {
-  if (!pg.value.trim() || !fotoB64.value) return
+  if (!pg.value.trim() || !fotoPrincipal.value) return
   const alvo = pg.value.trim().toUpperCase()
   const repetido = store.registros.find(r => String(r.pg_numero).trim().toUpperCase() === alvo)
   if (!repetido) return gravar()
@@ -462,11 +506,18 @@ function salvar () {
 async function gravar () {
   salvando.value = true
   try {
-    await store.salvarRegistro({ pg: pg.value.trim(), fotoB64: fotoB64.value, fotoMime: 'image/jpeg' })
-    $q.notify({ type: 'positive', message: `PG ${pg.value} salvo!`, position: 'top', timeout: 1800 })
+    const total = fotosPosteAtual.value.length
+    await store.salvarRegistro({ pg: pg.value.trim(), fotoB64: fotoPrincipal.value, extrasB64: [...extras.value] })
+    $q.notify({
+      type: 'positive',
+      message: `PG ${pg.value.trim()} salvo com ${total} ${total === 1 ? 'foto' : 'fotos'}. Registre o próximo poste.`,
+      position: 'top', timeout: 2200
+    })
     pg.value = ''
-    fotoPreview.value = null
-    fotoB64.value     = null
+    fotoPrincipal.value = null
+    extras.value = []
+  } catch (e) {
+    $q.notify({ type: 'negative', message: 'Não foi possível salvar o poste no aparelho: ' + e.message, position: 'top', timeout: 6000 })
   } finally {
     salvando.value = false
   }
@@ -518,7 +569,8 @@ function concluirMaisTarde () {
 function encerrar () {
   $q.dialog({
     title: 'Encerrar turno?',
-    message: 'Os postes registrados ficam salvos. Para continuar outro dia, inicie um turno com a mesma nota.',
+    message: (fotoPrincipal.value ? `Atenção: o PG ${pg.value.trim()} em registro ainda não foi salvo e as fotos dele serão perdidas. ` : '') +
+      'Os postes registrados ficam salvos. Para continuar outro dia, inicie um turno com a mesma nota.',
     cancel: true, ok: 'Encerrar', color: 'negative'
   }).onOk(() => {
     store.encerrarSessao()
@@ -541,9 +593,10 @@ function formatarQuando (iso) {
   return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${hora}`
 }
 
-function verFoto (url) {
-  if (!url) return
-  fotoDialogUrl.value = url
+function verFotos (lista, idx = 0) {
+  if (!lista?.length) return
+  fotoDialogLista.value = lista
+  fotoDialogIdx.value = idx
   fotoDialog.value = true
 }
 
@@ -673,6 +726,57 @@ onUnmounted(() => {
   width: 72px; height: 72px; border-radius: 50%;
   background: rgba(25,118,210,0.15);
   display: flex; align-items: center; justify-content: center;
+}
+
+/* Poste em registro: foto principal + adicionais */
+.cp-card-title { display: flex; align-items: center; gap: 10px; }
+.cp-card-step {
+  font-size: 11px; font-weight: 700;
+  color: #90caf9; background: rgba(25,118,210,0.18);
+  border-radius: 20px; padding: 2px 10px;
+}
+.cp-fotos-label {
+  font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4);
+  letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: -10px;
+}
+.cp-fotos-opc { text-transform: none; font-weight: 500; letter-spacing: 0; }
+.cp-principal { position: relative; }
+.cp-principal-img {
+  width: 100%; max-height: 260px; object-fit: cover;
+  border-radius: 14px; display: block; background: #0a1628; cursor: pointer;
+}
+.cp-principal-refazer {
+  position: absolute; right: 10px; bottom: 10px;
+  display: flex; align-items: center; gap: 4px;
+  border: none; border-radius: 20px; padding: 6px 12px;
+  background: rgba(0,0,0,0.6); color: #fff;
+  font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.cp-extras { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.cp-extra { position: relative; aspect-ratio: 1; }
+.cp-extra img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; cursor: pointer; }
+.cp-extra-x {
+  position: absolute; top: -6px; right: -6px;
+  width: 22px; height: 22px; border-radius: 50%; border: none;
+  background: #c62828; color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.cp-extra-add {
+  aspect-ratio: 1;
+  border-radius: 10px; border: 2px dashed rgba(25,118,210,0.5);
+  background: rgba(25,118,210,0.08); color: #64b5f6;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cp-extra-add:active { transform: scale(0.95); }
+.cp-reg-thumb-wrap { position: relative; flex-shrink: 0; cursor: pointer; }
+.cp-reg-thumb-count {
+  position: absolute; right: -4px; bottom: -4px;
+  background: #1976d2; color: #fff;
+  font-size: 10px; font-weight: 800;
+  border-radius: 10px; padding: 1px 6px;
+  border: 2px solid #0e1e35;
 }
 
 /* Preview */
