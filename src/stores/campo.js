@@ -9,6 +9,7 @@ const RESUMO_KEY  = 'cgb_campo_resumo'
 const HIST_PREFIX = 'cgb_campo_hist_'
 const PAUSA_KEY   = 'cgb_campo_pausadas'
 const IMPREV_KEY  = 'cgb_campo_imprevistos_fila'
+const STATUS_KEY  = 'cgb_campo_status_fila'
 
 export const MOTIVOS_IMPREVISTO = [
   'Sem acesso ao local',
@@ -145,12 +146,49 @@ export const useCampoStore = defineStore('campo', () => {
     const s = sessao.value
     if (!s) return
     const registrados = registros.value.length
+    if (registrados) enfileirarStatus(s.nota, 'andamento')
     pausadas.value = [
       { nota: s.nota, equipe: s.equipe, em: new Date().toISOString(), registrados },
       ...pausadas.value.filter(p => p.nota !== s.nota)
     ].slice(0, 20)
     localStorage.setItem(PAUSA_KEY, JSON.stringify(pausadas.value))
     encerrarSessao()
+  }
+
+  // ── Mudança de status da nota pelo campo ─────────────────────
+  // 'andamento' (Concluir mais tarde) → Andamento; 'finalizar' → Baixar Medidor.
+  const filaStatus = ref(lerJson(STATUS_KEY, []))
+
+  function gravarFilaStatus () {
+    localStorage.setItem(STATUS_KEY, JSON.stringify(filaStatus.value))
+  }
+
+  function enfileirarStatus (nota, acao) {
+    filaStatus.value = [...filaStatus.value.filter(s => s.nota !== nota), { nota, acao }]
+    gravarFilaStatus()
+  }
+
+  async function enviarStatus () {
+    for (const s of [...filaStatus.value]) {
+      // A nota só vai para Baixar Medidor depois que todos os postes dela chegaram ao sistema
+      if (fila.value.some(r => r.nota === s.nota)) continue
+      const fn = s.acao === 'finalizar' ? 'campo_finalizar_nota' : 'campo_marcar_em_andamento'
+      const { error } = await supabase.rpc(fn, { p_nota: s.nota })
+      if (error) { console.warn('[Campo] status:', error.message); continue }
+      filaStatus.value = filaStatus.value.filter(x => x !== s)
+    }
+    gravarFilaStatus()
+  }
+
+  async function finalizarSessao () {
+    const s = sessao.value
+    if (!s) return
+    enfileirarStatus(s.nota, 'finalizar')
+    pausadas.value = pausadas.value.filter(p => p.nota !== s.nota)
+    localStorage.setItem(PAUSA_KEY, JSON.stringify(pausadas.value))
+    encerrarSessao()
+    if (online.value) await sincronizar()
+    return { enviado: !filaStatus.value.some(x => x.nota === s.nota) }
   }
 
   function encerrarSessao () {
@@ -222,7 +260,11 @@ export const useCampoStore = defineStore('campo', () => {
 
   async function sincronizar () {
     if (filaImprevistos.value.length) await enviarImprevistos()
-    if (sincronizando.value || fila.value.length === 0) return
+    if (sincronizando.value) return
+    if (fila.value.length === 0) {
+      if (filaStatus.value.length) await enviarStatus()
+      return
+    }
     sincronizando.value = true
 
     const pendentes = [...fila.value]
@@ -267,14 +309,15 @@ export const useCampoStore = defineStore('campo', () => {
       }
     }
 
+    if (filaStatus.value.length) await enviarStatus()
     sincronizando.value = false
   }
 
   return {
     sessao, registros, fila, online, sincronizando,
-    resumoNotas, ultimaEquipe, carregandoHist, pausadas, filaImprevistos,
+    resumoNotas, ultimaEquipe, carregandoHist, pausadas, filaImprevistos, filaStatus,
     reportarImprevisto,
-    iniciarSessao, encerrarSessao, pausarSessao, salvarRegistro, sincronizar,
+    iniciarSessao, encerrarSessao, pausarSessao, finalizarSessao, salvarRegistro, sincronizar,
     carregarResumo, carregarRegistrosNota
   }
 })

@@ -148,6 +148,10 @@
 
     <!-- ── RODAPÉ: pausar e retomar outro dia ─────────────────── -->
     <footer v-if="!fotoPrincipal" class="cp-footer">
+      <button v-if="store.registros.length" class="cp-btn-finalizar" @click="finalizarNota">
+        <q-icon name="task_alt" size="20px" />
+        Finalizar nota
+      </button>
       <button class="cp-btn-imprevisto" @click="imprevistoAberto = true">
         <q-icon name="report_problem" size="20px" />
         Imprevisto
@@ -543,6 +547,33 @@ function onImprevistoEnviado ({ enviado }) {
   router.push('/campo')
 }
 
+function finalizarNota () {
+  const total = store.registros.length
+  const nota  = store.sessao?.nota
+  const faltam = postesPrevistos.value > total ? postesPrevistos.value - total : 0
+  $q.dialog({
+    title: `Finalizar a nota ${nota}?`,
+    message: `${total} ${total === 1 ? 'poste registrado' : 'postes registrados'}` +
+      (postesPrevistos.value ? ` de ${postesPrevistos.value} previstos` : '') + '. ' +
+      (faltam ? `Ainda faltam ${faltam} poste(s) previsto(s). ` : '') +
+      'A nota seguirá para "Baixar Medidor" no sistema e sairá da lista "Continuar de onde parou". ' +
+      'Se ainda for voltar ao local, use "Concluir mais tarde".',
+    cancel: { label: 'Voltar', flat: true },
+    ok: { label: 'Finalizar', color: 'positive', unelevated: true }
+  }).onOk(async () => {
+    const { enviado } = await store.finalizarSessao()
+    store.carregarResumo()
+    $q.notify({
+      type: enviado ? 'positive' : 'warning',
+      message: enviado
+        ? `Nota ${nota} finalizada e enviada para Baixar Medidor.`
+        : `Nota ${nota} finalizada. Será enviada para Baixar Medidor quando todos os postes subirem — não desinstale o app.`,
+      position: 'top', timeout: enviado ? 2500 : 6000
+    })
+    router.push('/campo')
+  })
+}
+
 function concluirMaisTarde () {
   const total = store.registros.length
   const pend  = store.fila.filter(r => r.nota === store.sessao?.nota).length
@@ -855,7 +886,21 @@ onUnmounted(() => {
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
   background: linear-gradient(180deg, rgba(6,13,26,0) 0%, #060d1a 35%);
 }
-.cp-footer { display: flex; gap: 10px; }
+.cp-footer { display: flex; flex-wrap: wrap; gap: 10px; }
+.cp-btn-finalizar {
+  flex: 1 1 100%;
+  padding: 15px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, #2e7d32, #43a047);
+  color: #fff;
+  font-family: inherit; font-size: 15px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(46,125,50,0.35);
+  -webkit-tap-highlight-color: transparent;
+}
+.cp-btn-finalizar:active { transform: scale(0.97); }
 .cp-btn-imprevisto {
   flex: 0 0 auto;
   padding: 15px 16px;

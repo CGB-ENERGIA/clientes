@@ -382,7 +382,7 @@
               <q-icon name="schedule" size="13px" /> Aguardando início
             </template>
             <template v-else-if="n.status === 'em_andamento'">
-              <q-icon name="construction" size="13px" /> Campo em andamento — postes sendo registrados
+              <q-icon name="construction" size="13px" /> Campo em andamento — aguardando a equipe finalizar
             </template>
             <template v-else-if="n.status === 'baixar_medidor'">
               <q-icon name="speed" size="13px" /> Registre o Nº do medidor e a foto
@@ -606,6 +606,29 @@
               @click="resolverImprevisto(imp)"
             >
               <q-tooltip>Marcar imprevisto como resolvido (remove o selo)</q-tooltip>
+            </q-btn>
+          </div>
+
+          <div v-if="notaAtiva && !podeConcluir" class="fluxo-banner">
+            <q-icon name="info" size="20px" color="orange-9" />
+            <div class="fluxo-banner-txt">
+              <template v-if="notaAtiva.status === 'em_andamento'">
+                Nota em <b>Andamento</b>: aguardando a equipe tocar em <b>"Finalizar nota"</b> no app de campo.
+              </template>
+              <template v-else>
+                Nota em <b>{{ labelStatus(notaAtiva.status) }}</b>.
+              </template>
+              Você pode preencher e salvar como rascunho; a conclusão é liberada quando a nota estiver em <b>Baixar Medidor</b>.
+            </div>
+            <q-btn
+              v-if="['pendente', 'em_andamento'].includes(notaAtiva.status)"
+              label="Enviar para Baixar Medidor"
+              icon="speed"
+              color="blue-7"
+              outline dense size="sm"
+              @click="alterarStatus('baixar_medidor')"
+            >
+              <q-tooltip>Use quando a equipe concluiu o campo mas não finalizou pelo app</q-tooltip>
             </q-btn>
           </div>
 
@@ -888,15 +911,20 @@
           >
             <q-tooltip>Guarda o que já foi preenchido sem concluir a nota</q-tooltip>
           </q-btn>
-          <q-btn
-            label="Salvar e Concluir"
-            icon="check_circle"
-            color="positive"
-            unelevated
-            :loading="salvando === 'concluir'"
-            :disable="!clientes.length || !!salvando"
-            @click="salvar(false)"
-          />
+          <div>
+            <q-btn
+              label="Salvar e Concluir"
+              icon="check_circle"
+              color="positive"
+              unelevated
+              :loading="salvando === 'concluir'"
+              :disable="!clientes.length || !!salvando || !podeConcluir"
+              @click="salvar(false)"
+            />
+            <q-tooltip v-if="!podeConcluir" class="text-body2">
+              Só notas em "Baixar Medidor" podem ser concluídas. Esta nota está em "{{ labelStatus(notaAtiva?.status) }}".
+            </q-tooltip>
+          </div>
         </q-card-actions>
 
       </q-card>
@@ -1124,9 +1152,9 @@ const statusOpcoes = [
 
 const statusLegenda = [
   { val: 'pendente',       label: 'Não Iniciado',   icon: 'schedule',     color: 'grey-6',   desc: 'Nota importada, mas a equipe de campo ainda não registrou nenhum poste.' },
-  { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', color: 'orange',   desc: 'A equipe já começou a registrar os postes (PG + foto) pelo app de campo.' },
-  { val: 'baixar_medidor', label: 'Baixar Medidor', icon: 'speed',        color: 'blue',     desc: 'Cliente ligado em campo. Falta registrar o Nº do medidor e a foto de cada cliente.' },
-  { val: 'concluido',      label: 'Concluído',      icon: 'check_circle', color: 'positive', desc: 'Ligado e medidor baixado (ou finalizado no CCS). Nenhuma ação pendente.' },
+  { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', color: 'orange',   desc: 'A equipe registrou postes pelo app de campo ou pausou com "Concluir mais tarde". Aguarda a equipe finalizar a nota.' },
+  { val: 'baixar_medidor', label: 'Baixar Medidor', icon: 'speed',        color: 'blue',     desc: 'Campo finalizado no app (ou cliente ligado na planilha). Falta registrar o Nº do medidor e a foto de cada cliente.' },
+  { val: 'concluido',      label: 'Concluído',      icon: 'check_circle', color: 'positive', desc: 'Medidores registrados na Etapa 2 (ou finalizado no CCS). Nenhuma ação pendente.' },
   { val: 'expurgo',        label: 'Expurgo',        icon: 'block',        color: 'negative', desc: 'Nota marcada como EXPURGO na planilha. Não será executada.' },
   { val: 'sem_acesso',     label: 'Sem Acesso',     icon: 'do_not_disturb_on', color: 'deep-orange', desc: 'A equipe não conseguiu acesso ao local (retorno SEM ACESSO na planilha).' },
 ]
@@ -1383,8 +1411,11 @@ async function removerBadge (g) {
   if (error) $q.notify({ type: 'negative', message: 'Erro ao remover marca: ' + error.message })
 }
 
+const podeConcluir = computed(() => ['baixar_medidor', 'concluido'].includes(notaAtiva.value?.status))
+
 async function salvar (rascunho = false) {
   const n = notaAtiva.value
+  if (!rascunho && !podeConcluir.value) return
 
   const erros = []
   if (!clientes.length) { erros.push('pelo menos um cliente') }
@@ -1536,6 +1567,12 @@ notasStore.fetchNotas()
   cursor: default;
 }
 .lista-status .badge-imprevisto { margin-left: 0; }
+.fluxo-banner {
+  display: flex; align-items: center; gap: 12px;
+  background: #fff8e1; border: 1px solid #ffe082;
+  border-radius: 12px; padding: 10px 14px; margin-bottom: 12px;
+}
+.fluxo-banner-txt { flex: 1; font-size: 13px; color: #5d4037; line-height: 1.45; }
 .imprevisto-banner {
   display: flex;
   align-items: center;

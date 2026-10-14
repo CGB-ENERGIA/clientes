@@ -175,7 +175,7 @@
     />
 
     <!-- Banner de fila pendente -->
-    <div v-if="store.fila.length > 0 || store.filaImprevistos.length > 0" class="cl-sync-pending">
+    <div v-if="store.fila.length > 0 || store.filaImprevistos.length > 0 || store.filaStatus.length > 0" class="cl-sync-pending">
       <div class="cl-sync-pending-info">
         <q-icon
           :name="store.sincronizando ? 'sync' : 'cloud_upload'"
@@ -190,6 +190,9 @@
             <template v-if="store.fila.length && store.filaImprevistos.length"> · </template>
             <template v-if="store.filaImprevistos.length">
               {{ store.filaImprevistos.length }} {{ store.filaImprevistos.length === 1 ? 'imprevisto' : 'imprevistos' }}
+            </template>
+            <template v-if="!store.fila.length && !store.filaImprevistos.length && store.filaStatus.length">
+              {{ store.filaStatus.length }} {{ store.filaStatus.length === 1 ? 'atualização de nota' : 'atualizações de nota' }}
             </template>
           </div>
           <div class="cl-sync-pending-sub">
@@ -256,9 +259,11 @@ const emAndamento = computed(() => {
   const pausadas = new Map(store.pausadas.map(p => [p.nota, p]))
   const pendentes = {}
   for (const r of store.fila) pendentes[r.nota] = (pendentes[r.nota] || 0) + 1
+  const finalizadas = new Set(store.filaStatus.filter(s => s.acao === 'finalizar').map(s => s.nota))
   return notas.value
     .filter(n => (resumoPorNota.value.has(n.nota) || pausadas.has(n.nota) || pendentes[n.nota]) &&
-                 !['concluido', 'expurgo', 'sem_acesso'].includes(n.status))
+                 !finalizadas.has(n.nota) &&
+                 !['baixar_medidor', 'concluido', 'expurgo', 'sem_acesso'].includes(n.status))
     .map(n => {
       const r = resumoPorNota.value.get(n.nota)
       const p = pausadas.get(n.nota)
