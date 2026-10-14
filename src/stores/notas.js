@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { supabase } from 'boot/supabase'
+import { supabase, fetchAll } from 'boot/supabase'
 import * as XLSX from 'xlsx'
 
 const CACHE_KEY = 'cgb_notas_cache'
@@ -16,14 +16,25 @@ export const useNotasStore = defineStore('notas', () => {
     if (c) notas.value = JSON.parse(c)
   } catch {}
 
+  const VALID_STATUSES = new Set(['pendente', 'em_andamento', 'baixar_medidor', 'concluido', 'expurgo', 'sem_acesso'])
+
   async function fetchNotas () {
     loading.value = true
-    const { data, error } = await supabase
+    const { data, error } = await fetchAll(() => supabase
       .from('notas_servico')
       .select('*')
       .eq('ativo', true)
-      .order('nota')
+      .order('nota'))
     if (!error && data) {
+      // Corrige status inválidos no banco (valores legados como 'ligar_campo')
+      const invalidos = data.filter(n => !VALID_STATUSES.has(n.status))
+      if (invalidos.length) {
+        await supabase
+          .from('notas_servico')
+          .update({ status: 'pendente' })
+          .in('nota', invalidos.map(n => n.nota))
+        invalidos.forEach(n => { n.status = 'pendente' })
+      }
       notas.value = data
       localStorage.setItem(CACHE_KEY, JSON.stringify(data))
     }
@@ -112,9 +123,10 @@ export const useNotasStore = defineStore('notas', () => {
         }
 
         // Preserva status existente (concluido e em_andamento nunca regridem)
-        const { data: existentes } = await supabase
+        const { data: existentes } = await fetchAll(() => supabase
           .from('notas_servico')
           .select('nota, status')
+          .order('nota'))
         const statusMap = {}
         for (const e of (existentes || [])) statusMap[e.nota] = e.status
 
@@ -168,10 +180,11 @@ export const useNotasStore = defineStore('notas', () => {
       if (!error) {
         // Desativa notas que saíram da planilha
         const notasImportadas = records.map(r => r.nota)
-        const { data: todasAtivas } = await supabase
+        const { data: todasAtivas } = await fetchAll(() => supabase
           .from('notas_servico')
           .select('nota')
           .eq('ativo', true)
+          .order('nota'))
         const orfas = (todasAtivas || []).map(r => r.nota).filter(n => !notasImportadas.includes(n))
         if (orfas.length > 0) {
           await supabase.from('notas_servico').update({ ativo: false }).in('nota', orfas)

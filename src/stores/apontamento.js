@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { supabase } from 'boot/supabase'
+import { supabase, fetchAll } from 'boot/supabase'
 
 export const useApontamentoStore = defineStore('apontamento', () => {
   const apontamentos = ref([])
@@ -37,10 +37,11 @@ export const useApontamentoStore = defineStore('apontamento', () => {
 
   async function fetchApontamentos () {
     loading.value = true
-    const { data, error } = await supabase
+    const { data, error } = await fetchAll(() => supabase
       .from('apontamentos')
       .select('*, clientes(*)')
       .order('created_at', { ascending: false })
+      .order('id'))
     if (!error) apontamentos.value = data || []
     loading.value = false
     return { error }

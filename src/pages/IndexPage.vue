@@ -37,6 +37,21 @@
           <span class="stab-label">{{ t.label }}</span>
           <span class="stab-count">{{ t.count }}</span>
         </button>
+        <q-btn flat round dense size="sm" icon="info_outline" color="grey-6" class="self-center">
+          <q-tooltip>O que significa cada status?</q-tooltip>
+          <q-menu anchor="bottom right" self="top right" class="status-legenda-menu">
+            <div class="status-legenda">
+              <div class="status-legenda-title">Status das notas</div>
+              <div v-for="s in statusLegenda" :key="s.val" class="status-legenda-item">
+                <q-icon :name="s.icon" :color="s.color" size="18px" />
+                <div>
+                  <div class="status-legenda-label">{{ s.label }}</div>
+                  <div class="status-legenda-desc">{{ s.desc }}</div>
+                </div>
+              </div>
+            </div>
+          </q-menu>
+        </q-btn>
       </div>
 
       <!-- ── Filtros ──────────────────────────────────────────────── -->
@@ -152,7 +167,24 @@
           <div>BASE</div>
           <div>CLIENTE</div>
           <div>P / C</div>
-          <div>STATUS</div>
+          <div class="lista-header-status">
+            STATUS
+            <q-icon name="info_outline" size="14px" class="cursor-pointer">
+              <q-tooltip>O que significa cada status?</q-tooltip>
+              <q-menu anchor="bottom middle" self="top middle" class="status-legenda-menu">
+                <div class="status-legenda">
+                  <div class="status-legenda-title">Status das notas</div>
+                  <div v-for="s in statusLegenda" :key="s.val" class="status-legenda-item">
+                    <q-icon :name="s.icon" :color="s.color" size="18px" />
+                    <div>
+                      <div class="status-legenda-label">{{ s.label }}</div>
+                      <div class="status-legenda-desc">{{ s.desc }}</div>
+                    </div>
+                  </div>
+                </div>
+              </q-menu>
+            </q-icon>
+          </div>
           <div></div>
         </div>
 
@@ -936,6 +968,16 @@ const statusOpcoes = [
   { val: 'concluido',      label: 'Concluído',      icon: 'check_circle', color: 'positive'},
 ]
 
+const statusLegenda = [
+  { val: 'pendente',       label: 'Não Iniciado',   icon: 'schedule',     color: 'grey-6',   desc: 'Nota importada, mas a equipe de campo ainda não registrou nenhum poste.' },
+  { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', color: 'orange',   desc: 'A equipe já começou a registrar os postes (PG + foto) pelo app de campo.' },
+  { val: 'ligar_campo',    label: 'Ligar em Campo', icon: 'cable',        color: 'teal',     desc: 'Aguardando a ligação do cliente em campo.' },
+  { val: 'baixar_medidor', label: 'Baixar Medidor', icon: 'speed',        color: 'blue',     desc: 'Cliente ligado em campo. Falta registrar o Nº do medidor e a foto de cada cliente.' },
+  { val: 'concluido',      label: 'Concluído',      icon: 'check_circle', color: 'positive', desc: 'Ligado e medidor baixado (ou finalizado no CCS). Nenhuma ação pendente.' },
+  { val: 'expurgo',        label: 'Expurgo',        icon: 'block',        color: 'negative', desc: 'Nota marcada como EXPURGO na planilha. Não será executada.' },
+  { val: 'sem_acesso',     label: 'Sem Acesso',     icon: 'do_not_disturb_on', color: 'deep-orange', desc: 'A equipe não conseguiu acesso ao local (retorno SEM ACESSO na planilha).' },
+]
+
 async function alterarStatus (novoStatus) {
   if (!notaAtiva.value) return
   const { error } = await notasStore.atualizarStatus(notaAtiva.value.nota, novoStatus)
@@ -960,8 +1002,25 @@ async function apagarRegistro (reg) {
 }
 
 async function apagarRegistrosCampo () {
-  const ids = registrosCampo.value.map(r => r.id)
-  if (!ids.length) return
+  const nota = notaAtiva.value?.nota
+  if (!nota) return
+
+  // Busca os IDs direto do banco para não depender do carregamento local
+  const { data: regsDB, error: fetchErr } = await supabase
+    .from('campo_registros')
+    .select('id')
+    .eq('nota', nota)
+
+  if (fetchErr) {
+    $q.notify({ type: 'negative', message: `Erro ao buscar registros: ${fetchErr.message}`, position: 'top', timeout: 3000 })
+    return
+  }
+
+  const ids = (regsDB || []).map(r => r.id)
+  if (!ids.length) {
+    $q.notify({ type: 'info', message: 'Nenhum registro de campo encontrado para esta nota.', position: 'top', timeout: 2000 })
+    return
+  }
 
   $q.dialog({
     title: 'Apagar todos os registros de campo?',
@@ -971,7 +1030,7 @@ async function apagarRegistrosCampo () {
     const { error } = await supabase.from('campo_registros').delete().in('id', ids)
     if (!error) {
       registrosCampo.value = []
-      $q.notify({ type: 'positive', message: 'Registros de campo removidos.', position: 'top', timeout: 2000 })
+      $q.notify({ type: 'positive', message: `${ids.length} registro(s) de campo removido(s).`, position: 'top', timeout: 2000 })
     } else {
       $q.notify({ type: 'negative', message: `Erro ao apagar: ${error.message}`, position: 'top', timeout: 3000 })
     }
@@ -1329,6 +1388,13 @@ notasStore.fetchNotas()
   text-align: center;
 }
 .lista-header > div { text-align: center; }
+.lista-header-status { display: flex; align-items: center; justify-content: center; gap: 4px; }
+
+.status-legenda { padding: 12px 14px; max-width: 340px; display: flex; flex-direction: column; gap: 10px; }
+.status-legenda-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #78909c; }
+.status-legenda-item { display: flex; align-items: flex-start; gap: 10px; }
+.status-legenda-label { font-size: 13px; font-weight: 700; }
+.status-legenda-desc { font-size: 12px; color: #78909c; line-height: 1.35; }
 .body--dark .lista-header { color: #b0bec5; border-bottom-color: rgba(255,255,255,0.15); }
 .lista-row {
   display: grid;
