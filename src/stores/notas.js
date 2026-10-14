@@ -18,13 +18,23 @@ export const useNotasStore = defineStore('notas', () => {
 
   const VALID_STATUSES = new Set(['pendente', 'em_andamento', 'baixar_medidor', 'concluido', 'expurgo', 'sem_acesso'])
 
+  // Notas que receberam ao menos um registro de campo pelo PWA
+  const notasViaPwa = ref(new Set())
+
   async function fetchNotas () {
     loading.value = true
-    const { data, error } = await fetchAll(() => supabase
-      .from('notas_servico')
-      .select('*')
-      .eq('ativo', true)
-      .order('nota'))
+    const [{ data, error }, { data: regs }] = await Promise.all([
+      fetchAll(() => supabase
+        .from('notas_servico')
+        .select('*')
+        .eq('ativo', true)
+        .order('nota')),
+      fetchAll(() => supabase
+        .from('campo_registros')
+        .select('nota')
+        .order('id'))
+    ])
+    if (regs) notasViaPwa.value = new Set(regs.map(r => r.nota))
     if (!error && data) {
       // Corrige status inválidos no banco (valores legados como 'ligar_campo')
       const invalidos = data.filter(n => !VALID_STATUSES.has(n.status))
@@ -234,5 +244,5 @@ export const useNotasStore = defineStore('notas', () => {
     return data ?? []
   }
 
-  return { notas, loading, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo }
+  return { notas, notasViaPwa, loading, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo }
 })

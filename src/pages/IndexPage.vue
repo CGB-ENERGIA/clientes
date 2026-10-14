@@ -54,6 +54,23 @@
         </q-btn>
       </div>
 
+      <!-- ── Origem (somente na aba Concluídos) ───────────────────── -->
+      <div v-if="tabAtual === 'concluido'" class="origem-tabs">
+        <span class="origem-tabs-label">Origem:</span>
+        <button
+          v-for="o in origemOpcoes"
+          :key="o.val"
+          class="origem-tab"
+          :class="{ 'origem-tab--active': origemConcluidos === o.val }"
+          @click="origemConcluidos = o.val"
+        >
+          <q-icon :name="o.icon" size="14px" />
+          {{ o.label }}
+          <span class="origem-tab-count">{{ o.count }}</span>
+          <q-tooltip>{{ o.tip }}</q-tooltip>
+        </button>
+      </div>
+
       <!-- ── Filtros ──────────────────────────────────────────────── -->
       <div class="filtros-bar">
         <q-input
@@ -876,10 +893,24 @@ const todasAgrupadas = computed(() => {
       g.status = n.status
     }
   }
+  const viaPwa = notasStore.notasViaPwa
+  for (const g of grupos.values()) g._viaPwa = g._notas.some(n => viaPwa.has(n.nota))
   return [...grupos.values()]
 })
 
 const somenteValidadas = ref(false)
+
+// ── Origem dos concluídos: feitos pelo PWA x já concluídos na planilha ─
+const origemConcluidos = ref('todas')
+const origemOpcoes = computed(() => {
+  const concl = todasAgrupadas.value.filter(g => g.status === 'concluido')
+  const pwa = concl.filter(g => g._viaPwa).length
+  return [
+    { val: 'todas', label: 'Todos',              icon: 'apps',         count: concl.length,       tip: 'Todas as notas concluídas' },
+    { val: 'pwa',   label: 'Via PWA',            icon: 'smartphone',   count: pwa,                tip: 'Concluídas com registros de campo feitos pelo app CGB Campo' },
+    { val: 'banco', label: 'Já vieram concluídas', icon: 'cloud_download', count: concl.length - pwa, tip: 'Já constavam como concluídas na planilha importada, sem registros pelo app' },
+  ]
+})
 
 const contadores = computed(() => {
   const gs = todasAgrupadas.value
@@ -906,6 +937,11 @@ const notasFiltradas = computed(() => {
   let lista = tabAtual.value === 'todas'
     ? todasAgrupadas.value
     : todasAgrupadas.value.filter(g => g.status === tabAtual.value)
+
+  if (tabAtual.value === 'concluido' && origemConcluidos.value !== 'todas') {
+    const pwa = origemConcluidos.value === 'pwa'
+    lista = lista.filter(g => g._viaPwa === pwa)
+  }
 
   if (somenteValidadas.value) {
     lista = lista.filter(g => g.status !== 'expurgo' && g.status !== 'sem_acesso')
@@ -1302,6 +1338,45 @@ notasStore.fetchNotas()
 .stab--active.stab--em_andamento   { border-color: #f57c00; background: #fff3e0; color: #e65100; }
 .stab--active.stab--baixar_medidor { border-color: #1565c0; background: #e3f2fd; color: #0d47a1; }
 .stab--active.stab--concluido      { border-color: #388e3c; background: #e8f5e9; color: #1b5e20; }
+
+/* ── Sub-abas de origem dos concluídos ── */
+.origem-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.origem-tabs-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary, #546e7a);
+  margin-right: 2px;
+}
+.origem-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border-color, #e0e0e0);
+  background: var(--bg-card, #fff);
+  color: var(--text-secondary, #546e7a);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.origem-tab-count {
+  background: rgba(0,0,0,0.08);
+  border-radius: 20px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.origem-tab--active { border-color: #388e3c; background: #e8f5e9; color: #1b5e20; }
 
 /* ── Grid de notas ── */
 .nota-grid {
