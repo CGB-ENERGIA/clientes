@@ -87,11 +87,17 @@ export const useNotasStore = defineStore('notas', () => {
     return { error }
   }
 
-  async function importarXlsx (file) {
+  // A mesclagem com o que já existe no sistema é feita no banco (função importar_notas),
+  // numa única transação: status nunca regridem e notas com trabalho em andamento não são desativadas.
+  async function importarXlsx (file, { origem = 'upload', exigirBaseBi = false, forcar = false } = {}) {
     importando.value = true
     try {
       const buf = await file.arrayBuffer()
       const wb  = XLSX.read(buf)
+
+      if (exigirBaseBi && !wb.SheetNames.includes('BASE BI')) {
+        return { error: new Error('A planilha não tem a aba "BASE BI". Nada foi alterado.'), count: 0 }
+      }
 
       // Planilha BASE BI tem cabeçalho na linha 2 e dados a partir da linha 3
       const sheetName = wb.SheetNames.includes('BASE BI') ? 'BASE BI' : wb.SheetNames[0]
@@ -149,8 +155,7 @@ export const useNotasStore = defineStore('notas', () => {
               postes:            postesVal || 1,
               qtd_clientes:      0,
               clientes_planilha: [],
-              ativo:             true,
-              _statusPlanilha:   statusPlanilha
+              status_planilha:   statusPlanilha
             }
           }
 
@@ -167,36 +172,7 @@ export const useNotasStore = defineStore('notas', () => {
           }
         }
 
-        // Preserva status existente (concluido e em_andamento nunca regridem)
-        const { data: existentes } = await fetchAll(() => supabase
-          .from('notas_servico')
-          .select('nota, status, apagada')
-          .order('nota'))
-        const statusMap = {}
-        const apagadas  = new Set()
-        for (const e of (existentes || [])) {
-          statusMap[e.nota] = e.status
-          if (e.apagada) apagadas.add(e.nota)
-        }
-
-        records = Object.values(porNota2).map(r => {
-          const statusPlanilha = r._statusPlanilha
-          const { _statusPlanilha, ...rest } = r
-          const statusAtual = statusMap[r.nota]
-          let status
-          if (statusPlanilha === 'expurgo' || statusPlanilha === 'sem_acesso') {
-            status = statusPlanilha
-          } else if (apagadas.has(r.nota) && statusPlanilha === 'concluido') {
-            status = statusAtual
-          } else if (statusAtual === 'concluido') {
-            status = 'concluido'
-          } else if (statusAtual === 'em_andamento' && statusPlanilha !== 'concluido') {
-            status = 'em_andamento'
-          } else {
-            status = statusPlanilha
-          }
-          return { ...rest, status }
-        })
+        records = Object.values(porNota2)
       } else {
         // Formato template simples: BASE, PEP, NOTA, POSTES, QTD_CLIENTES
         const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
@@ -215,8 +191,7 @@ export const useNotasStore = defineStore('notas', () => {
           pep:          String(col(r, 'PEP') || '').trim(),
           nota:         String(col(r, 'NOTA') || '').trim(),
           postes:       Number(col(r, 'POSTES') || 0),
-          qtd_clientes: Number(col(r, 'QTDCLIENTES', 'QTD_CLIENTES') || 0),
-          ativo:        true
+          qtd_clientes: Number(col(r, 'QTDCLIENTES', 'QTD_CLIENTES') || 0)
         })).filter(r => r.nota?.trim())
       }
 
@@ -224,25 +199,22 @@ export const useNotasStore = defineStore('notas', () => {
         return { error: new Error('Nenhuma nota encontrada na planilha.'), count: 0 }
       }
 
-      const { error } = await supabase
-        .from('notas_servico')
-        .upsert(records, { onConflict: 'nota' })
+      // Só a planilha completa (BASE BI) pode desativar notas ausentes
+      const { data: relatorio, error } = await supabase.rpc('importar_notas', {
+        p_registros: records,
+        p_desativar_ausentes: sheetName === 'BASE BI',
+        p_forcar: forcar,
+        p_origem: origem
+      })
 
-      if (!error) {
-        // Desativa notas que saíram da planilha
-        const notasImportadas = records.map(r => r.nota)
-        const { data: todasAtivas } = await fetchAll(() => supabase
-          .from('notas_servico')
-          .select('nota')
-          .eq('ativo', true)
-          .order('nota'))
-        const orfas = (todasAtivas || []).map(r => r.nota).filter(n => !notasImportadas.includes(n))
-        if (orfas.length > 0) {
-          await supabase.from('notas_servico').update({ ativo: false }).in('nota', orfas)
-        }
-        await fetchNotas()
+      if (error) {
+        const m = error.message?.match(/DESATIVACAO_EM_MASSA:(\d+):(\d+)/)
+        if (m) return { error: null, bloqueio: { desativar: Number(m[1]), ativas: Number(m[2]) }, count: records.length }
+        return { error, count: 0 }
       }
-      return { error, count: records.length }
+
+      await fetchNotas()
+      return { error: null, relatorio, count: records.length }
     } catch (e) {
       return { error: e, count: 0 }
     } finally {

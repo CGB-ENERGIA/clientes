@@ -346,10 +346,7 @@ async function executarSync () {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     })
 
-    const { error, count } = await store.importarXlsx(file)
-    if (error) throw new Error(error.message)
-
-    $q.notify({ type: 'positive', message: `${count} notas sincronizadas do Dropbox!`, icon: 'cloud_done' })
+    await processarImportacao(file, { origem: 'dropbox', exigirBaseBi: true })
   } catch (e) {
     $q.notify({
       type: 'negative',
@@ -367,12 +364,72 @@ async function onFile (e) {
   const file = e.target.files[0]
   if (!file) return
   e.target.value = ''
-  const { error, count } = await store.importarXlsx(file)
-  if (error) {
-    $q.notify({ type: 'negative', message: 'Erro na importação: ' + error.message, timeout: 5000 })
-  } else {
-    $q.notify({ type: 'positive', message: `${count} nota${count !== 1 ? 's' : ''} importada${count !== 1 ? 's' : ''} com sucesso!` })
+  try {
+    await processarImportacao(file, { origem: 'upload' })
+  } catch (err) {
+    $q.notify({ type: 'negative', message: 'Erro na importação: ' + err.message, timeout: 7000 })
   }
+}
+
+const STATUS_LABEL = {
+  pendente: 'Não Iniciado', em_andamento: 'Andamento', baixar_medidor: 'Baixar Medidor',
+  concluido: 'Concluído', expurgo: 'Expurgo', sem_acesso: 'Sem Acesso'
+}
+
+async function processarImportacao (file, opts, forcar = false) {
+  const { error, bloqueio, relatorio } = await store.importarXlsx(file, { ...opts, forcar })
+  if (error) throw new Error(error.message)
+
+  if (bloqueio) {
+    await new Promise(resolve => {
+      $q.dialog({
+        title: 'Importação bloqueada por segurança',
+        message: `Esta planilha desativaria ${bloqueio.desativar} das ${bloqueio.ativas} notas ativas, ` +
+                 'o que costuma indicar um arquivo incompleto ou errado. Nada foi alterado. ' +
+                 'Notas com trabalho em andamento no sistema são mantidas de qualquer forma. Deseja importar mesmo assim?',
+        cancel: { label: 'Cancelar', flat: true, color: 'grey-7' },
+        ok: { label: 'Importar mesmo assim', color: 'negative', unelevated: true },
+        persistent: true
+      }).onOk(async () => {
+        try { await processarImportacao(file, opts, true) } catch (e) {
+          $q.notify({ type: 'negative', message: 'Erro na importação: ' + e.message, timeout: 7000 })
+        }
+        resolve()
+      }).onCancel(resolve)
+    })
+    return
+  }
+
+  mostrarRelatorio(relatorio, opts.origem)
+}
+
+function mostrarRelatorio (r, origem) {
+  const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+  const lista = (itens, fmt) => itens.slice(0, 8).map(i => `<li>${fmt(i)}</li>`).join('') +
+    (itens.length > 8 ? `<li>… e mais ${itens.length - 8}</li>` : '')
+
+  let html = `<div><b>${r.total}</b> notas na planilha · <b>${r.novas}</b> novas · <b>${r.status_alterados}</b> com status alterado</div>`
+  if (r.preservados.length) {
+    html += `<div class="q-mt-sm"><b>${r.preservados.length}</b> avanço(s) do sistema preservado(s) (a planilha estava atrasada):</div><ul class="q-my-xs">` +
+      lista(r.preservados, p => `${esc(p.nota)}: planilha "${STATUS_LABEL[p.planilha] || esc(p.planilha)}" → mantido "${STATUS_LABEL[p.final] || esc(p.final)}"`) + '</ul>'
+  }
+  if (r.conflitos.length) {
+    html += `<div class="q-mt-sm text-deep-orange"><b>${r.conflitos.length}</b> conflito(s): concluída(s) no sistema, mas a planilha marca Expurgo/Sem Acesso. Mantidas como Concluído — confira:</div><ul class="q-my-xs">` +
+      lista(r.conflitos, c => `${esc(c.nota)}: planilha "${STATUS_LABEL[c.planilha] || esc(c.planilha)}"`) + '</ul>'
+  }
+  if (r.desativadas.length) {
+    html += `<div class="q-mt-sm"><b>${r.desativadas.length}</b> nota(s) saíram da planilha e foram desativadas.</div>`
+  }
+  if (r.protegidas.length) {
+    html += `<div class="q-mt-sm text-primary"><b>${r.protegidas.length}</b> nota(s) saíram da planilha mas continuam ativas por terem trabalho em andamento: ${r.protegidas.slice(0, 8).map(esc).join(', ')}${r.protegidas.length > 8 ? '…' : ''}</div>`
+  }
+
+  $q.dialog({
+    title: origem === 'dropbox' ? 'Sincronização com o Dropbox concluída' : 'Importação concluída',
+    message: html,
+    html: true,
+    ok: { label: 'OK', color: 'primary', unelevated: true }
+  })
 }
 
 async function copiarComando () {

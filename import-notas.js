@@ -118,8 +118,7 @@ for (const r of dados) {
       postes:            postesVal || 1,
       qtd_clientes:      0,
       clientes_planilha: [],
-      ativo:             true,
-      _statusPlanilha:   statusPlanilha
+      status_planilha:   statusPlanilha
     }
   }
 
@@ -137,37 +136,9 @@ for (const r of dados) {
   }
 }
 
-// Preserva status 'concluido' de notas já finalizadas
-console.log('🔍  Verificando status existentes...')
-const { data: existentes } = await supabase
-  .from('notas_servico')
-  .select('nota, status')
-const statusMap = {}
-for (const e of (existentes || [])) statusMap[e.nota] = e.status
-
-const qtdPendente  = Object.values(porNota).filter(r => r._statusPlanilha === 'pendente').length
-const qtdLigar     = Object.values(porNota).filter(r => r._statusPlanilha === 'ligar_campo').length
-const qtdBaixar    = Object.values(porNota).filter(r => r._statusPlanilha === 'baixar_medidor').length
-const qtdConcluido = Object.values(porNota).filter(r => r._statusPlanilha === 'concluido').length
-console.log(`   ↳ ${qtdPendente} pendente | ${qtdLigar} ligar-campo | ${qtdBaixar} baixar-medidor | ${qtdConcluido} concluído`)
-console.log(`   ↳ ${Object.keys(porNota).length} notas`)
-
-const records = Object.values(porNota).map(r => {
-  const statusPlanilha = r._statusPlanilha
-  const { _statusPlanilha, ...rest } = r
-  const statusAtual = statusMap[r.nota]
-  let status
-  if (statusPlanilha === 'expurgo' || statusPlanilha === 'sem_acesso') {
-    status = statusPlanilha  // planilha sempre prevalece para expurgo/sem_acesso
-  } else if (statusAtual === 'concluido') {
-    status = 'concluido'
-  } else if (statusAtual === 'em_andamento' && statusPlanilha !== 'concluido') {
-    status = 'em_andamento'
-  } else {
-    status = statusPlanilha
-  }
-  return { ...rest, status }
-})
+const records = Object.values(porNota)
+const contar = s => records.filter(r => r.status_planilha === s).length
+console.log(`   ↳ ${contar('pendente')} pendente | ${contar('baixar_medidor')} baixar-medidor | ${contar('concluido')} concluído | ${contar('expurgo')} expurgo | ${contar('sem_acesso')} sem acesso`)
 console.log(`✅  ${records.length} notas encontradas`)
 
 records.slice(0, 3).forEach(r => {
@@ -177,61 +148,33 @@ records.slice(0, 3).forEach(r => {
 })
 if (records.length > 3) console.log(`   ... e mais ${records.length - 3}`)
 
-// ── Upsert em lotes ───────────────────────────────────────────────
+// ── Importação (mesma função usada pelo sistema) ──────────────────
+// A mesclagem acontece no banco numa única transação: status nunca regridem,
+// notas com trabalho em andamento não são desativadas e há trava contra desativação em massa.
+const forcar = process.argv.includes('--forcar')
 console.log('\n🔄  Importando para o Supabase...')
 
-const LOTE = 50
-let importadas = 0
-let erros = 0
+const { data: rel, error } = await supabase.rpc('importar_notas', {
+  p_registros: records,
+  p_desativar_ausentes: true,
+  p_forcar: forcar,
+  p_origem: 'script'
+})
 
-for (let i = 0; i < records.length; i += LOTE) {
-  const lote = records.slice(i, i + LOTE)
-
-  const { error } = await supabase
-    .from('notas_servico')
-    .upsert(lote, { onConflict: 'nota' })
-
-  if (error) {
-    erros++
-    if (erros === 1) console.error('\n⚠️  Erro em lote:', error.message)
-    // Continua mesmo com erro para tentar os demais lotes
+if (error) {
+  const m = error.message?.match(/DESATIVACAO_EM_MASSA:(\d+):(\d+)/)
+  if (m) {
+    console.error(`\n⛔  Bloqueado: a planilha desativaria ${m[1]} de ${m[2]} notas ativas. Nada foi alterado.`)
+    console.error('   Confira o arquivo. Para importar mesmo assim: bun run import-notas -- --forcar\n')
+  } else {
+    console.error('\n❌  Erro na importação (nada foi alterado):', error.message, '\n')
   }
-
-  importadas += lote.length
-  process.stdout.write(`\r   ${importadas}/${records.length} notas...`)
+  process.exit(1)
 }
 
-// ── Desativa notas que não estão mais na planilha ────────────────
-console.log('🧹  Verificando notas órfãs...')
-const notasImportadas = new Set(records.map(r => r.nota))
-
-// Busca todas as notas ativas no banco
-const { data: todasAtivas } = await supabase
-  .from('notas_servico')
-  .select('nota')
-  .eq('ativo', true)
-
-const orfas = (todasAtivas || []).map(r => r.nota).filter(n => !notasImportadas.has(n))
-
-if (orfas.length > 0) {
-  console.log(`   ↳ ${orfas.length} nota(s) não encontrada(s) na planilha: ${orfas.slice(0, 5).join(', ')}${orfas.length > 5 ? '...' : ''}`)
-  const { error: errOrfas } = await supabase
-    .from('notas_servico')
-    .update({ ativo: false })
-    .in('nota', orfas)
-  if (!errOrfas) console.log(`   ↳ Desativadas com sucesso.`)
-  else console.warn('   ⚠️  Erro ao desativar:', errOrfas.message)
-} else {
-  console.log('   ↳ Nenhuma nota órfã encontrada.')
-}
-
-console.log(`\n`)
-
-if (erros === 0) {
-  console.log(`✅  Importação concluída! ${records.length} notas no banco.`)
-  console.log(`   Abra o sistema para ver as notas.\n`)
-} else {
-  console.log(`⚠️  Concluído com ${erros} lote(s) com erro.`)
-  console.log(`   Verifique se as colunas "municipio" e "clientes_planilha" existem.`)
-  console.log(`   Execute setup.sql no Supabase SQL Editor e tente novamente.\n`)
-}
+console.log(`\n✅  Importação concluída: ${rel.total} notas · ${rel.novas} novas · ${rel.status_alterados} com status alterado`)
+if (rel.preservados.length) console.log(`   ↳ ${rel.preservados.length} avanço(s) do sistema preservado(s)`)
+if (rel.conflitos.length)   console.log(`   ⚠️  ${rel.conflitos.length} conflito(s) (concluída no sistema x Expurgo/Sem Acesso na planilha): ${rel.conflitos.map(c => c.nota).join(', ')}`)
+if (rel.desativadas.length) console.log(`   ↳ ${rel.desativadas.length} nota(s) desativada(s) por saírem da planilha`)
+if (rel.protegidas.length)  console.log(`   ↳ ${rel.protegidas.length} nota(s) fora da planilha mantidas ativas (trabalho em andamento)`)
+console.log('')
