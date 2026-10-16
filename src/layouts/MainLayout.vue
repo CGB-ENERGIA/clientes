@@ -132,7 +132,8 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard',   icon: 'dashboard' },
   { to: '/',          label: 'Apontamento', icon: 'assignment' },
   { to: '/historico', label: 'Histórico',   icon: 'history' },
-  { to: '/notas',     label: 'Notas',       icon: 'table_chart' }
+  { to: '/notas',     label: 'Notas',       icon: 'table_chart' },
+  { to: '/programacao', label: 'Programação', icon: 'event_note' }
 ]
 </script>
 
