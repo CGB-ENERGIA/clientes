@@ -171,6 +171,8 @@
       :grupos="notasParaMapa"
       :foco="store.sessao?.nota"
       :permitir-abrir="false"
+      :plano-notas="store.plano.itens.map(i => i.nota)"
+      @planejar="adicionarAoDia"
     />
 
     <ImprevistoDialog
@@ -553,8 +555,30 @@ const notasParaMapa = computed(() => {
   return notasStore.notas.filter(n => n.nota === atual || ['pendente', 'em_andamento'].includes(n.status))
 })
 
+function adicionarAoDia (codigos) {
+  const n = store.adicionarAoPlano(codigos)
+  $q.notify({
+    type: n ? 'positive' : 'info',
+    icon: 'event_available',
+    message: n ? `${n} ${n === 1 ? 'nota adicionada' : 'notas adicionadas'} ao seu dia.` : 'Essas notas já estão no seu dia.',
+    position: 'top', timeout: 2200
+  })
+}
+
+// Depois de finalizar, pausar ou reportar imprevisto, lembra qual é a próxima nota do dia
+function avisarProxima (excluir) {
+  const p = store.proximaDoPlano
+  const n = p && notasStore.getNota(p.nota)
+  if (!n || n.nota === excluir) return
+  setTimeout(() => $q.notify({
+    type: 'info', icon: 'event_note', position: 'top', timeout: 5000,
+    message: `Próxima do seu dia: ${n.projeto_info_sap || n.nota}${n.municipio ? ' · ' + n.municipio : ''}`
+  }), 600)
+}
+
 function onImprevistoEnviado ({ enviado }) {
   const nota = store.sessao?.nota
+  store.marcarNoPlano(nota, 'imprevisto')
   store.encerrarSessao()
   $q.notify({
     type: enviado ? 'positive' : 'warning',
@@ -563,6 +587,7 @@ function onImprevistoEnviado ({ enviado }) {
       : `Sem conexão: o imprevisto da nota ${nota} será enviado quando houver internet.`,
     position: 'top'
   })
+  avisarProxima()
   router.push('/campo')
 }
 
@@ -589,6 +614,7 @@ function finalizarNota () {
         : `Nota ${nota} finalizada. Será enviada para Baixar Medidor quando todos os postes subirem — não desinstale o app.`,
       position: 'top', timeout: enviado ? 2500 : 6000
     })
+    avisarProxima()
     router.push('/campo')
   })
 }
@@ -612,6 +638,7 @@ function concluirMaisTarde () {
     store.pausarSessao()
     store.carregarResumo()
     $q.notify({ type: 'info', message: `Nota ${nota} pausada. Continue quando quiser.`, icon: 'schedule', position: 'top' })
+    avisarProxima(nota)
     router.push('/campo')
   })
 }

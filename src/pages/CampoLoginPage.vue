@@ -27,6 +27,72 @@
         <span v-if="erros.equipe" class="cl-err">{{ erros.equipe }}</span>
       </div>
 
+      <!-- MEU DIA -->
+      <div v-if="diaItens.length" class="cl-dia">
+        <div class="cl-dia-head">
+          <div>
+            <div class="cl-dia-titulo"><q-icon name="event_note" size="18px" /> Meu dia</div>
+            <div class="cl-dia-sub">
+              {{ diaFeitas }} de {{ diaItens.length }} {{ diaItens.length === 1 ? 'nota' : 'notas' }}
+              <template v-if="diaOntem"> · {{ diaOntem }} de ontem</template>
+              <template v-if="diaKmRestante"> · ≈ {{ diaKmRestante }} a percorrer</template>
+            </div>
+          </div>
+          <div class="cl-dia-acoes">
+            <button v-if="diaAbertas.length > 1" type="button" title="Reordenar pelo caminho mais curto" aria-label="Reordenar pelo caminho mais curto" @click="otimizarDia">
+              <q-icon :name="otimizando ? 'hourglass_empty' : 'flash_on'" size="18px" />
+            </button>
+            <button type="button" title="Limpar o dia" aria-label="Limpar o dia" @click="limparDia">
+              <q-icon name="delete_sweep" size="18px" />
+            </button>
+          </div>
+        </div>
+        <div class="cl-dia-barra"><i :style="{ width: diaPct + '%' }" /></div>
+
+        <div v-if="diaProxima" class="cl-dia-prox">
+          <div class="cl-dia-prox-label">{{ diaProxima.deOntem ? 'Ficou de ontem' : diaProxima.estado === 'pausada' ? 'Retomar' : (diaFeitas ? 'Próxima' : 'Começar por') }}</div>
+          <div class="cl-dia-prox-nota">
+            {{ diaProxima.nota.projeto_info_sap || diaProxima.nota.nota }}
+            <span>{{ diaProxima.nota.base }}</span>
+          </div>
+          <div class="cl-dia-prox-sub">
+            {{ [diaProxima.nota.municipio, `${Number(diaProxima.nota.postes) || 0} postes`].filter(Boolean).join(' · ') }}
+            <template v-if="diaDistProxima"> · {{ diaDistProxima }} de você</template>
+          </div>
+          <div class="cl-dia-prox-btns">
+            <button type="button" class="cl-dia-go" @click="iniciarDaLista(diaProxima.nota)">
+              <q-icon name="play_arrow" size="20px" /> Iniciar turno
+            </button>
+            <button v-if="temCoordenada(diaProxima.nota)" type="button" class="cl-dia-nav" @click="iniciarDeslocamento(diaProxima.nota)">
+              <q-icon name="navigation" size="18px" /> Ir
+            </button>
+          </div>
+        </div>
+        <div v-else class="cl-dia-fim"><q-icon name="task_alt" size="20px" /> Dia concluído. Todas as notas foram atendidas.</div>
+
+        <div class="cl-dia-lista">
+          <div v-for="it in diaItens" :key="it.nota.nota" class="cl-dia-item" :class="`cl-dia-item--${it.estado}`">
+            <q-icon :name="ICONE_ESTADO[it.estado]" size="18px" class="cl-dia-ico" />
+            <button
+              type="button"
+              class="cl-dia-corpo"
+              :disabled="it.estado === 'concluida' || it.estado === 'imprevisto'"
+              @click="iniciarDaLista(it.nota)"
+            >
+              <b>{{ it.nota.projeto_info_sap || it.nota.nota }}</b>
+              <small>{{ [it.nota.municipio || it.nota.base, rotuloDia(it)].join(' · ') }}</small>
+            </button>
+            <button
+              v-if="it.estado !== 'concluida' && it.estado !== 'atual'"
+              type="button" class="cl-dia-rm" title="Tirar do dia" aria-label="Tirar do dia"
+              @click="store.removerDoPlano(it.nota.nota)"
+            >
+              <q-icon name="close" size="16px" />
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- CONTINUAR DE ONDE PAROU -->
       <div v-if="emAndamento.length && !form.nota" class="cl-field">
         <label class="cl-label">Continuar de onde parou</label>
@@ -191,7 +257,9 @@
       :grupos="notasParaMapa"
       :foco="mapaFoco"
       rotulo-abrir="Selecionar esta nota"
+      :plano-notas="store.plano.itens.map(i => i.nota)"
       @abrir="selecionarDoMapa"
+      @planejar="adicionarDoMapa"
     />
 
     <ImprevistoDialog
@@ -243,14 +311,15 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCampoStore } from 'stores/campo'
 import { useNotasStore } from 'stores/notas'
 import { useQuasar } from 'quasar'
 import ImprevistoDialog from 'components/ImprevistoDialog.vue'
 import MapaNotas from 'components/MapaNotas.vue'
-import { temCoordenada, iniciarDeslocamento } from 'src/utils/rota'
+import { temCoordenada, iniciarDeslocamento, distanciaKm, formatarDistancia } from 'src/utils/rota'
+import { ordenarRoteiro } from 'src/utils/roteiro'
 
 const $q         = useQuasar()
 const router     = useRouter()
@@ -422,7 +491,106 @@ function abrirImprevisto () {
   imprevistoAberto.value = true
 }
 
+// ── Meu dia ──────────────────────────────────────────────────────
+const ICONE_ESTADO = { pendente: 'radio_button_unchecked', atual: 'play_circle', pausada: 'pause_circle', concluida: 'check_circle', imprevisto: 'report_problem' }
+const ROTULO_ESTADO = { pendente: 'a fazer', atual: 'em andamento', pausada: 'pausada', concluida: 'concluída', imprevisto: 'imprevisto' }
+const NOTA_FINALIZADA = ['baixar_medidor', 'concluido', 'expurgo', 'sem_acesso']
+
+const minhaPos   = ref(null)
+const otimizando = ref(false)
+
+function obterPosicao () {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve(null)
+    navigator.geolocation.getCurrentPosition(
+      p => { minhaPos.value = { lat: p.coords.latitude, lng: p.coords.longitude }; resolve(minhaPos.value) },
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 120000 }
+    )
+  })
+}
+
+// Nota já baixada por outro caminho (sistema, outra equipe) conta como feita
+const diaItens = computed(() => store.plano.itens
+  .map(i => ({ ...i, nota: notasStore.getNota(i.nota) }))
+  .filter(i => i.nota)
+  .map(i => (['pendente', 'pausada'].includes(i.estado) && NOTA_FINALIZADA.includes(i.nota.status)) ? { ...i, estado: 'concluida' } : i))
+const diaAbertas = computed(() => diaItens.value.filter(i => ['pendente', 'pausada'].includes(i.estado)))
+const diaFeitas  = computed(() => diaItens.value.filter(i => ['concluida', 'imprevisto'].includes(i.estado)).length)
+const diaOntem   = computed(() => diaAbertas.value.filter(i => i.deOntem).length)
+const rotuloDia  = it => it.deOntem && it.estado === 'pendente' ? 'ficou de ontem' : ROTULO_ESTADO[it.estado]
+const diaPct     = computed(() => diaItens.value.length ? Math.round(diaFeitas.value / diaItens.value.length * 100) : 0)
+const diaProxima = computed(() =>
+  diaItens.value.find(i => i.estado === 'pendente') ?? diaItens.value.find(i => i.estado === 'pausada') ?? null)
+
+const diaDistProxima = computed(() => {
+  const n = diaProxima.value?.nota
+  return minhaPos.value && n && temCoordenada(n)
+    ? formatarDistancia(distanciaKm(minhaPos.value, { lat: n.latitude, lng: n.longitude }))
+    : ''
+})
+
+// Distância em linha reta passando pelas notas que faltam, na ordem do dia
+const diaKmRestante = computed(() => {
+  const pts = diaAbertas.value.map(i => i.nota).filter(temCoordenada).map(n => ({ lat: n.latitude, lng: n.longitude }))
+  if (minhaPos.value) pts.unshift(minhaPos.value)
+  let km = 0
+  for (let k = 1; k < pts.length; k++) km += distanciaKm(pts[k - 1], pts[k])
+  return km > 0 ? formatarDistancia(km) : ''
+})
+
+function adicionarDoMapa (codigos) {
+  const n = store.adicionarAoPlano(codigos)
+  $q.notify({
+    type: n ? 'positive' : 'info',
+    icon: 'event_available',
+    message: n ? `${n} ${n === 1 ? 'nota adicionada' : 'notas adicionadas'} ao seu dia.` : 'Essas notas já estão no seu dia.',
+    position: 'top', timeout: 2200
+  })
+}
+
+function limparDia () {
+  $q.dialog({
+    title: 'Limpar o dia?',
+    message: 'As notas saem da lista de hoje. Os postes já registrados continuam salvos.',
+    cancel: { label: 'Voltar', flat: true },
+    ok: { label: 'Limpar', color: 'negative', unelevated: true }
+  }).onOk(() => store.limparPlano())
+}
+
+async function otimizarDia () {
+  if (otimizando.value) return
+  otimizando.value = true
+  const pos = minhaPos.value ?? await obterPosicao()
+  // "De ontem" vem sempre antes; cada grupo parte de onde o anterior termina
+  const ordem = []
+  let origem = pos
+  for (const grupo of [diaAbertas.value.filter(i => i.deOntem), diaAbertas.value.filter(i => !i.deOntem)]) {
+    const paradas = grupo.filter(i => temCoordenada(i.nota)).map(i => ({ codigo: i.nota.nota, lat: i.nota.latitude, lng: i.nota.longitude }))
+    const seq = ordenarRoteiro(paradas, origem)
+    ordem.push(...seq.map(p => p.codigo), ...grupo.filter(i => !temCoordenada(i.nota)).map(i => i.nota.nota))
+    if (seq.length) origem = seq[seq.length - 1]
+  }
+  store.reordenarPlano(ordem)
+  otimizando.value = false
+  $q.notify({
+    type: 'positive', icon: 'flash_on', position: 'top', timeout: 2200,
+    message: pos ? 'Dia reordenado a partir de onde você está.' : 'Dia reordenado pelo caminho mais curto.'
+  })
+}
+
+// Escolhe a nota do dia; começa direto quando já dá (cliente único), senão leva ao cliente
+async function iniciarDaLista (n) {
+  selecionarNota(n)
+  if (validar()) { iniciar(); return }
+  await nextTick()
+  const alvo = erros.equipe ? document.querySelector('.cl-input') : document.querySelector('.cl-clientes-list')
+  alvo?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  $q.notify({ type: 'info', position: 'top', timeout: 2200, message: erros.equipe ? 'Informe o nome da equipe para iniciar.' : 'Escolha o cliente para iniciar o turno.' })
+}
+
 function onImprevistoEnviado ({ enviado }) {
+  store.marcarNoPlano(form.nota, 'imprevisto')
   $q.notify({
     type: enviado ? 'positive' : 'warning',
     message: enviado ? 'Imprevisto registrado.' : 'Sem conexão: o imprevisto será enviado quando houver internet.',
@@ -446,6 +614,9 @@ async function recarregar () {
 
 onMounted(async () => {
   if (store.sessao) { router.replace('/campo/registro'); return }
+  // Nota que ficou "em andamento" sem sessão ativa (app fechado) volta como pausada
+  store.plano.itens.filter(i => i.estado === 'atual').forEach(i => store.marcarNoPlano(i.nota, 'pausada'))
+  if (store.plano.itens.length) obterPosicao()
   // Sempre sincroniza quando online (mostra cache enquanto carrega)
   await sincronizarNotas(notas.value.length > 0)
   // Atualiza a cada 2 minutos enquanto a tela estiver aberta
@@ -530,6 +701,74 @@ onUnmounted(() => {
   .cl-desloc-mapa { padding: 0 9px; }
 }
 .cl-desloc-sem { font-size: 12px; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 4px; }
+
+/* ── Meu dia ── */
+.cl-dia {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 14px; border-radius: 18px;
+  background: linear-gradient(160deg, rgba(255,202,40,0.1), rgba(255,255,255,0.03));
+  border: 1px solid rgba(255,202,40,0.28);
+}
+.cl-dia-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.cl-dia-titulo { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; color: #ffca28; }
+.cl-dia-sub { margin-top: 2px; font-size: 12px; color: rgba(255,255,255,0.55); font-variant-numeric: tabular-nums; }
+.cl-dia-acoes { display: flex; gap: 6px; }
+.cl-dia-acoes button {
+  width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.75);
+  display: flex; align-items: center; justify-content: center; transition: background 0.15s;
+}
+.cl-dia-acoes button:hover { background: rgba(255,255,255,0.16); }
+.cl-dia-barra { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.cl-dia-barra i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #43a047, #66bb6a); transition: width 0.4s ease; }
+
+.cl-dia-prox {
+  padding: 12px 14px; border-radius: 14px;
+  background: rgba(10,22,40,0.7); border: 1px solid rgba(100,181,246,0.35);
+}
+.cl-dia-prox-label { font-size: 10.5px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #90caf9; }
+.cl-dia-prox-nota { margin-top: 3px; font-size: 19px; font-weight: 800; color: #fff; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.cl-dia-prox-nota span { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.5); }
+.cl-dia-prox-sub { margin-top: 2px; font-size: 12.5px; color: rgba(255,255,255,0.55); }
+.cl-dia-prox-btns { display: flex; gap: 8px; margin-top: 12px; }
+.cl-dia-go {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: none; border-radius: 12px; padding: 13px; cursor: pointer;
+  background: linear-gradient(135deg, #1565c0, #1e88e5); color: #fff;
+  font-family: inherit; font-size: 15px; font-weight: 800;
+}
+.cl-dia-nav {
+  display: flex; align-items: center; gap: 6px; border: none; border-radius: 12px; padding: 0 16px; cursor: pointer;
+  background: linear-gradient(135deg, #2e7d32, #43a047); color: #fff;
+  font-family: inherit; font-size: 14px; font-weight: 800;
+}
+.cl-dia-go:active, .cl-dia-nav:active { transform: scale(0.97); }
+.cl-dia-fim {
+  display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px;
+  background: rgba(67,160,71,0.15); color: #a5d6a7; font-size: 14px; font-weight: 700;
+}
+
+.cl-dia-lista { display: flex; flex-direction: column; gap: 4px; }
+.cl-dia-item { display: flex; align-items: center; gap: 8px; padding: 2px 4px; border-radius: 10px; }
+.cl-dia-ico { flex-shrink: 0; color: rgba(255,255,255,0.35); }
+.cl-dia-item--pendente .cl-dia-ico { color: #90caf9; }
+.cl-dia-item--atual .cl-dia-ico { color: #ffca28; }
+.cl-dia-item--pausada .cl-dia-ico { color: #ffb74d; }
+.cl-dia-item--concluida .cl-dia-ico { color: #66bb6a; }
+.cl-dia-item--imprevisto .cl-dia-ico { color: #ef9a9a; }
+.cl-dia-corpo {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  border: none; background: none; padding: 6px 4px; cursor: pointer; text-align: left; font-family: inherit;
+}
+.cl-dia-corpo b { font-size: 14px; color: #fff; }
+.cl-dia-corpo small { max-width: 100%; font-size: 11.5px; color: rgba(255,255,255,0.45); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-dia-corpo:disabled { cursor: default; }
+.cl-dia-item--concluida b, .cl-dia-item--imprevisto b { color: rgba(255,255,255,0.45); text-decoration: line-through; }
+.cl-dia-rm {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer;
+  background: none; color: rgba(255,255,255,0.35); display: flex; align-items: center; justify-content: center;
+}
+.cl-dia-rm:hover { background: rgba(255,255,255,0.1); color: #fff; }
 
 .cl-input-wrap, .cl-select-wrap {
   display: flex; align-items: center; gap: 10px;

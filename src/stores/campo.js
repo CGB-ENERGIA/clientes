@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { supabase } from 'boot/supabase'
+
+const PLANO_KEY = 'cgb_campo_plano'
+const hojeISO = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 const QUEUE_KEY   = 'cgb_campo_fila'
 const SESSAO_KEY  = 'cgb_campo_sessao'
@@ -103,6 +109,65 @@ export const useCampoStore = defineStore('campo', () => {
     localStorage.setItem(RESUMO_KEY, JSON.stringify(data))
   }
 
+  // ── Meu dia: notas que a equipe pretende atender hoje, em ordem ──
+  // estado: pendente | atual | pausada | concluida | imprevisto. Vale só para o dia em que foi montado.
+  // Notas abertas de dias anteriores entram no dia de hoje como "de ontem", antes das novas
+  function carregarPlano () {
+    const p = lerJson(PLANO_KEY, null)
+    if (!p || !Array.isArray(p.itens)) return { data: hojeISO(), itens: [] }
+    if (p.data === hojeISO()) return p
+    const abertas = p.itens
+      .filter(i => ['pendente', 'atual', 'pausada'].includes(i.estado))
+      .map(i => ({ nota: i.nota, estado: 'pendente', deOntem: true }))
+    return { data: hojeISO(), itens: abertas }
+  }
+  const plano = ref(carregarPlano())
+
+  function gravarPlano () { localStorage.setItem(PLANO_KEY, JSON.stringify(plano.value)) }
+  gravarPlano()
+  function planoDeHoje () {
+    if (plano.value.data !== hojeISO()) { plano.value = carregarPlano(); gravarPlano() }
+  }
+
+  // Próxima a fazer: primeiro as que ainda não começaram, depois as pausadas
+  const proximaDoPlano = computed(() =>
+    plano.value.itens.find(i => i.estado === 'pendente') ?? plano.value.itens.find(i => i.estado === 'pausada') ?? null)
+
+  function adicionarAoPlano (codigos) {
+    planoDeHoje()
+    const ja = new Set(plano.value.itens.map(i => i.nota))
+    const novos = [...new Set(codigos)].filter(c => !ja.has(c)).map(nota => ({ nota, estado: 'pendente' }))
+    plano.value = { ...plano.value, itens: [...plano.value.itens, ...novos] }
+    gravarPlano()
+    return novos.length
+  }
+
+  function marcarNoPlano (nota, estado) {
+    if (!plano.value.itens.some(i => i.nota === nota)) return
+    plano.value = { ...plano.value, itens: plano.value.itens.map(i => i.nota === nota ? { ...i, estado } : i) }
+    gravarPlano()
+  }
+
+  function removerDoPlano (nota) {
+    plano.value = { ...plano.value, itens: plano.value.itens.filter(i => i.nota !== nota) }
+    gravarPlano()
+  }
+
+  function limparPlano () {
+    plano.value = { data: hojeISO(), itens: [] }
+    gravarPlano()
+  }
+
+  // Reordena só o que ainda está em aberto; o que já foi feito continua no topo
+  function reordenarPlano (codigos) {
+    const porNota = new Map(plano.value.itens.map(i => [i.nota, i]))
+    const feitos = plano.value.itens.filter(i => ['concluida', 'imprevisto', 'atual'].includes(i.estado))
+    const abertos = codigos.map(c => porNota.get(c)).filter(i => i && !feitos.includes(i))
+    const resto = plano.value.itens.filter(i => !feitos.includes(i) && !abertos.includes(i))
+    plano.value = { ...plano.value, itens: [...feitos, ...abertos, ...resto] }
+    gravarPlano()
+  }
+
   // ── Sessão ────────────────────────────────────────────────────
   function iniciarSessao (data) {
     sessao.value = data
@@ -110,6 +175,7 @@ export const useCampoStore = defineStore('campo', () => {
     localStorage.setItem(SESSAO_KEY, JSON.stringify(data))
     ultimaEquipe.value = data.equipe
     localStorage.setItem(EQUIPE_KEY, data.equipe)
+    marcarNoPlano(data.nota, 'atual')
   }
 
   // Junta os registros já enviados da nota (de qualquer dia/equipe) com os pendentes deste aparelho
@@ -152,6 +218,7 @@ export const useCampoStore = defineStore('campo', () => {
       ...pausadas.value.filter(p => p.nota !== s.nota)
     ].slice(0, 20)
     localStorage.setItem(PAUSA_KEY, JSON.stringify(pausadas.value))
+    marcarNoPlano(s.nota, 'pausada')
     encerrarSessao()
   }
 
@@ -186,12 +253,16 @@ export const useCampoStore = defineStore('campo', () => {
     enfileirarStatus(s.nota, 'finalizar')
     pausadas.value = pausadas.value.filter(p => p.nota !== s.nota)
     localStorage.setItem(PAUSA_KEY, JSON.stringify(pausadas.value))
+    marcarNoPlano(s.nota, 'concluida')
     encerrarSessao()
     if (online.value) await sincronizar()
     return { enviado: !filaStatus.value.some(x => x.nota === s.nota) }
   }
 
   function encerrarSessao () {
+    // Sair sem finalizar devolve a nota ao plano como pausada
+    const atual = sessao.value && plano.value.itens.find(i => i.nota === sessao.value.nota)
+    if (atual?.estado === 'atual') marcarNoPlano(atual.nota, 'pausada')
     sessao.value = null
     registros.value = []
     localStorage.removeItem(SESSAO_KEY)
@@ -317,6 +388,7 @@ export const useCampoStore = defineStore('campo', () => {
     sessao, registros, fila, online, sincronizando,
     resumoNotas, ultimaEquipe, carregandoHist, pausadas, filaImprevistos, filaStatus,
     reportarImprevisto,
+    plano, proximaDoPlano, adicionarAoPlano, marcarNoPlano, removerDoPlano, limparPlano, reordenarPlano,
     iniciarSessao, encerrarSessao, pausarSessao, finalizarSessao, salvarRegistro, sincronizar,
     carregarResumo, carregarRegistrosNota
   }

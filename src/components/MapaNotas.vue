@@ -270,13 +270,14 @@
 
             <template v-else>
               <div class="rot-ctrl">
-                <div class="rot-seg">
+                <div v-if="rotAtivas.length > 1" class="rot-seg">
                   <button :class="{ 'rot-seg--on': rotOrdem === 'otima' }" @click="rotOrdem = 'otima'">
                     <q-icon name="flash_on" size="15px" /> Melhor sequência
                   </button>
                   <button :class="{ 'rot-seg--on': rotOrdem === 'nota' }" @click="rotOrdem = 'nota'">Por nota</button>
                 </div>
-                <button class="rot-ico" title="Inverter sequência" aria-label="Inverter sequência" @click="rotInvertido = !rotInvertido">
+                <q-space v-else />
+                <button v-if="rotAtivas.length > 1" class="rot-ico" title="Inverter sequência" aria-label="Inverter sequência" @click="rotInvertido = !rotInvertido">
                   <q-icon name="swap_vert" size="20px" />
                 </button>
                 <button class="rot-ico" title="Ampliar o grupo no mapa" aria-label="Ampliar o grupo no mapa" @click="ampliarRoteiro">
@@ -317,7 +318,7 @@
                               :title="`${labelDe(n.status)}${permitirAbrir ? ' · abrir nota' : ''}`"
                               @click="permitirAbrir && emit('abrir', n)"
                             >
-                              Nota {{ n.nota }}<i :style="{ background: corDe(n.status) }" />
+                              Nota {{ n.nota }}<i :style="{ background: corDe(n.status) }" /><q-icon v-if="permitirAbrir" name="open_in_new" size="14px" />
                             </button>
                             <span v-if="p.notas.length > 3" class="rot-mais">+{{ p.notas.length - 3 }}</span>
                           </div>
@@ -347,6 +348,16 @@
               </div>
 
               <div class="rot-rodape">
+                <button
+                  v-if="modo === 'campo' && rotSequencia.length"
+                  class="rot-btn rot-btn--dia"
+                  :class="{ 'rot-btn--dia-ok': rotJaNoDia }"
+                  :disabled="rotJaNoDia"
+                  @click="emit('planejar', rotCodigosNotas)"
+                >
+                  <q-icon :name="rotJaNoDia ? 'event_available' : 'event_note'" size="18px" />
+                  {{ rotJaNoDia ? 'No seu dia' : `Atender ${rotCodigosNotas.length === 1 ? 'esta nota' : rotCodigosNotas.length + ' notas'} hoje` }}
+                </button>
                 <button class="rot-btn rot-btn--prim" :class="{ 'rot-btn--ok': copiado === 'todos' }" :disabled="!rotSequencia.length" @click="copiarTodos">
                   <q-icon :name="copiado === 'todos' ? 'check' : 'content_copy'" size="18px" />
                   {{ copiado === 'todos' ? 'Links copiados!' : `Copiar ${rotSequencia.length} ${rotSequencia.length === 1 ? 'link' : 'links'}` }}
@@ -399,9 +410,11 @@ const props = defineProps({
   foco: { type: String, default: null },
   rotuloAbrir: { type: String, default: 'Abrir nota' },
   permitirAbrir: { type: Boolean, default: true },
-  baseInicial: { type: String, default: null }
+  baseInicial: { type: String, default: null },
+  // Notas que já estão no "Meu dia" da equipe (modo campo)
+  planoNotas: { type: Array, default: () => [] }
 })
-const emit = defineEmits(['update:modelValue', 'abrir'])
+const emit = defineEmits(['update:modelValue', 'abrir', 'planejar'])
 
 const $q = useQuasar()
 const compacto = computed(() => $q.screen.lt.sm)
@@ -794,6 +807,9 @@ let rotAbort = null
 let copiadoTimer = null
 let rotRealcado = null
 let rotAnimar = false
+let rotGeracao = 0
+const rotLocalizando = ref(false)
+const rotSemGps = ref('')
 const rotMarcadores = new Map()
 const cacheRotasMulti = new Map()
 
@@ -835,7 +851,14 @@ const rotTotais = computed(() => {
 })
 const rotSubtitulo = computed(() => {
   const base = rotOrdem.value === 'otima' ? 'sequência mais curta' : 'ordem por número da nota'
-  return roteiro.value?.origem ? `${base} · saindo de você` : base
+  if (roteiro.value?.origem) return `${base} · saindo de você`
+  if (rotLocalizando.value) return `${base} · obtendo sua localização…`
+  return rotSemGps.value ? `${base} · sem sua localização` : base
+})
+const rotCodigosNotas = computed(() => rotNotas.value.map(n => n.nota))
+const rotJaNoDia = computed(() => {
+  const no = new Set(props.planoNotas)
+  return rotCodigosNotas.value.length > 0 && rotCodigosNotas.value.every(c => no.has(c))
 })
 const rotTrechos = computed(() =>
   trechosGoogle(rotSequencia.value, { daPosicaoAtual: !!roteiro.value?.origem }))
@@ -956,6 +979,21 @@ function desenharRoteiro () {
     }).addTo(camadaRoteiro)
   }
 
+  // No modo campo a bolinha azul da equipe já está no mapa
+  const origem = roteiro.value.origem
+  if (origem && !marcadorEu) {
+    L.marker([origem.lat, origem.lng], {
+      icon: L.divIcon({
+        className: 'mapa-eu',
+        html: '<span class="mapa-eu-pulso"></span><span class="mapa-eu-ponto"></span>',
+        iconSize: [64, 64]
+      }),
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: 900
+    }).addTo(camadaRoteiro)
+  }
+
   const ultimo = seq.length - 1
   const animar = rotAnimar
   rotAnimar = false
@@ -1034,34 +1072,66 @@ function enquadrarRoteiro (duracao = 0.9) {
   })
 }
 
-async function abrirRoteiro (cluster) {
-  if (!mapa) return
-  fecharSelecao()
+function abrirRoteiroDoPonto (lat, lng) {
+  const notas = notasNoPonto(lat, lng)
+  if (!notas.length) return
+  abrirRoteiroDe([{ id: chavePonto(lat, lng), lat, lng, notas }], L.latLngBounds([[lat, lng]]))
+}
+
+function abrirRoteiro (cluster) {
   const paradas = cluster.getAllChildMarkers().map(m => {
     const { lat, lng } = m.getLatLng()
     return { id: chavePonto(lat, lng), lat, lng, notas: m.options.notasPonto ?? [] }
   })
+  abrirRoteiroDe(paradas, cluster.getBounds())
+}
+
+async function abrirRoteiroDe (paradas, bounds) {
+  if (!mapa) return
+  fecharSelecao()
   rotOrdem.value = 'otima'
   rotInvertido.value = false
   rotExcluidas.value = new Set()
   rotSelecionada.value = null
   copiado.value = ''
   rotAnimar = true
+  const geracao = ++rotGeracao
+  rotSemGps.value = ''
   roteiro.value = {
     paradas,
     grande: paradas.length > LIMITE_ROTEIRO,
-    bounds: cluster.getBounds(),
+    bounds,
     // Fixa a posição de partida na abertura: o GPS atualiza sempre e embaralharia a sequência
-    origem: props.modo === 'campo' && minhaPos.value ? { lat: minhaPos.value.lat, lng: minhaPos.value.lng } : null
+    origem: minhaPos.value ? { lat: minhaPos.value.lat, lng: minhaPos.value.lng } : null
   }
+  if (!roteiro.value.origem && !roteiro.value.grande) obterOrigem(geracao)
   await nextTick()
   enquadrarRoteiro()
+}
+
+// O roteiro parte de onde o usuário está agora; sem permissão, usa o ponto mais conveniente
+function obterOrigem (geracao) {
+  if (!navigator.geolocation) { rotSemGps.value = 'sem localização'; return }
+  rotLocalizando.value = true
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      rotLocalizando.value = false
+      if (geracao !== rotGeracao || !roteiro.value) return
+      roteiro.value = { ...roteiro.value, origem: { lat: pos.coords.latitude, lng: pos.coords.longitude } }
+      nextTick(() => enquadrarRoteiro())
+    },
+    () => {
+      rotLocalizando.value = false
+      if (geracao === rotGeracao) rotSemGps.value = 'sem localização'
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+  )
 }
 
 function ampliarRoteiro () {
   const bounds = roteiro.value?.bounds
   fecharRoteiro()
-  if (bounds && mapa) mapa.flyToBounds(bounds, { padding: [50, 50], duration: 0.8 })
+  if (bounds && mapa) mapa.flyToBounds(bounds, { padding: [50, 50], maxZoom: 17, duration: 0.8 })
 }
 
 function fecharRoteiro () {
@@ -1069,6 +1139,8 @@ function fecharRoteiro () {
   rotAbort?.abort()
   rotAbort = null
   rotRealPontos = null
+  rotGeracao++
+  rotLocalizando.value = false
   roteiro.value = null
   rotReal.value = { estado: null }
   rotSelecionada.value = null
@@ -1229,7 +1301,7 @@ function desenharMarcadores () {
       notasPonto: [...notas].sort((a, b) => ordem(a.status) - ordem(b.status))
     })
     if (temHover) m.bindTooltip(notas.length > 1 ? `${notas.length} notas` : `Nota ${principal.nota}`, { direction: 'top', offset: [0, -6] })
-    m.on('click', () => selecionarNoPonto(principal.latitude, principal.longitude))
+    m.on('click', () => abrirRoteiroDoPonto(principal.latitude, principal.longitude))
     marcadores.push(m)
   }
   camadaMarcadores.addLayers ? camadaMarcadores.addLayers(marcadores) : marcadores.forEach(m => m.addTo(camadaMarcadores))
@@ -1748,6 +1820,9 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 .rot-btn--prim { background: #1d4ed8; color: #fff; box-shadow: 0 6px 16px rgba(29,78,216,0.35); }
 .rot-btn--prim:hover { filter: brightness(1.08); }
 .rot-btn--ok { background: #16a34a; box-shadow: 0 6px 16px rgba(22,163,74,0.35); }
+.rot-btn--dia { background: linear-gradient(135deg, #ffb300, #ffca28); color: #3b2a00; box-shadow: 0 6px 16px rgba(255,179,0,0.35); }
+.rot-btn--dia:hover { filter: brightness(1.05); }
+.rot-btn--dia-ok, .rot-btn--dia-ok:disabled { background: #fff8e1; color: #8a6100; box-shadow: inset 0 0 0 1.5px #ffca28; opacity: 1; }
 .rot-btn--zap { background: #25d366; color: #05381b; }
 .rot-btn--zap:hover { filter: brightness(1.05); }
 .rot-btn--maps { background: #e8f0fe; color: #1a56db; }

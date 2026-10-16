@@ -13,6 +13,19 @@ export default route(function (/* { store, ssrContext } */) {
     history: createHistory(process.env.VUE_ROUTER_BASE)
   })
 
+  // Após um deploy os arquivos antigos somem do servidor: quem ainda roda a versão anterior
+  // falha ao abrir telas novas. Recarregar busca a versão atual (uma vez a cada 15 s, sem laço).
+  router.onError((err, to) => {
+    if (!/dynamically imported module|Importing a module script failed|Loading chunk|preload CSS/i.test(err?.message || '')) return
+    try {
+      const ultimo = Number(sessionStorage.getItem('cgb_chunk_reload') || 0)
+      if (Date.now() - ultimo < 15000) return
+      sessionStorage.setItem('cgb_chunk_reload', String(Date.now()))
+    } catch {}
+    if (to?.fullPath) window.location.hash = to.fullPath
+    window.location.reload()
+  })
+
   router.beforeEach(async (to, _from, next) => {
     // Importação dinâmica para evitar dependência circular no boot
     const { useAuthStore } = await import('stores/auth')
