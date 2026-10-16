@@ -1019,16 +1019,27 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 :deep(.mapa-cluster-anel) {
   width: 100%; height: 100%; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
   animation: mapa-pop 0.4s cubic-bezier(0.2, 1.5, 0.4, 1);
-  transition: transform 0.15s;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
 }
-:deep(.mapa-cluster-anel:hover) { transform: scale(1.1); }
+:deep(.mapa-cluster-anel:hover) {
+  transform: scale(1.12);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+}
 :deep(.mapa-cluster-anel span) {
   width: calc(100% - 10px); height: calc(100% - 10px); border-radius: 50%;
-  background: #fff; color: #263238; font-weight: 800; font-size: 13px;
+  background: rgba(255,255,255,0.82);
+  color: #1a2535; font-weight: 800; font-size: 13px;
   display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(2px);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+:deep(.mapa-cluster-anel:hover span) {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5);
 }
 @keyframes mapa-pop { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
