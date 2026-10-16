@@ -121,17 +121,37 @@
       <div class="mapa-wrap">
         <div ref="mapaEl" class="mapa-el" />
 
-        <div v-if="modo === 'campo' && !selecionado" class="mapa-fabs">
-          <q-btn round color="white" text-color="blue-8" icon="my_location" @click="centralizarEmMim">
-            <q-tooltip v-if="!compacto">Onde estou</q-tooltip>
-          </q-btn>
-          <q-btn round color="teal-7" icon="near_me" :disable="!minhaPos" @click="irParaMaisProxima">
-            <q-tooltip v-if="!compacto">Nota mais próxima</q-tooltip>
-          </q-btn>
-        </div>
+        <transition name="mapa-fabs">
+          <div v-if="modo === 'campo' && !selecionado" class="mapa-fabs">
+            <q-btn
+              round
+              :color="seguindo ? 'blue-7' : 'white'"
+              :text-color="seguindo ? 'white' : 'blue-8'"
+              :icon="seguindo ? 'gps_fixed' : 'my_location'"
+              class="mapa-fab-gps"
+              :class="{ 'mapa-fab-gps--ativo': seguindo }"
+              @click="centralizarEmMim"
+            >
+              <q-tooltip v-if="!compacto">{{ seguindo ? 'Seguindo você' : 'Onde estou' }}</q-tooltip>
+            </q-btn>
+            <q-btn round color="teal-7" icon="near_me" :disable="!minhaPos" @click="irParaMaisProxima">
+              <q-tooltip v-if="!compacto">Nota mais próxima</q-tooltip>
+            </q-btn>
+          </div>
+        </transition>
 
         <transition name="mapa-sheet">
-          <div v-if="selecionado" ref="sheetEl" class="mapa-sheet">
+          <div
+            v-if="selecionado"
+            ref="sheetEl"
+            class="mapa-sheet"
+            :class="{ 'mapa-sheet--arrastando': arrasteY > 0 }"
+            :style="arrasteY > 0 ? { transform: `translateY(${arrasteY}px)` } : null"
+            @touchstart.passive="iniciarArraste"
+            @touchmove="moverArraste"
+            @touchend="soltarArraste"
+            @touchcancel="soltarArraste"
+          >
             <div v-if="compacto" class="mapa-sheet-alca" />
             <button class="mapa-sheet-fechar" aria-label="Fechar" @click="fecharSelecao">
               <q-icon name="close" size="20px" />
@@ -160,7 +180,19 @@
               </div>
             </div>
 
-            <div v-if="distanciaSelecionado" class="mapa-sheet-dist">
+            <div v-if="rota.estado === 'ok'" class="mapa-sheet-rota">
+              <q-icon name="directions_car" size="22px" />
+              <div class="mapa-sheet-rota-info">
+                <b>{{ formatarDuracao(rota.minutos) }}</b>
+                <span>{{ formatarDistancia(rota.km) }} de carro</span>
+              </div>
+              <q-btn flat dense no-caps color="primary" icon="route" label="Ver trajeto" @click="enquadrarRota" />
+            </div>
+            <div v-else-if="rota.estado === 'carregando'" class="mapa-sheet-rota mapa-sheet-rota--carregando">
+              <q-spinner-dots size="22px" color="primary" />
+              <span>Calculando rota{{ distanciaSelecionado ? ` · ${distanciaSelecionado} em linha reta` : '' }}</span>
+            </div>
+            <div v-else-if="distanciaSelecionado" class="mapa-sheet-dist">
               <q-icon name="straighten" size="16px" /> A {{ distanciaSelecionado }} de você (em linha reta)
             </div>
 
@@ -192,7 +224,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useQuasar } from 'quasar'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { urlGoogleMaps, urlWaze, distanciaKm, formatarDistancia } from 'src/utils/rota'
+import { urlGoogleMaps, urlWaze, distanciaKm, formatarDistancia, formatarDuracao, buscarRota } from 'src/utils/rota'
 import { chaveMunicipio, limitesDe } from 'src/utils/limites'
 import { booleanPointInPolygon } from '@turf/boolean-point-in-polygon'
 
@@ -234,15 +266,34 @@ const minhaPos = ref(null)
 const erroGps  = ref('')
 const painelAberto = ref(false)
 const selecionado  = ref(null)
+const seguindo     = ref(false)
+const rota         = ref({ estado: null })
+const arrasteY     = ref(0)
 let mapa = null
 let camadaMarcadores = null
 let camadaDestaque = null
+let camadaRota = null
 let camadasBase = {}
 let ajustouVisao = false
 let marcadorEu = null
 let circuloEu = null
 let gpsWatch = null
+let rumo = null
+let ouvindoBussola = false
 let seguirPrimeiraPosicao = false
+
+// O plugin de agrupamento procura o Leaflet na variável global
+let clusterPronto = null
+function carregarCluster () {
+  if (!clusterPronto) {
+    window.L = L
+    clusterPronto = Promise.all([
+      import('leaflet.markercluster'),
+      import('leaflet.markercluster/dist/MarkerCluster.css')
+    ])
+  }
+  return clusterPronto
+}
 
 function atualizarOnline () { online.value = navigator.onLine }
 
@@ -423,12 +474,22 @@ function notasNoPonto (lat, lng) {
 
 async function selecionar (notas) {
   if (!notas?.length || !mapa) return
+  const mesmoPonto = selecionado.value?.[0]?.nota === notas[0].nota
   selecionado.value = notas
+  seguindo.value = false
   const { latitude: lat, longitude: lng } = notas[0]
   camadaDestaque.clearLayers()
-  L.circleMarker([lat, lng], {
-    radius: compacto.value ? 16 : 13, color: '#ffca28', weight: 4, fill: false, interactive: false
+  L.marker([lat, lng], {
+    icon: L.divIcon({
+      className: 'mapa-pulso',
+      html: `<span class="mapa-pulso-onda"></span><span class="mapa-pulso-onda mapa-pulso-onda--2"></span><span class="mapa-pulso-anel" style="--cor:${corDe(notas[0].status)}"></span>`,
+      iconSize: [44, 44]
+    }),
+    interactive: false,
+    keyboard: false,
+    zIndexOffset: 1000
   }).addTo(camadaDestaque)
+  if (!mesmoPonto) calcularRota()
 
   // Garante que o ponto fique visível acima da gaveta
   await nextTick()
@@ -446,7 +507,100 @@ async function selecionar (notas) {
 
 function fecharSelecao () {
   selecionado.value = null
+  arrasteY.value = 0
   camadaDestaque?.clearLayers()
+  limparRota()
+}
+
+// ── Rota de carro até a nota selecionada (modo campo) ───────────
+let rotaAbort = null
+let rotaOrigem = null
+let rotaLinha = null
+const cacheRotas = new Map()
+
+function limparRota () {
+  rotaAbort?.abort()
+  rotaAbort = null
+  rotaOrigem = null
+  rotaLinha = null
+  camadaRota?.clearLayers()
+  rota.value = { estado: null }
+}
+
+async function calcularRota () {
+  limparRota()
+  if (props.modo !== 'campo' || !minhaPos.value || !selecionado.value || !navigator.onLine) return
+  const n = selecionado.value[0]
+  const origem = { lat: minhaPos.value.lat, lng: minhaPos.value.lng }
+  // O servidor público não atende trajetos muito longos com rapidez
+  if (distanciaKm(origem, { lat: n.latitude, lng: n.longitude }) > 400) return
+
+  const chave = `${n.nota}|${origem.lat.toFixed(3)},${origem.lng.toFixed(3)}`
+  rotaOrigem = origem
+  rota.value = { estado: 'carregando' }
+  let res = cacheRotas.get(chave)
+  if (!res) {
+    rotaAbort = new AbortController()
+    try {
+      res = await buscarRota(origem, { lat: n.latitude, lng: n.longitude }, rotaAbort.signal)
+      cacheRotas.set(chave, res)
+    } catch (e) {
+      if (e.name !== 'AbortError') rota.value = { estado: 'erro' }
+      return
+    }
+  }
+  if (!mapa || selecionado.value?.[0]?.nota !== n.nota) return
+  rota.value = { estado: 'ok', km: res.km, minutos: res.minutos }
+  desenharRota(res.pontos)
+}
+
+function desenharRota (pontos) {
+  camadaRota.clearLayers()
+  const renderer = L.svg({ pane: 'rota' })
+  L.polyline(pontos, { renderer, pane: 'rota', color: '#fff', weight: 9, opacity: 0.9, interactive: false, className: 'mapa-rota-linha mapa-rota-linha--borda' }).addTo(camadaRota)
+  rotaLinha = L.polyline(pontos, { renderer, pane: 'rota', color: '#1e88e5', weight: 5, opacity: 1, interactive: false, className: 'mapa-rota-linha' }).addTo(camadaRota)
+  // pathLength = 1 permite animar o "desenho" da linha com CSS, qualquer que seja o tamanho
+  camadaRota.eachLayer(l => l.getElement()?.setAttribute('pathLength', '1'))
+}
+
+function enquadrarRota () {
+  if (!mapa || !rotaLinha) return
+  const sheet = compacto.value ? (sheetEl.value?.offsetHeight ?? 0) : 0
+  const lateral = !compacto.value && sheetEl.value ? sheetEl.value.offsetWidth + 24 : 30
+  mapa.flyToBounds(rotaLinha.getBounds(), {
+    paddingTopLeft: [lateral, 30],
+    paddingBottomRight: [30, sheet + 30],
+    maxZoom: 17,
+    duration: 0.9
+  })
+}
+
+// ── Arrastar a gaveta para baixo fecha os detalhes ─────────────
+let arrasteInicio = null
+function iniciarArraste (e) {
+  if (!compacto.value || sheetEl.value?.scrollTop > 0) { arrasteInicio = null; return }
+  arrasteInicio = e.touches[0].clientY
+}
+function moverArraste (e) {
+  if (arrasteInicio == null) return
+  const dy = e.touches[0].clientY - arrasteInicio
+  if (dy > 0) {
+    arrasteY.value = dy
+    if (e.cancelable) e.preventDefault()
+  } else {
+    arrasteY.value = 0
+  }
+}
+function soltarArraste () {
+  if (arrasteInicio == null) return
+  arrasteInicio = null
+  if (arrasteY.value > 90) {
+    const el = sheetEl.value
+    if (el) { el.style.transition = 'transform 0.2s ease-in'; el.style.transform = 'translateY(100%)' }
+    fecharSelecao()
+  } else {
+    arrasteY.value = 0
+  }
 }
 
 function selecionarNoPonto (lat, lng) {
@@ -460,7 +614,7 @@ function moverESelecionar (mover, n) {
 
 function irParaNota (n, zoom = 16) {
   if (!mapa || !n) return
-  moverESelecionar(() => mapa.setView([n.latitude, n.longitude], zoom), n)
+  moverESelecionar(() => mapa.flyTo([n.latitude, n.longitude], zoom, { duration: 0.9 }), n)
 }
 
 // ── Localização da equipe (modo campo) ──────────────────────────
@@ -470,9 +624,15 @@ function iniciarGps () {
   gpsWatch = navigator.geolocation.watchPosition(
     pos => {
       erroGps.value = ''
-      minhaPos.value = { lat: pos.coords.latitude, lng: pos.coords.longitude, precisao: pos.coords.accuracy }
+      const { latitude, longitude, accuracy, heading, speed } = pos.coords
+      minhaPos.value = { lat: latitude, lng: longitude, precisao: accuracy }
+      // Em movimento, o rumo do GPS é mais confiável que a bússola
+      if (Number.isFinite(heading) && speed > 1.5) atualizarRumo(heading)
       desenharEu()
       if (seguirPrimeiraPosicao) { seguirPrimeiraPosicao = false; centralizarEmMim() }
+      else if (seguindo.value) mapa?.panTo([latitude, longitude], { animate: true, duration: 0.6 })
+      if (rotaOrigem && distanciaKm(rotaOrigem, minhaPos.value) > 0.5) calcularRota()
+      else if (selecionado.value && !rotaOrigem && rota.value.estado == null) calcularRota()
     },
     err => {
       erroGps.value = err.code === 1
@@ -486,14 +646,62 @@ function iniciarGps () {
 function pararGps () {
   if (gpsWatch != null) navigator.geolocation.clearWatch(gpsWatch)
   gpsWatch = null
+  pararBussola()
+}
+
+// ── Direção para onde a pessoa está virada (bússola do aparelho) ─
+function aoGirarAparelho (e) {
+  let h = null
+  if (Number.isFinite(e.webkitCompassHeading)) h = e.webkitCompassHeading
+  else if (e.absolute && Number.isFinite(e.alpha)) h = 360 - e.alpha
+  if (h != null) atualizarRumo(h)
+}
+
+async function iniciarBussola () {
+  if (ouvindoBussola || typeof window.DeviceOrientationEvent === 'undefined') return
+  // iPhone exige permissão, pedida a partir de um toque do usuário
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      if (await DeviceOrientationEvent.requestPermission() !== 'granted') return
+    } catch { return }
+  }
+  ouvindoBussola = true
+  window.addEventListener('deviceorientationabsolute', aoGirarAparelho)
+  window.addEventListener('deviceorientation', aoGirarAparelho)
+}
+
+function pararBussola () {
+  if (!ouvindoBussola) return
+  ouvindoBussola = false
+  window.removeEventListener('deviceorientationabsolute', aoGirarAparelho)
+  window.removeEventListener('deviceorientation', aoGirarAparelho)
+}
+
+function atualizarRumo (h) {
+  rumo = ((h % 360) + 360) % 360
+  const cone = marcadorEu?.getElement()?.querySelector('.mapa-eu-cone')
+  if (cone) {
+    cone.style.opacity = '1'
+    cone.style.transform = `rotate(${rumo}deg)`
+  }
 }
 
 function desenharEu () {
   if (!mapa || !minhaPos.value) return
   const { lat, lng, precisao } = minhaPos.value
   if (!marcadorEu) {
-    circuloEu = L.circle([lat, lng], { radius: precisao, color: '#1e88e5', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(mapa)
-    marcadorEu = L.circleMarker([lat, lng], { radius: 8, color: '#fff', weight: 3, fillColor: '#1e88e5', fillOpacity: 1, interactive: false }).addTo(mapa)
+    circuloEu = L.circle([lat, lng], { radius: precisao, color: '#1e88e5', weight: 1, opacity: 0.5, fillOpacity: 0.1, interactive: false }).addTo(mapa)
+    marcadorEu = L.marker([lat, lng], {
+      icon: L.divIcon({
+        className: 'mapa-eu',
+        html: '<span class="mapa-eu-cone"></span><span class="mapa-eu-pulso"></span><span class="mapa-eu-ponto"></span>',
+        iconSize: [64, 64]
+      }),
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: 900
+    }).addTo(mapa)
+    if (rumo != null) atualizarRumo(rumo)
   } else {
     marcadorEu.setLatLng([lat, lng])
     circuloEu.setLatLng([lat, lng]).setRadius(precisao)
@@ -501,8 +709,10 @@ function desenharEu () {
 }
 
 function centralizarEmMim () {
+  iniciarBussola()
   if (!minhaPos.value) { seguirPrimeiraPosicao = true; iniciarGps(); return }
-  mapa?.setView([minhaPos.value.lat, minhaPos.value.lng], Math.max(mapa.getZoom(), 14))
+  seguindo.value = true
+  mapa?.flyTo([minhaPos.value.lat, minhaPos.value.lng], Math.max(mapa.getZoom(), 16), { duration: 0.8 })
 }
 
 function irParaMaisProxima () {
@@ -513,9 +723,9 @@ function irParaMaisProxima () {
     if (d < menor) { menor = d; melhor = n }
   }
   if (!melhor) return
-  moverESelecionar(() => mapa.fitBounds(
+  moverESelecionar(() => mapa.flyToBounds(
     L.latLngBounds([[minhaPos.value.lat, minhaPos.value.lng], [melhor.latitude, melhor.longitude]]),
-    { padding: [60, 60], maxZoom: 16 }
+    { padding: [60, 60], maxZoom: 16, duration: 1 }
   ), melhor)
 }
 
@@ -533,6 +743,7 @@ function desenharMarcadores () {
 
   const ordem = s => STATUS.findIndex(x => x.val === s)
   const raio = compacto.value ? 9 : 7
+  const marcadores = []
   for (const notas of porPonto.values()) {
     const principal = [...notas].sort((a, b) => ordem(a.status) - ordem(b.status))[0]
     const m = L.circleMarker([principal.latitude, principal.longitude], {
@@ -540,12 +751,14 @@ function desenharMarcadores () {
       color: '#fff',
       weight: notas.length > 1 ? 3 : 2,
       fillColor: corDe(principal.status),
-      fillOpacity: 0.95
+      fillOpacity: 0.95,
+      statusNotas: notas.map(n => n.status)
     })
     if (temHover) m.bindTooltip(notas.length > 1 ? `${notas.length} notas` : `Nota ${principal.nota}`, { direction: 'top', offset: [0, -6] })
     m.on('click', () => selecionarNoPonto(principal.latitude, principal.longitude))
-    m.addTo(camadaMarcadores)
+    marcadores.push(m)
   }
+  camadaMarcadores.addLayers ? camadaMarcadores.addLayers(marcadores) : marcadores.forEach(m => m.addTo(camadaMarcadores))
 
   if (selecionado.value) {
     const { latitude, longitude } = selecionado.value[0]
@@ -562,9 +775,33 @@ function desenharMarcadores () {
   }
 }
 
+// Bolha com o total de notas e um anel colorido na proporção de cada status
+function iconeCluster (cluster) {
+  const cont = {}
+  let total = 0
+  for (const m of cluster.getAllChildMarkers()) {
+    for (const s of m.options.statusNotas ?? []) { cont[s] = (cont[s] || 0) + 1; total++ }
+  }
+  let acc = 0
+  const fatias = Object.keys(cont)
+    .sort((a, b) => STATUS.findIndex(x => x.val === a) - STATUS.findIndex(x => x.val === b))
+    .map(s => {
+      const ini = acc
+      acc += cont[s] / total * 360
+      return `${corDe(s)} ${ini}deg ${acc}deg`
+    })
+  const tam = total < 10 ? 38 : total < 50 ? 46 : total < 200 ? 54 : 62
+  return L.divIcon({
+    className: 'mapa-cluster',
+    html: `<div class="mapa-cluster-anel" style="background:conic-gradient(${fatias.join(',')})"><span>${total}</span></div>`,
+    iconSize: [tam, tam]
+  })
+}
+
 async function montarMapa () {
   await nextTick()
-  if (mapa || !mapaEl.value) return
+  await carregarCluster().catch(() => null)
+  if (mapa || !mapaEl.value || !props.modelValue) return
   mapa = L.map(mapaEl.value, {
     // Tolerância maior facilita acertar o ponto com o dedo
     renderer: L.canvas({ tolerance: compacto.value ? 10 : 4 }),
@@ -585,8 +822,20 @@ async function montarMapa () {
   mapa.createPane('mascara').style.zIndex = 350
   mapa.createPane('contorno').style.zIndex = 360
   mapa.createPane('rotulos').style.zIndex = 370
-  camadaMarcadores = L.layerGroup().addTo(mapa)
+  mapa.createPane('rota').style.zIndex = 390
+  camadaMarcadores = (L.markerClusterGroup
+    ? L.markerClusterGroup({
+      iconCreateFunction: iconeCluster,
+      showCoverageOnHover: false,
+      spiderfyOnMaxZoom: false,
+      disableClusteringAtZoom: 15,
+      maxClusterRadius: z => z < 10 ? 60 : 45,
+      chunkedLoading: true
+    })
+    : L.layerGroup()).addTo(mapa)
   camadaDestaque = L.layerGroup().addTo(mapa)
+  camadaRota = L.layerGroup().addTo(mapa)
+  mapa.on('dragstart', () => { seguindo.value = false })
   mapa.on('click', aoClicarMapa)
   mapa.on('zoomend', atualizarRotulos)
 
@@ -614,6 +863,10 @@ function desmontarMapa () {
   circuloEu = null
   camadaArea = null
   municipiosDaArea = []
+  limparRota()
+  camadaRota = null
+  seguindo.value = false
+  arrasteY.value = 0
   selecionado.value = null
   mapa?.remove()
   mapa = null
@@ -636,7 +889,7 @@ function irParaBusca () {
     irParaNota(achadas[0])
   } else {
     fecharSelecao()
-    mapa.fitBounds(L.latLngBounds(achadas.map(n => [n.latitude, n.longitude])), { padding: [40, 40], maxZoom: 15 })
+    mapa.flyToBounds(L.latLngBounds(achadas.map(n => [n.latitude, n.longitude])), { padding: [40, 40], maxZoom: 15, duration: 0.9 })
   }
 }
 
@@ -738,8 +991,90 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 .mapa-rota--link { color: #1565c0; font-size: 13px; font-weight: 700; padding: 4px 0; }
 .mapa-rota:active { transform: scale(0.98); }
 
-.mapa-sheet-enter-active, .mapa-sheet-leave-active { transition: transform 0.22s ease, opacity 0.22s ease; }
+.mapa-sheet { transition: transform 0.25s cubic-bezier(0.2, 1.25, 0.35, 1); }
+.mapa-sheet--arrastando { transition: none; }
+.mapa-sheet-enter-active { transition: transform 0.42s cubic-bezier(0.2, 1.25, 0.35, 1), opacity 0.25s ease; }
+.mapa-sheet-leave-active { transition: transform 0.2s ease-in, opacity 0.2s ease-in; }
 .mapa-sheet-enter-from, .mapa-sheet-leave-to { transform: translateY(24px); opacity: 0; }
+
+.mapa-sheet-rota {
+  display: flex; align-items: center; gap: 10px; margin-top: 12px;
+  background: #e3f2fd; color: #1565c0; border-radius: 12px; padding: 8px 6px 8px 12px;
+  animation: mapa-surgir 0.3s ease;
+}
+.mapa-sheet-rota-info { display: flex; flex-direction: column; line-height: 1.2; flex: 1; min-width: 0; }
+.mapa-sheet-rota-info b { font-size: 17px; color: #0d47a1; }
+.mapa-sheet-rota-info span { font-size: 12px; color: #1976d2; }
+.mapa-sheet-rota--carregando { background: #f5f7fa; color: #607d8b; font-size: 13px; padding: 10px 12px; }
+
+@keyframes mapa-surgir { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.mapa-fabs-enter-active { transition: transform 0.35s cubic-bezier(0.2, 1.4, 0.4, 1), opacity 0.2s; }
+.mapa-fabs-leave-active { transition: transform 0.15s ease-in, opacity 0.15s; }
+.mapa-fabs-enter-from, .mapa-fabs-leave-to { transform: scale(0.4); opacity: 0; }
+.mapa-fab-gps--ativo { box-shadow: 0 0 0 4px rgba(30,136,229,0.3), 0 3px 8px rgba(0,0,0,0.25); }
+
+/* Bolhas de agrupamento */
+:deep(.mapa-cluster) { background: none; border: none; }
+:deep(.mapa-cluster-anel) {
+  width: 100%; height: 100%; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  animation: mapa-pop 0.4s cubic-bezier(0.2, 1.5, 0.4, 1);
+  transition: transform 0.15s;
+  cursor: pointer;
+}
+:deep(.mapa-cluster-anel:hover) { transform: scale(1.1); }
+:deep(.mapa-cluster-anel span) {
+  width: calc(100% - 10px); height: calc(100% - 10px); border-radius: 50%;
+  background: #fff; color: #263238; font-weight: 800; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+}
+@keyframes mapa-pop { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Nota selecionada */
+:deep(.mapa-pulso) { background: none; border: none; pointer-events: none; }
+:deep(.mapa-pulso-anel) {
+  position: absolute; inset: 8px; border-radius: 50%;
+  border: 4px solid #ffca28; box-shadow: 0 0 0 2px #fff, 0 2px 10px rgba(0,0,0,0.35);
+  animation: mapa-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+:deep(.mapa-pulso-onda) {
+  position: absolute; inset: 8px; border-radius: 50%;
+  background: rgba(255,202,40,0.45);
+  animation: mapa-onda 1.8s ease-out infinite;
+}
+:deep(.mapa-pulso-onda--2) { animation-delay: 0.9s; }
+@keyframes mapa-onda { from { transform: scale(0.6); opacity: 0.9; } to { transform: scale(2.2); opacity: 0; } }
+
+/* Posição da equipe */
+:deep(.mapa-eu) { background: none; border: none; pointer-events: none; }
+:deep(.mapa-eu-ponto) {
+  position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+  border-radius: 50%; background: #1e88e5; border: 3px solid #fff;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.4);
+}
+:deep(.mapa-eu-pulso) {
+  position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+  border-radius: 50%; background: rgba(30,136,229,0.5);
+  animation: mapa-onda 2s ease-out infinite;
+}
+:deep(.mapa-eu-cone) {
+  position: absolute; inset: 0; opacity: 0;
+  transition: transform 0.3s ease-out, opacity 0.3s;
+  background: conic-gradient(from -28deg at 50% 50%, rgba(30,136,229,0.55) 0deg, rgba(30,136,229,0) 56deg, transparent 56deg);
+  -webkit-mask: radial-gradient(circle, #000 0 30px, transparent 31px);
+  mask: radial-gradient(circle, #000 0 30px, transparent 31px);
+  border-radius: 50%;
+}
+
+/* Rota até a nota */
+:deep(.mapa-rota-linha) {
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: mapa-desenhar 1.1s ease-out forwards;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+@keyframes mapa-desenhar { to { stroke-dashoffset: 0; } }
 
 :deep(.mapa-mun-label) {
   background: rgba(255,255,255,0.8); border: none; box-shadow: none;

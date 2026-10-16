@@ -31,3 +31,27 @@ export function formatarDistancia (km) {
   if (km == null) return ''
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(km < 10 ? 1 : 0).replace('.', ',')} km`
 }
+
+export function formatarDuracao (min) {
+  if (min == null) return ''
+  const m = Math.max(1, Math.round(min))
+  if (m < 60) return `${m} min`
+  const h = Math.floor(m / 60)
+  return `${h} h ${String(m % 60).padStart(2, '0')} min`
+}
+
+// Rota de carro pelo servidor público do OSRM (dados do OpenStreetMap)
+export async function buscarRota (origem, destino, signal) {
+  const url = 'https://router.project-osrm.org/route/v1/driving/' +
+    `${origem.lng},${origem.lat};${destino.lng},${destino.lat}?overview=full&geometries=geojson`
+  const resp = await fetch(url, { signal })
+  if (!resp.ok) throw new Error(`OSRM ${resp.status}`)
+  const json = await resp.json()
+  const r = json.routes?.[0]
+  if (json.code !== 'Ok' || !r) throw new Error(json.message || 'Rota não encontrada')
+  return {
+    pontos: r.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+    km: r.distance / 1000,
+    minutos: r.duration / 60
+  }
+}
