@@ -225,6 +225,156 @@
             </div>
           </div>
         </transition>
+
+        <transition name="rot">
+          <div v-if="roteiro" ref="rotEl" class="rot-painel">
+            <div v-if="compacto" class="rot-alca" />
+            <header class="rot-head">
+              <div class="rot-head-linha">
+                <span class="rot-selo"><q-icon name="alt_route" size="15px" /> Roteiro inteligente</span>
+                <button class="rot-x" aria-label="Fechar roteiro" @click="fecharRoteiro">
+                  <q-icon name="close" size="20px" />
+                </button>
+              </div>
+
+              <template v-if="!roteiro.grande">
+                <div class="rot-titulo">
+                  {{ rotSequencia.length }} {{ rotSequencia.length === 1 ? 'parada' : 'paradas' }}
+                  <small>{{ rotSubtitulo }}</small>
+                </div>
+                <div class="rot-stats">
+                  <div><b>{{ rotPostes }}</b><span>postes</span></div>
+                  <div><b>{{ rotTotais.km }}</b><span>{{ rotTotais.real ? 'por estrada' : 'em linha reta' }}</span></div>
+                  <div>
+                    <b><q-spinner-dots v-if="rotReal.estado === 'carregando'" size="20px" /><template v-else>{{ rotTotais.tempo }}</template></b>
+                    <span>de carro</span>
+                  </div>
+                </div>
+                <div v-if="rotMix.length" class="rot-mix">
+                  <i v-for="s in rotMix" :key="s.val" :style="{ flex: s.qtd, background: s.cor }" :title="`${s.qtd} ${s.label}`" />
+                </div>
+              </template>
+              <div v-else class="rot-titulo">{{ roteiro.paradas.length }} pontos neste grupo</div>
+            </header>
+
+            <div v-if="roteiro.grande" class="rot-grande">
+              <q-icon name="zoom_in" size="36px" />
+              <p>
+                Para gerar a sequência e os links, aproxime o mapa até o grupo ter no máximo
+                <b>{{ LIMITE_ROTEIRO }}</b> pontos.
+              </p>
+              <button class="rot-btn rot-btn--prim" @click="ampliarRoteiro">
+                <q-icon name="zoom_in" size="18px" /> Ampliar este grupo
+              </button>
+            </div>
+
+            <template v-else>
+              <div class="rot-ctrl">
+                <div class="rot-seg">
+                  <button :class="{ 'rot-seg--on': rotOrdem === 'otima' }" @click="rotOrdem = 'otima'">
+                    <q-icon name="flash_on" size="15px" /> Melhor sequência
+                  </button>
+                  <button :class="{ 'rot-seg--on': rotOrdem === 'nota' }" @click="rotOrdem = 'nota'">Por nota</button>
+                </div>
+                <button class="rot-ico" title="Inverter sequência" aria-label="Inverter sequência" @click="rotInvertido = !rotInvertido">
+                  <q-icon name="swap_vert" size="20px" />
+                </button>
+                <button class="rot-ico" title="Ampliar o grupo no mapa" aria-label="Ampliar o grupo no mapa" @click="ampliarRoteiro">
+                  <q-icon name="zoom_in" size="20px" />
+                </button>
+              </div>
+
+              <div class="rot-scroll">
+                <div class="rot-lista">
+                  <div v-if="roteiro.origem" class="rot-item">
+                    <span class="rot-num rot-num--eu"><q-icon name="my_location" size="17px" /></span>
+                    <div class="rot-info">
+                      <div class="rot-top"><span class="rot-nota">Sua posição</span></div>
+                      <div class="rot-sub">Ponto de partida</div>
+                    </div>
+                  </div>
+
+                  <template v-for="(p, i) in rotSequencia" :key="p.id">
+                    <div v-if="rotPerna(i)" class="rot-perna">
+                      <q-icon name="arrow_downward" size="12px" /> {{ rotPerna(i) }}
+                    </div>
+                    <div
+                      class="rot-item"
+                      :class="{ 'rot-item--ativo': rotSelecionada === p.id }"
+                      :data-id="p.id"
+                      @mouseenter="realcar(p.id)"
+                      @mouseleave="realcar(null)"
+                    >
+                      <button class="rot-num" :style="{ '--cor': corDe(p.notas[0]?.status) }" :aria-label="`Ir para a parada ${i + 1}`" @click="rotFocarNoMapa(p)">{{ i + 1 }}</button>
+                      <div class="rot-info">
+                        <div class="rot-top">
+                          <div class="rot-notas">
+                            <button
+                              v-for="n in p.notas.slice(0, 3)"
+                              :key="n.nota"
+                              class="rot-nota"
+                              :class="{ 'rot-nota--link': permitirAbrir }"
+                              :title="`${labelDe(n.status)}${permitirAbrir ? ' · abrir nota' : ''}`"
+                              @click="permitirAbrir && emit('abrir', n)"
+                            >
+                              Nota {{ n.nota }}<i :style="{ background: corDe(n.status) }" />
+                            </button>
+                            <span v-if="p.notas.length > 3" class="rot-mais">+{{ p.notas.length - 3 }}</span>
+                          </div>
+                          <div class="rot-acoes">
+                            <a :href="urlPontoGoogle(p.lat, p.lng)" target="_blank" rel="noopener" title="Abrir no Google Maps" aria-label="Abrir no Google Maps"><q-icon name="map" size="18px" /></a>
+                            <a :href="urlWaze(p.lat, p.lng)" target="_blank" rel="noopener" title="Navegar com Waze" aria-label="Navegar com Waze"><q-icon name="navigation" size="18px" /></a>
+                            <button title="Tirar do roteiro" aria-label="Tirar do roteiro" @click="rotAlternar(p.id)"><q-icon name="remove_circle_outline" size="18px" /></button>
+                          </div>
+                        </div>
+                        <div class="rot-sub">{{ rotLocal(p) }}</div>
+                        <button class="rot-link" :class="{ 'rot-link--ok': copiado === p.id }" title="Copiar link" @click="copiar(urlPontoGoogle(p.lat, p.lng), p.id)">
+                          <span>{{ linkCurto(p.lat, p.lng) }}</span>
+                          <q-icon :name="copiado === p.id ? 'check' : 'content_copy'" size="14px" />
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+
+                <div v-if="rotForaDoRoteiro.length" class="rot-fora">
+                  <div class="rot-fora-titulo">Fora do roteiro · {{ rotForaDoRoteiro.length }}</div>
+                  <div v-for="p in rotForaDoRoteiro" :key="p.id" class="rot-fora-item">
+                    <span>{{ p.notas.map(n => `Nota ${n.nota}`).join(', ') }}</span>
+                    <button title="Incluir de volta" @click="rotAlternar(p.id)"><q-icon name="add_circle_outline" size="18px" /> Incluir</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rot-rodape">
+                <button class="rot-btn rot-btn--prim" :class="{ 'rot-btn--ok': copiado === 'todos' }" :disabled="!rotSequencia.length" @click="copiarTodos">
+                  <q-icon :name="copiado === 'todos' ? 'check' : 'content_copy'" size="18px" />
+                  {{ copiado === 'todos' ? 'Links copiados!' : `Copiar ${rotSequencia.length} ${rotSequencia.length === 1 ? 'link' : 'links'}` }}
+                </button>
+                <div class="rot-rodape-2">
+                  <a v-if="rotSequencia.length" class="rot-btn rot-btn--zap" :href="urlWhatsApp(rotTexto)" target="_blank" rel="noopener">
+                    <q-icon name="chat" size="18px" /> WhatsApp
+                  </a>
+                  <a v-if="rotTrechos.length === 1" class="rot-btn rot-btn--maps" :href="rotTrechos[0].url" target="_blank" rel="noopener">
+                    <q-icon name="directions" size="18px" /> Rota no Maps
+                  </a>
+                  <button v-else-if="rotTrechos.length > 1" class="rot-btn rot-btn--maps">
+                    <q-icon name="directions" size="18px" /> Rota no Maps
+                    <q-menu anchor="top right" self="bottom right">
+                      <q-list dense style="min-width: 230px">
+                        <q-item-label header>Rota em {{ rotTrechos.length }} trechos</q-item-label>
+                        <q-item v-for="(t, k) in rotTrechos" :key="k" clickable v-close-popup tag="a" :href="t.url" target="_blank" rel="noopener">
+                          <q-item-section avatar><q-icon name="directions" /></q-item-section>
+                          <q-item-section>Trecho {{ k + 1 }} · paradas {{ t.de }}–{{ t.ate }}</q-item-section>
+                        </q-item>
+                      </q-list>
+                    </q-menu>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </transition>
       </div>
     </q-card>
   </q-dialog>
@@ -232,10 +382,11 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
-import { useQuasar } from 'quasar'
+import { useQuasar, copyToClipboard } from 'quasar'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { urlGoogleMaps, urlWaze, distanciaKm, formatarDistancia, formatarDuracao, buscarRota } from 'src/utils/rota'
+import { urlGoogleMaps, urlWaze, distanciaKm, formatarDistancia, formatarDuracao, buscarRota, buscarRotaMulti } from 'src/utils/rota'
+import { ordenarRoteiro, trechosGoogle, urlPontoGoogle, linkCurto, urlWhatsApp } from 'src/utils/roteiro'
 import { chaveMunicipio, limitesDe } from 'src/utils/limites'
 import { booleanPointInPolygon } from '@turf/boolean-point-in-polygon'
 
@@ -453,6 +604,7 @@ function atualizarRotulos () {
 }
 
 function aoClicarMapa (e) {
+  if (roteiro.value) return
   if (selecionado.value) { fecharSelecao(); return }
   if (!municipiosDaArea.length) return
   const ponto = [e.latlng.lng, e.latlng.lat]
@@ -490,6 +642,7 @@ function notasNoPonto (lat, lng) {
 
 async function selecionar (notas) {
   if (!notas?.length || !mapa) return
+  if (roteiro.value) fecharRoteiro()
   const mesmoPonto = selecionado.value?.[0]?.nota === notas[0].nota
   selecionado.value = notas
   seguindo.value = false
@@ -622,6 +775,310 @@ function soltarArraste () {
 function selecionarNoPonto (lat, lng) {
   selecionar(notasNoPonto(lat, lng))
 }
+
+// ── Roteiro: clicar numa bolha separa os pontos, ordena e gera os links ──
+const LIMITE_ROTEIRO = 200
+const roteiro = ref(null)
+const rotOrdem = ref('otima')
+const rotInvertido = ref(false)
+const rotExcluidas = ref(new Set())
+const rotReal = ref({ estado: null })
+const rotSelecionada = ref(null)
+const copiado = ref('')
+const rotEl = ref(null)
+let camadaRoteiro = null
+let rendererRoteiro = null
+let rotRealPontos = null
+let rotTimer = null
+let rotAbort = null
+let copiadoTimer = null
+let rotRealcado = null
+let rotAnimar = false
+const rotMarcadores = new Map()
+const cacheRotasMulti = new Map()
+
+const porNotaParada = (a, b) =>
+  String(a.notas[0]?.nota).localeCompare(String(b.notas[0]?.nota), undefined, { numeric: true })
+
+const rotAtivas = computed(() =>
+  roteiro.value ? roteiro.value.paradas.filter(p => !rotExcluidas.value.has(p.id)) : [])
+const rotForaDoRoteiro = computed(() =>
+  roteiro.value ? roteiro.value.paradas.filter(p => rotExcluidas.value.has(p.id)) : [])
+
+const rotSequencia = computed(() => {
+  if (!roteiro.value || roteiro.value.grande) return []
+  const seq = rotOrdem.value === 'otima'
+    ? ordenarRoteiro(rotAtivas.value, roteiro.value.origem)
+    : [...rotAtivas.value].sort(porNotaParada)
+  return rotInvertido.value ? seq.reverse() : seq
+})
+
+// Origem (se houver) + paradas, na ordem em que serão percorridas
+const rotPontos = computed(() => [...(roteiro.value?.origem ? [roteiro.value.origem] : []), ...rotSequencia.value])
+const rotNotas = computed(() => rotSequencia.value.flatMap(p => p.notas))
+const rotPostes = computed(() => rotNotas.value.reduce((s, n) => s + (Number(n.postes) || 0), 0))
+const rotMix = computed(() => {
+  const c = {}
+  for (const n of rotNotas.value) c[n.status] = (c[n.status] || 0) + 1
+  return STATUS.filter(s => c[s.val]).map(s => ({ ...s, qtd: c[s.val] }))
+})
+const rotKmReta = computed(() => {
+  const pts = rotPontos.value
+  let t = 0
+  for (let k = 1; k < pts.length; k++) t += distanciaKm(pts[k - 1], pts[k])
+  return t
+})
+const rotTotais = computed(() => {
+  const r = rotReal.value
+  if (r.estado === 'ok') return { real: true, km: formatarDistancia(r.km), tempo: formatarDuracao(r.minutos) }
+  return { real: false, km: rotSequencia.value.length > 1 || roteiro.value?.origem ? `≈ ${formatarDistancia(rotKmReta.value)}` : '—', tempo: '—' }
+})
+const rotSubtitulo = computed(() => {
+  const base = rotOrdem.value === 'otima' ? 'sequência mais curta' : 'ordem por número da nota'
+  return roteiro.value?.origem ? `${base} · saindo de você` : base
+})
+const rotTrechos = computed(() =>
+  trechosGoogle(rotSequencia.value, { daPosicaoAtual: !!roteiro.value?.origem }))
+
+function rotLocal (p) {
+  const mun = p.notas[0]?.municipio
+  const postes = p.notas.reduce((s, n) => s + (Number(n.postes) || 0), 0)
+  return `${mun ? mun + ' · ' : ''}${postes} ${postes === 1 ? 'poste' : 'postes'}`
+}
+
+function rotPerna (i) {
+  const k = i + (roteiro.value?.origem ? 1 : 0) - 1
+  if (k < 0) return ''
+  const r = rotReal.value
+  if (r.estado === 'ok' && r.pernas?.[k]) return `${formatarDistancia(r.pernas[k].km)} · ${formatarDuracao(r.pernas[k].minutos)}`
+  const pts = rotPontos.value
+  return `≈ ${formatarDistancia(distanciaKm(pts[k], pts[k + 1]))} em linha reta`
+}
+
+const rotTexto = computed(() => {
+  const seq = rotSequencia.value
+  const linhas = [`Roteiro CGB · ${seq.length} ${seq.length === 1 ? 'parada' : 'paradas'}`]
+  if (rotTotais.value.real) linhas.push(`${rotTotais.value.km} · ${rotTotais.value.tempo} de carro`)
+  linhas.push('')
+  seq.forEach((p, i) => {
+    const mun = p.notas[0]?.municipio
+    linhas.push(`${i + 1}) Nota ${p.notas.map(n => n.nota).join(', ')}${mun ? ` · ${mun}` : ''}`)
+    linhas.push(urlPontoGoogle(p.lat, p.lng), '')
+  })
+  return linhas.join('\n').trim()
+})
+
+// A API de área de transferência exige contexto seguro e permissão; o textarea temporário cobre o resto
+function copiarComTextarea (texto) {
+  const ta = document.createElement('textarea')
+  ta.value = texto
+  ta.setAttribute('readonly', '')
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none'
+  document.body.appendChild(ta)
+  ta.select()
+  ta.setSelectionRange(0, texto.length)
+  let ok = false
+  try { ok = document.execCommand('copy') } catch { ok = false }
+  ta.remove()
+  return ok
+}
+
+async function copiar (texto, chave) {
+  try { await copyToClipboard(texto) } catch {
+    if (!copiarComTextarea(texto)) {
+      $q.notify({ type: 'negative', message: 'Não foi possível copiar. Selecione e copie manualmente.', position: 'top', timeout: 2500 })
+      return
+    }
+  }
+  copiado.value = chave
+  clearTimeout(copiadoTimer)
+  copiadoTimer = setTimeout(() => { copiado.value = '' }, 1800)
+}
+const copiarTodos = () => copiar(rotTexto.value, 'todos')
+
+function rotAlternar (id) {
+  const novo = new Set(rotExcluidas.value)
+  novo.has(id) ? novo.delete(id) : novo.add(id)
+  rotExcluidas.value = novo
+}
+
+function realcar (id) {
+  rotRealcado?.getElement()?.firstElementChild?.classList.remove('rot-pin--realce')
+  rotRealcado = id != null ? rotMarcadores.get(id) : null
+  rotRealcado?.getElement()?.firstElementChild?.classList.add('rot-pin--realce')
+}
+
+function marcarAtivo () {
+  for (const [id, m] of rotMarcadores) {
+    m.getElement()?.firstElementChild?.classList.toggle('rot-pin--ativo', id === rotSelecionada.value)
+  }
+}
+
+function rotFocarNoMapa (p) {
+  rotSelecionada.value = p.id
+  marcarAtivo()
+  const lateral = !compacto.value && rotEl.value ? rotEl.value.offsetWidth + 24 : 0
+  const base = compacto.value ? (rotEl.value?.offsetHeight ?? 0) : 0
+  const alvo = L.latLng(p.lat, p.lng)
+  const zoom = Math.max(mapa.getZoom(), 15)
+  // Desloca o centro para o ponto cair na área livre, fora do painel
+  const pt = mapa.project(alvo, zoom).add([-lateral / 2, base / 2])
+  mapa.flyTo(mapa.unproject(pt, zoom), zoom, { duration: 0.7 })
+}
+
+function rotFocarNaLista (p) {
+  rotSelecionada.value = p.id
+  marcarAtivo()
+  nextTick(() => {
+    const el = [...(rotEl.value?.querySelectorAll('[data-id]') ?? [])].find(e => e.dataset.id === p.id)
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  })
+}
+
+function desenharRoteiro () {
+  camadaRoteiro?.clearLayers()
+  rotMarcadores.clear()
+  rotRealcado = null
+  if (!mapa || !roteiro.value || roteiro.value.grande) return
+
+  const seq = rotSequencia.value
+  const pts = rotPontos.value.map(p => [p.lat, p.lng])
+  if (rotReal.value.estado === 'ok' && rotRealPontos) {
+    const base = { renderer: rendererRoteiro, pane: 'roteiroLinha', interactive: false }
+    L.polyline(rotRealPontos, { ...base, color: '#fff', weight: 9, opacity: 0.9, className: 'mapa-rota-linha mapa-rota-linha--borda' }).addTo(camadaRoteiro)
+    L.polyline(rotRealPontos, { ...base, color: '#1e88e5', weight: 5, opacity: 1, className: 'mapa-rota-linha' }).addTo(camadaRoteiro)
+    // pathLength = 1 permite animar o "desenho" da linha com CSS
+    camadaRoteiro.eachLayer(l => l.getElement()?.setAttribute('pathLength', '1'))
+  } else if (pts.length > 1) {
+    L.polyline(pts, {
+      renderer: rendererRoteiro, pane: 'roteiroLinha', interactive: false,
+      color: '#1e88e5', weight: 4, opacity: 0.9, dashArray: '1 10', lineCap: 'round', className: 'rot-linha-reta'
+    }).addTo(camadaRoteiro)
+  }
+
+  const ultimo = seq.length - 1
+  const animar = rotAnimar
+  rotAnimar = false
+  seq.forEach((p, i) => {
+    const cls = `rot-pin${animar ? ' rot-pin--anim' : ''}${i === 0 ? ' rot-pin--ini' : ''}${i === ultimo && ultimo > 0 ? ' rot-pin--fim' : ''}`
+    const m = L.marker([p.lat, p.lng], {
+      pane: 'roteiroPontos',
+      keyboard: false,
+      icon: L.divIcon({
+        className: 'rot-pin-wrap',
+        html: `<span class="${cls}" style="--cor:${corDe(p.notas[0]?.status)};animation-delay:${Math.min(i * 35, 700)}ms">${i + 1}</span>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      })
+    })
+    if (temHover) m.bindTooltip(p.notas.map(n => `Nota ${n.nota}`).join(', '), { direction: 'top', offset: [0, -14] })
+    m.on('click', () => rotFocarNaLista(p))
+    m.addTo(camadaRoteiro)
+    rotMarcadores.set(p.id, m)
+  })
+  marcarAtivo()
+}
+
+// A rota por estrada chega depois; enquanto isso vale a linha reta entre as paradas
+function agendarRotaReal () {
+  clearTimeout(rotTimer)
+  rotAbort?.abort()
+  rotAbort = null
+  rotRealPontos = null
+  const pts = rotPontos.value
+  if (!roteiro.value || roteiro.value.grande || pts.length < 2) {
+    rotReal.value = { estado: null }
+    desenharRoteiro()
+    return
+  }
+  if (!navigator.onLine || pts.length > 90) {
+    rotReal.value = { estado: 'reta' }
+    desenharRoteiro()
+    return
+  }
+  const chave = pts.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join(';')
+  const cache = cacheRotasMulti.get(chave)
+  if (cache) { aplicarRotaReal(cache); return }
+  rotReal.value = { estado: 'carregando' }
+  desenharRoteiro()
+  rotTimer = setTimeout(async () => {
+    rotAbort = new AbortController()
+    try {
+      const res = await buscarRotaMulti(pts, rotAbort.signal)
+      cacheRotasMulti.set(chave, res)
+      aplicarRotaReal(res)
+    } catch (e) {
+      if (e.name !== 'AbortError') { rotReal.value = { estado: 'reta' }; desenharRoteiro() }
+    }
+  }, 350)
+}
+
+function aplicarRotaReal (res) {
+  rotRealPontos = res.pontos
+  rotReal.value = { estado: 'ok', km: res.km, minutos: res.minutos, pernas: res.pernas }
+  desenharRoteiro()
+}
+
+function enquadrarRoteiro (duracao = 0.9) {
+  if (!mapa || !roteiro.value) return
+  const pts = (roteiro.value.grande ? roteiro.value.paradas : rotPontos.value).map(p => [p.lat, p.lng])
+  if (!pts.length) return
+  const el = rotEl.value
+  const lateral = !compacto.value && el ? el.offsetWidth + 24 : 30
+  const base = compacto.value ? (el?.offsetHeight ?? 0) : 0
+  mapa.flyToBounds(L.latLngBounds(pts), {
+    paddingTopLeft: [lateral, 40],
+    paddingBottomRight: [40, base + 30],
+    maxZoom: 17,
+    duration: duracao
+  })
+}
+
+async function abrirRoteiro (cluster) {
+  if (!mapa) return
+  fecharSelecao()
+  const paradas = cluster.getAllChildMarkers().map(m => {
+    const { lat, lng } = m.getLatLng()
+    return { id: chavePonto(lat, lng), lat, lng, notas: m.options.notasPonto ?? [] }
+  })
+  rotOrdem.value = 'otima'
+  rotInvertido.value = false
+  rotExcluidas.value = new Set()
+  rotSelecionada.value = null
+  copiado.value = ''
+  rotAnimar = true
+  roteiro.value = {
+    paradas,
+    grande: paradas.length > LIMITE_ROTEIRO,
+    bounds: cluster.getBounds(),
+    // Fixa a posição de partida na abertura: o GPS atualiza sempre e embaralharia a sequência
+    origem: props.modo === 'campo' && minhaPos.value ? { lat: minhaPos.value.lat, lng: minhaPos.value.lng } : null
+  }
+  await nextTick()
+  enquadrarRoteiro()
+}
+
+function ampliarRoteiro () {
+  const bounds = roteiro.value?.bounds
+  fecharRoteiro()
+  if (bounds && mapa) mapa.flyToBounds(bounds, { padding: [50, 50], duration: 0.8 })
+}
+
+function fecharRoteiro () {
+  clearTimeout(rotTimer)
+  rotAbort?.abort()
+  rotAbort = null
+  rotRealPontos = null
+  roteiro.value = null
+  rotReal.value = { estado: null }
+  rotSelecionada.value = null
+  camadaRoteiro?.clearLayers()
+  rotMarcadores.clear()
+  rotRealcado = null
+}
+
+watch(rotSequencia, agendarRotaReal)
+watch([filtroBase, filtroMunicipio, ocultos], () => { if (roteiro.value) fecharRoteiro() }, { deep: true })
 
 function moverESelecionar (mover, n) {
   mapa.once('moveend', () => setTimeout(() => selecionarNoPonto(n.latitude, n.longitude), 30))
@@ -768,7 +1225,8 @@ function desenharMarcadores () {
       weight: notas.length > 1 ? 3 : 2,
       fillColor: corDe(principal.status),
       fillOpacity: 0.95,
-      statusNotas: notas.map(n => n.status)
+      statusNotas: notas.map(n => n.status),
+      notasPonto: [...notas].sort((a, b) => ordem(a.status) - ordem(b.status))
     })
     if (temHover) m.bindTooltip(notas.length > 1 ? `${notas.length} notas` : `Nota ${principal.nota}`, { direction: 'top', offset: [0, -6] })
     m.on('click', () => selecionarNoPonto(principal.latitude, principal.longitude))
@@ -809,7 +1267,7 @@ function iconeCluster (cluster) {
   const tam = total < 10 ? 38 : total < 50 ? 46 : total < 200 ? 54 : 62
   return L.divIcon({
     className: 'mapa-cluster',
-    html: `<div class="mapa-cluster-anel" style="background:conic-gradient(${fatias.join(',')})"><span>${total}</span></div>`,
+    html: `<div class="mapa-cluster-anel" title="Clique para montar o roteiro" style="background:conic-gradient(${fatias.join(',')})"><span>${total}</span></div>`,
     iconSize: [tam, tam]
   })
 }
@@ -839,18 +1297,25 @@ async function montarMapa () {
   mapa.createPane('contorno').style.zIndex = 360
   mapa.createPane('rotulos').style.zIndex = 370
   mapa.createPane('rota').style.zIndex = 390
+  mapa.createPane('roteiroLinha').style.zIndex = 420
+  mapa.createPane('roteiroPontos').style.zIndex = 640
   camadaMarcadores = (L.markerClusterGroup
     ? L.markerClusterGroup({
       iconCreateFunction: iconeCluster,
       showCoverageOnHover: false,
       spiderfyOnMaxZoom: false,
+      // O clique na bolha abre o roteiro em vez de aproximar o mapa
+      zoomToBoundsOnClick: false,
       disableClusteringAtZoom: 15,
       maxClusterRadius: z => z < 10 ? 60 : 45,
       chunkedLoading: true
     })
     : L.layerGroup()).addTo(mapa)
+  camadaMarcadores.on('clusterclick', e => abrirRoteiro(e.layer))
   camadaDestaque = L.layerGroup().addTo(mapa)
   camadaRota = L.layerGroup().addTo(mapa)
+  rendererRoteiro = L.svg({ pane: 'roteiroLinha' })
+  camadaRoteiro = L.layerGroup().addTo(mapa)
   mapa.on('dragstart', () => { seguindo.value = false })
   mapa.on('click', aoClicarMapa)
   mapa.on('zoomend', atualizarRotulos)
@@ -881,6 +1346,9 @@ function desmontarMapa () {
   municipiosDaArea = []
   limparRota()
   camadaRota = null
+  fecharRoteiro()
+  camadaRoteiro = null
+  rendererRoteiro = null
   seguindo.value = false
   arrasteY.value = 0
   selecionado.value = null
@@ -1133,6 +1601,179 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 }
 @keyframes mapa-pop { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
+/* ── Roteiro ── */
+.rot-painel {
+  position: absolute; z-index: 620;
+  left: 12px; bottom: 12px; width: 384px; max-height: calc(100% - 24px);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: #fff; border-radius: 20px;
+  box-shadow: 0 18px 48px rgba(10,22,40,0.38), 0 0 0 1px rgba(10,22,40,0.06);
+}
+.rot-enter-active { transition: transform 0.45s cubic-bezier(0.2, 1.2, 0.35, 1), opacity 0.25s ease; }
+.rot-leave-active { transition: transform 0.2s ease-in, opacity 0.2s ease-in; }
+.rot-enter-from, .rot-leave-to { transform: translateY(28px) scale(0.98); opacity: 0; }
+
+.rot-alca { position: absolute; top: 7px; left: 50%; width: 40px; height: 4px; margin-left: -20px; border-radius: 2px; background: rgba(255,255,255,0.35); z-index: 2; }
+.rot-head {
+  flex-shrink: 0; color: #fff; padding: 14px 16px 14px;
+  background: radial-gradient(120% 160% at 0% 0%, #2563eb 0%, #12306b 48%, #0a1628 100%);
+}
+.rot-head-linha { display: flex; align-items: center; justify-content: space-between; }
+.rot-selo {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  background: rgba(255,255,255,0.14); border-radius: 20px; padding: 4px 10px 4px 8px;
+  backdrop-filter: blur(6px);
+}
+.rot-x {
+  width: 34px; height: 34px; margin: -4px -6px -4px 0; border-radius: 50%; border: none;
+  background: rgba(255,255,255,0.12); color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: background 0.15s;
+}
+.rot-x:hover { background: rgba(255,255,255,0.24); }
+.rot-titulo { margin-top: 10px; font-size: 22px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.1; }
+.rot-titulo small { display: block; margin-top: 3px; font-size: 12px; font-weight: 600; opacity: 0.72; letter-spacing: 0; }
+.rot-stats { display: grid; grid-template-columns: 0.8fr 1.1fr 1.1fr; gap: 7px; margin-top: 12px; }
+.rot-stats > div {
+  display: flex; flex-direction: column; gap: 1px; min-width: 0;
+  background: rgba(255,255,255,0.1); border-radius: 12px; padding: 7px 10px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+.rot-stats b { font-size: 17px; line-height: 1.25; font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 22px; display: flex; align-items: center; }
+.rot-stats span { font-size: 10.5px; opacity: 0.68; font-weight: 600; }
+.rot-mix { display: flex; gap: 2px; height: 6px; margin-top: 11px; border-radius: 3px; overflow: hidden; }
+.rot-mix i { display: block; min-width: 4px; }
+
+.rot-ctrl { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; flex-shrink: 0; }
+.rot-seg { display: inline-flex; flex: 1; min-width: 0; background: #eef2f9; border-radius: 22px; padding: 3px; }
+.rot-seg button {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  border: none; background: none; border-radius: 20px; padding: 7px 10px; white-space: nowrap;
+  font-family: inherit; font-size: 12px; font-weight: 700; line-height: 1; color: #475569; cursor: pointer;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+}
+.rot-seg .rot-seg--on { background: #1d4ed8; color: #fff; box-shadow: 0 2px 8px rgba(29,78,216,0.4); }
+.rot-ico {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; border: none;
+  background: #eef2f9; color: #334155; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: background 0.15s, transform 0.12s;
+}
+.rot-ico:hover { background: #dde6f7; }
+.rot-ico:active { transform: scale(0.92); }
+
+.rot-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px 12px 10px; }
+.rot-lista { position: relative; }
+.rot-lista::before {
+  content: ''; position: absolute; left: 21px; top: 20px; bottom: 20px; width: 2px;
+  background: repeating-linear-gradient(#cbd5e1 0 4px, transparent 4px 8px);
+}
+.rot-item {
+  position: relative; display: grid; grid-template-columns: 32px 1fr; gap: 10px;
+  padding: 8px 6px; border-radius: 14px; transition: background 0.15s, box-shadow 0.15s;
+}
+.rot-item:hover { background: #f1f5ff; }
+.rot-item--ativo { background: #fff8e1; box-shadow: inset 0 0 0 1.5px #ffca28; }
+.rot-num {
+  position: relative; z-index: 1; width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--cor, #1e88e5); color: #fff; font-family: inherit; font-size: 14px; font-weight: 800; line-height: 1;
+  border: 3px solid #fff; box-shadow: 0 0 0 1.5px var(--cor, #1e88e5), 0 2px 6px rgba(0,0,0,0.2);
+  cursor: pointer; padding: 0; text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  transition: transform 0.15s;
+}
+.rot-num:hover { transform: scale(1.1); }
+.rot-num--eu { --cor: #1e88e5; cursor: default; }
+.rot-num--eu:hover { transform: none; }
+.rot-perna {
+  display: inline-flex; align-items: center; gap: 4px; margin: 1px 0 1px 48px;
+  font-size: 11px; font-weight: 700; color: #64748b; font-variant-numeric: tabular-nums;
+  background: #f1f5f9; border-radius: 10px; padding: 2px 9px 2px 6px;
+}
+.rot-info { min-width: 0; }
+.rot-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+.rot-notas { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; padding-top: 4px; }
+.rot-nota {
+  display: inline-flex; align-items: center; gap: 6px; border: none; background: none; padding: 0;
+  font-family: inherit; font-size: 14px; font-weight: 800; line-height: 1.2; color: #0f172a; cursor: default; text-align: left;
+}
+.rot-nota i { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 1.5px rgba(0,0,0,0.12); }
+.rot-nota--link { cursor: pointer; }
+.rot-nota--link:hover { color: #1d4ed8; text-decoration: underline; }
+.rot-mais { font-size: 12px; font-weight: 700; color: #64748b; }
+.rot-sub { margin-top: 1px; font-size: 12.5px; color: #64748b; }
+.rot-acoes { display: flex; flex-shrink: 0; gap: 2px; margin: -2px -2px 0 0; }
+.rot-acoes a, .rot-acoes button {
+  width: 30px; height: 30px; border-radius: 50%; border: none; background: none; color: #64748b; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; text-decoration: none; transition: background 0.15s, color 0.15s;
+}
+.rot-acoes a:hover, .rot-acoes button:hover { background: #e2e8f0; color: #1d4ed8; }
+.rot-link {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 6px;
+  padding: 5px 9px; border-radius: 9px; border: 1px dashed #cbd5e1; background: #f8fafc; color: #475569;
+  font: 11px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; cursor: pointer; text-align: left;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.rot-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rot-link:hover { background: #eef2ff; border-color: #818cf8; color: #3730a3; }
+.rot-link--ok, .rot-link--ok:hover { background: #f0fdf4; border: 1px solid #22c55e; color: #15803d; }
+
+.rot-fora { margin-top: 8px; padding: 8px 10px; border-radius: 14px; background: #f8fafc; }
+.rot-fora-titulo { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #94a3b8; margin-bottom: 4px; }
+.rot-fora-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: #94a3b8; padding: 3px 0; }
+.rot-fora-item span { text-decoration: line-through; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rot-fora-item button {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; border: none; background: none;
+  font-family: inherit; font-size: 12px; font-weight: 700; line-height: 1; color: #1d4ed8; cursor: pointer; padding: 4px 6px; border-radius: 8px;
+}
+.rot-fora-item button:hover { background: #e0e7ff; }
+
+.rot-grande { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 22px 20px 20px; text-align: center; color: #475569; }
+.rot-grande p { margin: 0; font-size: 14px; line-height: 1.45; }
+
+.rot-rodape {
+  flex-shrink: 0; display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid #eef2f9; background: #fff;
+}
+.rot-rodape-2 { display: flex; gap: 8px; }
+.rot-rodape-2 > .rot-btn { flex: 1; }
+.rot-btn {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  border: none; border-radius: 14px; padding: 12px 12px; cursor: pointer; text-decoration: none;
+  font-family: inherit; font-size: 14px; font-weight: 800; line-height: 1.1; white-space: nowrap;
+  transition: transform 0.12s, box-shadow 0.18s, background 0.18s, filter 0.18s;
+}
+.rot-btn:active { transform: scale(0.98); }
+.rot-btn:disabled { opacity: 0.5; cursor: default; }
+.rot-btn--prim { background: #1d4ed8; color: #fff; box-shadow: 0 6px 16px rgba(29,78,216,0.35); }
+.rot-btn--prim:hover { filter: brightness(1.08); }
+.rot-btn--ok { background: #16a34a; box-shadow: 0 6px 16px rgba(22,163,74,0.35); }
+.rot-btn--zap { background: #25d366; color: #05381b; }
+.rot-btn--zap:hover { filter: brightness(1.05); }
+.rot-btn--maps { background: #e8f0fe; color: #1a56db; }
+.rot-btn--maps:hover { background: #d7e4fd; }
+
+/* Pinos numerados no mapa */
+:deep(.rot-pin-wrap) { background: none; border: none; }
+:deep(.rot-pin) {
+  display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--cor, #1e88e5); color: #fff; font-weight: 800; font-size: 13px;
+  border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.4); text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+:deep(.rot-pin--anim) { animation: mapa-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) backwards; }
+:deep(.rot-pin--ini) { box-shadow: 0 0 0 3px #22c55e, 0 2px 8px rgba(0,0,0,0.4); }
+:deep(.rot-pin--fim) { box-shadow: 0 0 0 3px #0a1628, 0 2px 8px rgba(0,0,0,0.4); }
+:deep(.rot-pin.rot-pin--realce),
+:deep(.rot-pin.rot-pin--ativo) { transform: scale(1.3); box-shadow: 0 0 0 4px rgba(255,202,40,0.95), 0 4px 14px rgba(0,0,0,0.45); }
+:deep(.rot-linha-reta) { animation: rot-fluxo 0.9s linear infinite; }
+@keyframes rot-fluxo { to { stroke-dashoffset: -11; } }
+
+@media (prefers-reduced-motion: reduce) {
+  :deep(.rot-linha-reta), :deep(.rot-pin) { animation: none; }
+}
+
 /* Nota selecionada */
 :deep(.mapa-pulso) { background: none; border: none; pointer-events: none; }
 :deep(.mapa-pulso-anel) {
@@ -1218,6 +1859,14 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 .mapa-card--compacto .mapa-sheet-enter-from,
 .mapa-card--compacto .mapa-sheet-leave-to { transform: translateY(100%); opacity: 1; }
 .mapa-card--compacto .mapa-sheet-abrir { width: 100%; padding: 6px 12px; font-size: 14px; }
+.mapa-card--compacto .rot-painel {
+  left: 0; right: 0; bottom: 0; width: auto; max-height: 72%;
+  border-radius: 20px 20px 0 0; box-shadow: 0 -8px 28px rgba(10,22,40,0.3);
+}
+.mapa-card--compacto .rot-head { padding-top: 20px; }
+.mapa-card--compacto .rot-titulo { font-size: 20px; }
+.mapa-card--compacto .rot-enter-from,
+.mapa-card--compacto .rot-leave-to { transform: translateY(100%); opacity: 1; }
 .mapa-card--compacto .mapa-fabs :deep(.q-btn) { width: 48px; height: 48px; }
 
 @media (max-width: 360px) {

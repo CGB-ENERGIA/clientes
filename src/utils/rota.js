@@ -40,6 +40,22 @@ export function formatarDuracao (min) {
   return `${h} h ${String(m % 60).padStart(2, '0')} min`
 }
 
+// Rota de carro passando por vários pontos, na ordem dada (com o tempo e a distância de cada trecho)
+export async function buscarRotaMulti (pontos, signal) {
+  const coords = pontos.map(p => `${p.lng},${p.lat}`).join(';')
+  const resp = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false`, { signal })
+  if (!resp.ok) throw new Error(`OSRM ${resp.status}`)
+  const json = await resp.json()
+  const r = json.routes?.[0]
+  if (json.code !== 'Ok' || !r) throw new Error(json.message || 'Rota não encontrada')
+  return {
+    pontos: r.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+    km: r.distance / 1000,
+    minutos: r.duration / 60,
+    pernas: r.legs.map(l => ({ km: l.distance / 1000, minutos: l.duration / 60 }))
+  }
+}
+
 // Rota de carro pelo servidor público do OSRM (dados do OpenStreetMap)
 export async function buscarRota (origem, destino, signal) {
   const url = 'https://router.project-osrm.org/route/v1/driving/' +
