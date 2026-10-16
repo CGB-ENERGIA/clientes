@@ -50,13 +50,23 @@
               v-model="filtroBase"
               :options="basesOpcoes"
               dense outlined clearable
+              multiple
+              :display-value="filtroBase.length > 1 ? `${filtroBase.length} bases` : (filtroBase[0] ?? undefined)"
               label="Base"
               class="mapa-filtro"
               options-dense
               behavior="menu"
-              :hide-dropdown-icon="compacto && !!filtroBase"
+              :hide-dropdown-icon="compacto && !!filtroBase.length"
             >
-              <template #prepend><q-icon name="business" size="18px" /></template>
+              <template #prepend>
+                <q-icon name="business" size="18px" />
+              </template>
+              <template #option="{ itemProps, opt }">
+                <q-item v-bind="itemProps" dense>
+                  <q-item-section side><q-checkbox :model-value="filtroBase.includes(opt)" dense color="primary" /></q-item-section>
+                  <q-item-section><q-item-label>{{ opt }}</q-item-label></q-item-section>
+                </q-item>
+              </template>
             </q-select>
             <q-select
               v-model="filtroMunicipio"
@@ -303,7 +313,7 @@ const comCoordenada = computed(() => todasNotas.value.filter(n => Number.isFinit
 const semCoordenada = computed(() => todasNotas.value.filter(n => !Number.isFinite(n.latitude) || !Number.isFinite(n.longitude)))
 
 // ── Filtro por área (base / município) ───────────────────────────
-const filtroBase      = ref(null)
+const filtroBase      = ref([])
 const filtroMunicipio = ref(null)
 const avisoArea       = ref('')
 const areaAtual       = ref(null)
@@ -312,14 +322,16 @@ let camadaArea = null
 let geracaoArea = 0
 let municipiosDaArea = []
 
-const filtrosAtivos = computed(() => (filtroBase.value ? 1 : 0) + (filtroMunicipio.value ? 1 : 0) + ocultos.value.size)
+const filtrosAtivos = computed(() =>
+  filtroBase.value.length + (filtroMunicipio.value ? 1 : 0) + ocultos.value.size
+)
 
 const basesOpcoes = computed(() =>
   [...new Set(todasNotas.value.map(n => n.base).filter(Boolean))].sort()
 )
 const municipiosOpcoes = computed(() =>
   [...new Set(todasNotas.value
-    .filter(n => !filtroBase.value || n.base === filtroBase.value)
+    .filter(n => !filtroBase.value.length || filtroBase.value.includes(n.base))
     .map(n => n.municipio).filter(Boolean))].sort()
 )
 const municipiosOpcoesFiltradas = computed(() => {
@@ -331,7 +343,7 @@ function filtrarMunicipios (val, update) {
 }
 
 const notasDaArea = computed(() => comCoordenada.value.filter(n =>
-  (!filtroBase.value || n.base === filtroBase.value) &&
+  (!filtroBase.value.length || filtroBase.value.includes(n.base)) &&
   (!filtroMunicipio.value || chaveMunicipio(n.municipio) === chaveMunicipio(filtroMunicipio.value))
 ))
 
@@ -367,11 +379,11 @@ function limparArea () {
 async function desenharArea () {
   const geracao = ++geracaoArea
   limparArea()
-  if (!mapa || (!filtroBase.value && !filtroMunicipio.value)) return
+  if (!mapa || (!filtroBase.value.length && !filtroMunicipio.value)) return
 
   const municipios = filtroMunicipio.value
     ? [filtroMunicipio.value]
-    : todasNotas.value.filter(n => n.base === filtroBase.value).map(n => n.municipio)
+    : todasNotas.value.filter(n => filtroBase.value.includes(n.base)).map(n => n.municipio)
 
   let res
   try {
@@ -382,9 +394,12 @@ async function desenharArea () {
   }
   if (geracao !== geracaoArea || !mapa) return
 
+  const tituloBase = filtroBase.value.length === 1
+    ? `Base ${filtroBase.value[0]}`
+    : `${filtroBase.value.length} bases selecionadas`
   areaAtual.value = filtroMunicipio.value
     ? { titulo: filtroMunicipio.value, sub: resumoArea(notasDaArea.value) }
-    : { titulo: `Base ${filtroBase.value}`, sub: `${res.features.length} municípios · ${resumoArea(notasDaArea.value)}` }
+    : { titulo: tituloBase, sub: `${res.features.length} municípios · ${resumoArea(notasDaArea.value)}` }
 
   if (res.naoEncontrados.length) {
     avisoArea.value = `Sem limite oficial para: ${res.naoEncontrados.join(', ')}.`
@@ -450,7 +465,7 @@ function aoClicarMapa (e) {
 watch(filtroBase, () => {
   if (filtroMunicipio.value && !municipiosOpcoes.value.includes(filtroMunicipio.value)) filtroMunicipio.value = null
   else desenharArea()
-})
+}, { deep: true })
 watch(filtroMunicipio, () => {
   if (compacto.value && filtroMunicipio.value) painelAberto.value = false
   desenharArea()
@@ -844,7 +859,7 @@ async function montarMapa () {
   painelAberto.value = false
   desenharMarcadores()
   setTimeout(() => mapa?.invalidateSize(), 150)
-  if (props.baseInicial && filtroBase.value !== props.baseInicial) filtroBase.value = props.baseInicial
+  if (props.baseInicial && !filtroBase.value.includes(props.baseInicial)) filtroBase.value = [props.baseInicial]
   else desenharArea()
 
   window.addEventListener('online', atualizarOnline)
@@ -1101,6 +1116,7 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 :deep(.mapa-cluster-anel:hover) {
   transform: scale(1.12);
   box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  opacity: 0.42;
 }
 :deep(.mapa-cluster-anel span) {
   width: calc(100% - 10px); height: calc(100% - 10px); border-radius: 50%;
@@ -1108,12 +1124,12 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
   color: #1a2535; font-weight: 800; font-size: 13px;
   display: flex; align-items: center; justify-content: center;
   backdrop-filter: blur(2px);
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, text-shadow 0.2s ease;
 }
 :deep(.mapa-cluster-anel:hover span) {
-  background: rgba(255,255,255,0.12);
+  background: transparent;
   color: #fff;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5);
+  text-shadow: 0 0 3px #000, 0 1px 6px rgba(0,0,0,0.95), 0 0 14px rgba(0,0,0,0.7);
 }
 @keyframes mapa-pop { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
