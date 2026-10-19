@@ -9,7 +9,8 @@ const routes = [
       { path: 'historico', component: () => import('pages/HistoricoGeralPage.vue') },
       { path: 'dashboard', component: () => import('pages/DashboardPage.vue') },
       { path: 'notas', component: () => import('pages/NotasPage.vue') },
-      { path: 'programacao', component: () => import('pages/ProgramacaoPage.vue') }
+      { path: 'programacao', component: () => import('pages/ProgramacaoPage.vue') },
+      { path: 'usuarios', component: () => import('pages/UsuariosPage.vue') }
     ]
   },
   // ── PWA Campo (sem autenticação Supabase) ─────────────────────

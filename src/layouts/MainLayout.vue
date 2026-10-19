@@ -19,7 +19,7 @@
 
         <!-- Nav desktop -->
         <nav class="header-nav row items-center gt-sm">
-          <template v-for="(item, i) in navItems" :key="item.to">
+          <template v-for="(item, i) in navVisiveis" :key="item.to">
             <div v-if="i > 0" class="nav-divider" />
             <router-link :to="item.to" custom v-slot="{ isExactActive, navigate }">
               <button class="nav-btn" :class="{ 'nav-btn--active': isExactActive }" @click="navigate">
@@ -70,7 +70,7 @@
         <div class="text-caption text-weight-bold q-mb-md" style="color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Menu</div>
         <q-list>
           <q-item
-            v-for="item in navItems" :key="item.to"
+            v-for="item in navVisiveis" :key="item.to"
             :to="item.to"
             :exact="item.to === '/'"
             clickable v-ripple
@@ -133,8 +133,11 @@ const navItems = [
   { to: '/',          label: 'Apontamento', icon: 'assignment' },
   { to: '/historico', label: 'Histórico',   icon: 'history' },
   { to: '/notas',     label: 'Notas',       icon: 'table_chart' },
-  { to: '/programacao', label: 'Programação', icon: 'event_note' }
+  { to: '/programacao', label: 'Programação', icon: 'event_note' },
+  { to: '/usuarios',  label: 'Usuários',    icon: 'group', admin: true }
 ]
+
+const navVisiveis = computed(() => navItems.filter(i => !i.admin || auth.isAdmin))
 </script>
 
 <style scoped>
