@@ -28,6 +28,131 @@
       Sincronize o Dropbox ou importe a planilha do dia.
     </q-banner>
 
+    <q-tabs v-model="secao" dense no-caps active-color="primary" indicator-color="primary" align="left" class="q-mt-md prog-secoes">
+      <q-tab name="painel" icon="insights" label="Painel" />
+      <q-tab name="conferencia" icon="fact_check" label="Conferência" />
+    </q-tabs>
+
+    <div v-if="secao === 'painel'" class="prog-painel q-mt-md">
+      <div class="prog-kpis">
+        <div class="prog-kpi prog-kpi--destaque">
+          <div class="prog-kpi-n">{{ kpis.progresso }}%</div>
+          <div class="prog-kpi-l">concluído · {{ kpis.concluidas }} de {{ kpis.total }}</div>
+          <div class="prog-barra-fundo"><i :style="{ width: kpis.progresso + '%' }" /></div>
+        </div>
+        <div class="prog-kpi prog-kpi--parada">
+          <div class="prog-kpi-n">{{ kpis.paradas }}</div>
+          <div class="prog-kpi-l">obras paradas</div>
+        </div>
+        <div class="prog-kpi prog-kpi--atraso">
+          <div class="prog-kpi-n">{{ atrasadas.length }}</div>
+          <div class="prog-kpi-l">visitas com data vencida</div>
+        </div>
+        <div class="prog-kpi">
+          <div class="prog-kpi-n">{{ proximas.length }}</div>
+          <div class="prog-kpi-l">previstas nos próximos 7 dias</div>
+        </div>
+        <div class="prog-kpi">
+          <div class="prog-kpi-n">{{ kpis.andamento }}</div>
+          <div class="prog-kpi-l">em andamento</div>
+        </div>
+      </div>
+
+      <div class="prog-card q-mt-md">
+        <div class="prog-sec-titulo"><q-icon name="lightbulb" size="18px" /> Oportunidades</div>
+        <div v-if="!oportunidades.length" class="prog-muted">Nenhuma ação pendente na programação.</div>
+        <div v-for="(o, i) in oportunidades" :key="i" class="prog-insight" :class="`prog-insight--${o.tipo}`">
+          <q-icon :name="o.icone" size="20px" />
+          <div>
+            <div class="prog-insight-titulo">{{ o.titulo }}</div>
+            <div class="prog-insight-texto">{{ o.texto }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="prog-duas q-mt-md">
+        <div class="prog-card">
+          <div class="prog-sec-titulo"><q-icon name="pause_circle" size="18px" /> Obras paradas
+            <small>último registro é "Andamento"</small>
+          </div>
+          <q-table
+            flat dense
+            :rows="paradas"
+            :columns="colParadas"
+            row-key="sap"
+            :pagination="{ rowsPerPage: 8, sortBy: 'dias', descending: true }"
+            no-data-label="Nenhuma obra parada"
+          >
+            <template #body-cell-dias="props">
+              <q-td :props="props">
+                <span class="prog-dias" :class="{ 'prog-dias--alerta': props.row.dias > 15 }">
+                  {{ props.row.dias === null ? '—' : props.row.dias + ' d' }}
+                </span>
+              </q-td>
+            </template>
+          </q-table>
+        </div>
+
+        <div class="prog-card">
+          <div class="prog-sec-titulo"><q-icon name="groups" size="18px" /> Por equipe</div>
+          <q-markup-table flat dense separator="horizontal" class="prog-eq">
+            <thead>
+              <tr><th>Equipe</th><th>Obras</th><th>Concluídas</th><th>Paradas</th><th>Progresso</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="e in porEquipe" :key="e.equipe">
+                <td>{{ e.equipe }}</td>
+                <td>{{ e.total }}</td>
+                <td>{{ e.concluidas }}</td>
+                <td>{{ e.paradas }}</td>
+                <td>
+                  <div class="prog-mini"><i :style="{ width: e.progresso + '%' }" /><span>{{ e.progresso }}%</span></div>
+                </td>
+              </tr>
+            </tbody>
+          </q-markup-table>
+        </div>
+      </div>
+
+      <div class="prog-duas q-mt-md">
+        <div class="prog-card">
+          <div class="prog-sec-titulo"><q-icon name="event" size="18px" /> Visitas vencidas e próximas</div>
+          <q-table
+            flat dense
+            :rows="[...atrasadas, ...proximas]"
+            :columns="colAgenda"
+            row-key="sap"
+            :pagination="{ rowsPerPage: 8 }"
+            no-data-label="Nenhuma visita vencida ou nos próximos 7 dias"
+          >
+            <template #body-cell-situacao="props">
+              <q-td :props="props" class="text-right">
+                <span :class="props.row.dias > 0 ? 'prog-dias prog-dias--alerta' : 'prog-dias'">
+                  {{ props.row.dias > 0 ? `${props.row.dias} d em atraso` : (props.row.dias === 0 ? 'hoje' : `em ${-props.row.dias} d`) }}
+                </span>
+              </q-td>
+            </template>
+          </q-table>
+        </div>
+
+        <div class="prog-card">
+          <div class="prog-sec-titulo"><q-icon name="show_chart" size="18px" /> Ritmo entre importações</div>
+          <div v-if="!ritmo.length" class="prog-muted">
+            Sem histórico ainda. O ritmo aparece quando houver importações em dias diferentes.
+          </div>
+          <div v-for="r in ritmo.slice(0, 10)" :key="r.data_ref" class="prog-ritmo">
+            <span class="prog-ritmo-dia">{{ formatarData(r.data_ref) }}</span>
+            <b>{{ r.concluidas }}</b><span class="prog-muted"> concluídas</span>
+            <span class="prog-delta" :class="{ 'prog-delta--pos': r.delta > 0, 'prog-delta--neg': r.delta < 0 }">
+              {{ r.delta > 0 ? '+' : '' }}{{ r.delta }}
+            </span>
+            <span class="prog-muted">· {{ r.paradas }} paradas</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <template v-if="secao === 'conferencia'">
     <div class="prog-tiles">
       <div v-for="t in tiles" :key="t.key" class="prog-tile" :class="`prog-tile--${t.key}`">
         <div class="prog-tile-n">{{ t.n }}</div>
@@ -103,6 +228,7 @@
         </q-td>
       </template>
     </q-table>
+    </template>
 
     <q-dialog v-model="configAberta">
       <q-card style="width: 460px; max-width: 94vw">
@@ -144,6 +270,8 @@ const ROTULO_SISTEMA = {
 }
 
 const linhas = ref([])
+const tendencia = ref([])
+const secao = ref('painel')
 const ultimaImportacao = ref(null)
 const dropboxUrl = ref('')
 const ocupado = ref(false)
@@ -184,6 +312,125 @@ const linhasAba = computed(() => {
   )
 })
 
+const ativas = computed(() => linhas.value.filter(l => l.status_programacao !== 'CANCELAR'))
+
+function diasDesde (iso) {
+  if (!iso) return null
+  const d = new Date(`${iso}T00:00:00`)
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  return Math.round((hoje - d) / 86400000)
+}
+
+const kpis = computed(() => {
+  const k = { total: ativas.value.length, concluidas: 0, andamento: 0, programadas: 0, paradas: 0 }
+  for (const l of ativas.value) {
+    if (l.status_programacao === 'CONCLUIDA') k.concluidas++
+    if (l.status_programacao === 'ANDAMENTO') k.andamento++
+    if (l.status_programacao === 'PROGRAMADA') k.programadas++
+    if (l.ultimo_status === 'ANDAMENTO') k.paradas++
+  }
+  k.progresso = k.total ? Math.round(k.concluidas / k.total * 100) : 0
+  return k
+})
+
+// Parada: o registro mais recente da obra é "Andamento" (não há visita programada depois)
+const paradas = computed(() => ativas.value
+  .filter(l => l.ultimo_status === 'ANDAMENTO')
+  .map(l => ({ ...l, dias: diasDesde(l.ultimo_evento) }))
+  .sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1)))
+
+const atrasadas = computed(() => ativas.value
+  .filter(l => l.status_programacao === 'PROGRAMADA' && diasDesde(l.data_programada) > 0)
+  .map(l => ({ ...l, dias: diasDesde(l.data_programada) }))
+  .sort((a, b) => b.dias - a.dias))
+
+const proximas = computed(() => ativas.value
+  .filter(l => {
+    const d = diasDesde(l.data_programada)
+    return l.status_programacao === 'PROGRAMADA' && d !== null && d <= 0 && d >= -7
+  })
+  .map(l => ({ ...l, dias: diasDesde(l.data_programada) }))
+  .sort((a, b) => b.dias - a.dias))
+
+const porEquipe = computed(() => {
+  const m = new Map()
+  for (const l of ativas.value) {
+    const e = l.equipe || '—'
+    if (!m.has(e)) m.set(e, { equipe: e, total: 0, concluidas: 0, paradas: 0 })
+    const r = m.get(e)
+    r.total++
+    if (l.status_programacao === 'CONCLUIDA') r.concluidas++
+    if (l.ultimo_status === 'ANDAMENTO') r.paradas++
+  }
+  return [...m.values()]
+    .map(r => ({ ...r, progresso: r.total ? Math.round(r.concluidas / r.total * 100) : 0 }))
+    .sort((a, b) => b.total - a.total)
+})
+
+const pendentesPorMunicipio = computed(() => {
+  const m = new Map()
+  for (const l of ativas.value) {
+    if (l.status_programacao === 'CONCLUIDA' || !l.municipio) continue
+    m.set(l.municipio, (m.get(l.municipio) || 0) + 1)
+  }
+  return [...m].filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1])
+})
+
+const ritmo = computed(() => tendencia.value
+  .map((t, i, arr) => ({ ...t, delta: i ? t.concluidas - arr[i - 1].concluidas : 0 }))
+  .reverse())
+
+const oportunidades = computed(() => {
+  const lista = []
+  const longas = paradas.value.filter(p => p.dias > 15)
+  if (longas.length) {
+    lista.push({
+      tipo: 'alerta', icone: 'pause_circle',
+      titulo: `${longas.length} obras paradas há mais de 15 dias`,
+      texto: `A mais antiga é a nota ${longas[0].sap}, parada há ${longas[0].dias} dias.`
+    })
+  }
+  if (atrasadas.value.length) {
+    lista.push({
+      tipo: 'alerta', icone: 'schedule',
+      titulo: `${atrasadas.value.length} visitas com data vencida`,
+      texto: 'A data passou e a obra segue programada. Reagende ou confirme a execução.'
+    })
+  }
+  if (proximas.value.length) {
+    lista.push({
+      tipo: 'ok', icone: 'event_available',
+      titulo: `${proximas.value.length} visitas nos próximos 7 dias`,
+      texto: 'Confirme equipe e material antes da data.'
+    })
+  }
+  for (const [mun, n] of pendentesPorMunicipio.value.slice(0, 3)) {
+    lista.push({
+      tipo: 'oportunidade', icone: 'route',
+      titulo: `${mun}: ${n} obras pendentes`,
+      texto: 'Dá para agrupar numa mesma ida. Use o mapa para montar o roteiro.'
+    })
+  }
+  return lista
+})
+
+const colParadas = [
+  { name: 'sap', label: 'Nota SAP', field: 'sap', align: 'left', sortable: true },
+  { name: 'municipio', label: 'Município', field: 'municipio', align: 'left', sortable: true },
+  { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'left' },
+  { name: 'ultimo', label: 'Último registro', field: 'ultimo_evento', align: 'left', format: formatarData },
+  { name: 'dias', label: 'Parada há', field: 'dias', align: 'right', sortable: true }
+]
+
+const colAgenda = [
+  { name: 'sap', label: 'Nota SAP', field: 'sap', align: 'left' },
+  { name: 'municipio', label: 'Município', field: 'municipio', align: 'left' },
+  { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'left' },
+  { name: 'data', label: 'Data prevista', field: 'data_programada', align: 'left', format: formatarData },
+  { name: 'situacao', label: 'Situação', field: 'dias', align: 'right' }
+]
+
 const precisaAtualizar = computed(() =>
   !ultimaImportacao.value || new Date(ultimaImportacao.value.criado_em).toDateString() !== new Date().toDateString()
 )
@@ -197,19 +444,22 @@ const ultimaTexto = computed(() => {
 })
 
 function formatarData (iso) {
+  if (!iso) return '—'
   const [a, m, d] = iso.split('-')
   return `${d}/${m}/${a}`
 }
 
 async function carregar () {
-  const [{ data: v }, { data: imp }, { data: cfg }] = await Promise.all([
+  const [{ data: v }, { data: imp }, { data: cfg }, { data: tend }] = await Promise.all([
     fetchAll(() => supabase.from('programacao_comparativo').select('*').order('sap')),
     supabase.from('programacao_importacoes').select('*').order('criado_em', { ascending: false }).limit(1),
-    supabase.from('configuracoes').select('valor').eq('chave', CONFIG_KEY).maybeSingle()
+    supabase.from('configuracoes').select('valor').eq('chave', CONFIG_KEY).maybeSingle(),
+    supabase.rpc('programacao_tendencia')
   ])
   linhas.value = v || []
   ultimaImportacao.value = imp?.[0] || null
   dropboxUrl.value = cfg?.valor || ''
+  tendencia.value = tend || []
 }
 
 // Qualquer caminho de importação passa por aqui: grava a programação e aplica as mudanças seguras
@@ -351,6 +601,53 @@ onMounted(carregar)
 .prog-sis { font-size: 13px; font-weight: 600; }
 .prog-aviso { font-size: 11.5px; color: #b26a00; font-weight: 600; }
 .prog-sis-linha { font-size: 12px; color: #334155; font-variant-numeric: tabular-nums; }
+
+.prog-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.prog-kpi { border-radius: 14px; padding: 14px 16px; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,0.06); }
+.prog-kpi-n { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.prog-kpi-l { font-size: 12px; font-weight: 600; color: #64748b; }
+.prog-kpi--destaque { background: linear-gradient(135deg, #1d4ed8, #1e88e5); color: #fff; }
+.prog-kpi--destaque .prog-kpi-l { color: rgba(255,255,255,0.8); }
+.prog-kpi--parada { border-left: 4px solid #e65100; }
+.prog-kpi--atraso { border-left: 4px solid #c62828; }
+.prog-barra-fundo { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.25); margin-top: 8px; overflow: hidden; }
+.prog-barra-fundo i { display: block; height: 100%; background: #fff; border-radius: 3px; }
+
+.prog-card { background: #fff; border-radius: 16px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(15,23,42,0.06); min-width: 0; }
+.prog-duas { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; }
+.prog-sec-titulo { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 800; margin-bottom: 10px; }
+.prog-sec-titulo small { font-weight: 500; color: #64748b; margin-left: 4px; }
+
+.prog-insight { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; margin-bottom: 8px; background: #f8fafc; }
+.prog-insight:last-child { margin-bottom: 0; }
+.prog-insight-titulo { font-weight: 700; font-size: 14px; }
+.prog-insight-texto { font-size: 12.5px; color: #64748b; }
+.prog-insight--alerta { background: #fff3e0; }
+.prog-insight--alerta > .q-icon { color: #e65100; }
+.prog-insight--ok { background: #e8f5e9; }
+.prog-insight--ok > .q-icon { color: #2e7d32; }
+.prog-insight--oportunidade { background: #e3f2fd; }
+.prog-insight--oportunidade > .q-icon { color: #1565c0; }
+
+.prog-dias { font-weight: 700; font-variant-numeric: tabular-nums; color: #334155; }
+.prog-dias--alerta { color: #c62828; }
+
+.prog-eq { width: 100%; }
+.prog-eq th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
+.prog-mini { position: relative; height: 18px; border-radius: 9px; background: #eef2f9; min-width: 90px; overflow: hidden; }
+.prog-mini i { position: absolute; left: 0; top: 0; bottom: 0; background: #43a047; border-radius: 9px; }
+.prog-mini span { position: relative; font-size: 11.5px; font-weight: 700; line-height: 18px; padding-left: 6px; }
+
+.prog-ritmo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; font-size: 13px; }
+.prog-ritmo:last-child { border-bottom: none; }
+.prog-ritmo-dia { font-weight: 700; min-width: 76px; }
+.prog-delta { font-weight: 700; font-size: 12px; padding: 1px 7px; border-radius: 9px; background: #eef2f9; color: #64748b; }
+.prog-delta--pos { background: #e8f5e9; color: #2e7d32; }
+.prog-delta--neg { background: #ffebee; color: #c62828; }
+
+.body--dark .prog-kpi, .body--dark .prog-card { background: #111c2e; }
+.body--dark .prog-insight { background: #0f1a2b; }
+.body--dark .prog-eq th { color: #94a3b8; }
 .prog-muted { color: #94a3b8; font-size: 12.5px; }
 
 .body--dark .prog-sub { color: #94a3b8; }

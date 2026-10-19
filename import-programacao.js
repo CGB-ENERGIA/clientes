@@ -39,25 +39,14 @@ const { registros, lidas, ignoradas } = lerProgramacao(arrayBuffer)
 const hash = await hashArquivo(arrayBuffer)
 const nomeArquivo = ARQUIVO.split(/[\\/]/).pop()
 
-const { data: ultima } = await supabase
-  .from('programacao_importacoes')
-  .select('hash, criado_em')
-  .order('criado_em', { ascending: false })
-  .limit(1)
-  .maybeSingle()
-
-if (ultima?.hash === hash) {
-  console.log(`ℹ️  Planilha sem alterações desde ${new Date(ultima.criado_em).toLocaleString('pt-BR')}. Só reaplicando.`)
-} else {
-  const { data: rel, error } = await supabase.rpc('importar_programacao', {
-    p_registros: registros, p_origem: 'agendador', p_arquivo: nomeArquivo, p_hash: hash
-  })
-  if (error) {
-    console.error('❌  Erro na importação (nada foi alterado):', error.message)
-    process.exit(1)
-  }
-  console.log(`✅  Programação: ${rel.notas} notas gravadas · ${rel.removidas} removidas por saírem da planilha`)
+const { data: rel, error } = await supabase.rpc('importar_programacao', {
+  p_registros: registros, p_origem: 'agendador', p_arquivo: nomeArquivo, p_hash: hash
+})
+if (error) {
+  console.error('❌  Erro na importação (nada foi alterado):', error.message)
+  process.exit(1)
 }
+console.log(`✅  Programação: ${rel.notas} notas gravadas · ${rel.removidas} removidas por saírem da planilha`)
 
 const { data: ap, error: erroAplicar } = await supabase.rpc('aplicar_programacao', { p_saps: null })
 if (erroAplicar) {

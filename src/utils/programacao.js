@@ -43,14 +43,16 @@ function resumirNota (linhas) {
   }
 
   const base = [...linhas].sort(maisRecentePrimeiro)[0]
-  if (!atuais.length) return { ...base, status: 'CANCELAR' }
+  const recente = linhas.filter(l => l.status !== 'CANCELAR').sort(maisRecentePrimeiro)[0]
+  const ultimo = { ultimo_status: recente?.status ?? null, ultimo_evento: recente?.data_programada ?? null }
+  if (!atuais.length) return { ...base, status: 'CANCELAR', ...ultimo }
 
   const status = atuais.every(l => l.status === 'CONCLUIDA') ? 'CONCLUIDA'
     : atuais.some(l => l.status === 'ANDAMENTO' || l.status === 'CONCLUIDA') ? 'ANDAMENTO'
     : atuais.some(l => l.status === 'REPROGRAMAR') ? 'REPROGRAMAR'
     : 'PROGRAMADA'
   const maisRecente = [...atuais].sort(maisRecentePrimeiro)[0]
-  return { ...base, status, data_programada: maisRecente.data_programada }
+  return { ...base, status, data_programada: maisRecente.data_programada, ...ultimo }
 }
 
 export function lerProgramacao (buffer) {
@@ -98,7 +100,9 @@ export function lerProgramacao (buffer) {
       supervisor: r.supervisor,
       motivo: r.motivo,
       observacao: r.observacao,
-      linhas: grupo.length
+      linhas: grupo.length,
+      ultimo_status: r.ultimo_status,
+      ultimo_evento: r.ultimo_evento
     })
   }
 
