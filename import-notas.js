@@ -43,6 +43,8 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY)
 
 // ── Lê planilha ───────────────────────────────────────────────────
 const PLANILHA = 'C:\\Users\\Italo\\Dropbox\\Acompanhamento 2018\\01. ACOMPANHAMENTO OBRAS\\ACOMPANHAMENTO PLA PAT 1.xlsx'
+// Só entram no sistema as notas da equipe STC/GERE ou sem programação definida
+const PROGRAMACOES_ACEITAS = new Set(['', 'EQUIPE STC/GERE'])
 
 console.log('\n📂  Lendo planilha...')
 const wb  = XLSX.readFile(PLANILHA)
@@ -97,6 +99,7 @@ function lerCoordenada (v) {
 for (const r of dados) {
   const nota = String(r['NOTA'] || '').trim()
   if (!nota || isNaN(Number(nota))) continue
+  if (!PROGRAMACOES_ACEITAS.has(String(r['PROGRAMAÇÃO'] ?? '').trim().toUpperCase())) continue
 
   const retorno    = String(colRetorno    ? (r[colRetorno]    ?? '') : '').trim().toUpperCase()
   const projetoSap = String(colProjetoSap ? (r[colProjetoSap] ?? '') : '').trim()

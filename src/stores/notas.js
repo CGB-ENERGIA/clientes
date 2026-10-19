@@ -4,6 +4,8 @@ import { supabase, fetchAll } from 'boot/supabase'
 import * as XLSX from 'xlsx'
 
 const CACHE_KEY = 'cgb_notas_cache'
+// Só entram no sistema as notas da equipe STC/GERE ou sem programação definida
+const PROGRAMACOES_ACEITAS = new Set(['', 'EQUIPE STC/GERE'])
 
 export const useNotasStore = defineStore('notas', () => {
   const notas      = ref([])
@@ -135,6 +137,7 @@ export const useNotasStore = defineStore('notas', () => {
         for (const r of dados) {
           const nota = String(r['NOTA'] || '').trim()
           if (!nota || isNaN(Number(nota))) continue
+          if (!PROGRAMACOES_ACEITAS.has(String(r['PROGRAMAÇÃO'] ?? '').trim().toUpperCase())) continue
 
           const retorno2   = String(colRetorno2   ? (r[colRetorno2]   ?? '') : '').trim().toUpperCase()
           const projetoSap = String(colProjSap    ? (r[colProjSap]    ?? '') : '').trim()
