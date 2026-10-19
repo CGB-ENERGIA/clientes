@@ -454,7 +454,7 @@ const oportunidades = computed(() => {
     lista.push({
       tipo: 'oportunidade', icone: 'route',
       titulo: `${mun}: ${n} obras pendentes`,
-      texto: 'Dá para agrupar numa mesma ida. Use o mapa para montar o roteiro.'
+      texto: 'Obras pendentes no mesmo município, boas para sair juntas numa mesma ida.'
     })
   }
   return lista
