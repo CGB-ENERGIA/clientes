@@ -174,6 +174,7 @@
 
         <div class="filtros-count text-grey-6 text-caption self-center q-ml-auto">
           {{ notasFiltradas.length }} de {{ notasStore.notas.length }}
+          <ProgInfo titulo="Contagem da lista" texto="Cada linha é um projeto SAP. Notas que dividem o mesmo PROJETO SAP aparecem juntas em uma linha. O número depois de de é o total de notas carregadas." />
         </div>
       </div>
 
@@ -945,6 +946,7 @@ import { useNotasStore } from 'stores/notas'
 import { useApontamentoStore } from 'stores/apontamento'
 import { supabase } from 'boot/supabase'
 import MapaNotas from 'components/MapaNotas.vue'
+import ProgInfo from 'components/ProgInfo.vue'
 
 const $q         = useQuasar()
 const notasStore = useNotasStore()
