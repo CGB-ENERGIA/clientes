@@ -411,6 +411,8 @@ const props = defineProps({
   rotuloAbrir: { type: String, default: 'Abrir nota' },
   permitirAbrir: { type: Boolean, default: true },
   baseInicial: { type: String, default: null },
+  // 'sistema': cores dos status do sistema | 'programacao': status da planilha da supervisão
+  esquema: { type: String, default: 'sistema' },
   // Notas que já estão no "Meu dia" da equipe (modo campo)
   planoNotas: { type: Array, default: () => [] }
 })
@@ -420,16 +422,26 @@ const $q = useQuasar()
 const compacto = computed(() => $q.screen.lt.sm)
 const temHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches
 
-const STATUS = [
-  { val: 'pendente',       label: 'Não Iniciado',   cor: '#9e9e9e' },
-  { val: 'em_andamento',   label: 'Andamento',      cor: '#fb8c00' },
-  { val: 'baixar_medidor', label: 'Baixar Medidor', cor: '#1976d2' },
-  { val: 'concluido',      label: 'Concluído',      cor: '#43a047' },
-  { val: 'expurgo',        label: 'Expurgo',        cor: '#e53935' },
-  { val: 'sem_acesso',     label: 'Sem Acesso',     cor: '#6d4c41' }
-]
-const corDe   = s => STATUS.find(x => x.val === s)?.cor ?? '#607d8b'
-const labelDe = s => STATUS.find(x => x.val === s)?.label ?? s
+const ESQUEMAS = {
+  sistema: [
+    { val: 'pendente',       label: 'Não Iniciado',   cor: '#9e9e9e' },
+    { val: 'em_andamento',   label: 'Andamento',      cor: '#fb8c00' },
+    { val: 'baixar_medidor', label: 'Baixar Medidor', cor: '#1976d2' },
+    { val: 'concluido',      label: 'Concluído',      cor: '#43a047' },
+    { val: 'expurgo',        label: 'Expurgo',        cor: '#e53935' },
+    { val: 'sem_acesso',     label: 'Sem Acesso',     cor: '#6d4c41' }
+  ],
+  programacao: [
+    { val: 'PROGRAMADA',  label: 'Programada',  cor: '#1e88e5' },
+    { val: 'ANDAMENTO',   label: 'Andamento',   cor: '#fb8c00' },
+    { val: 'CONCLUIDA',   label: 'Concluída',   cor: '#43a047' },
+    { val: 'REPROGRAMAR', label: 'Reprogramar', cor: '#8e24aa' },
+    { val: 'CANCELAR',    label: 'Cancelar',    cor: '#90a4ae' }
+  ]
+}
+const statusLista = () => ESQUEMAS[props.esquema] ?? ESQUEMAS.sistema
+const corDe   = s => statusLista().find(x => x.val === s)?.cor ?? '#607d8b'
+const labelDe = s => statusLista().find(x => x.val === s)?.label ?? s
 
 const mapaEl  = ref(null)
 const sheetEl = ref(null)
@@ -517,7 +529,7 @@ const contagem = computed(() => {
   return c
 })
 
-const statusVisiveis = computed(() => STATUS.filter(s => contagem.value[s.val] || ocultos.value.has(s.val)))
+const statusVisiveis = computed(() => statusLista().filter(s => contagem.value[s.val] || ocultos.value.has(s.val)))
 
 const notasNoMapa = computed(() => notasDaArea.value.filter(n => !ocultos.value.has(n.status)))
 
@@ -647,7 +659,7 @@ const chavePonto = (lat, lng) => `${lat.toFixed(6)},${lng.toFixed(6)}`
 
 function notasNoPonto (lat, lng) {
   const k = chavePonto(lat, lng)
-  const ordem = s => STATUS.findIndex(x => x.val === s)
+  const ordem = s => statusLista().findIndex(x => x.val === s)
   return notasNoMapa.value
     .filter(n => chavePonto(n.latitude, n.longitude) === k)
     .sort((a, b) => ordem(a.status) - ordem(b.status))
@@ -836,7 +848,7 @@ const rotPostes = computed(() => rotNotas.value.reduce((s, n) => s + (Number(n.p
 const rotMix = computed(() => {
   const c = {}
   for (const n of rotNotas.value) c[n.status] = (c[n.status] || 0) + 1
-  return STATUS.filter(s => c[s.val]).map(s => ({ ...s, qtd: c[s.val] }))
+  return statusLista().filter(s => c[s.val]).map(s => ({ ...s, qtd: c[s.val] }))
 })
 const rotKmReta = computed(() => {
   const pts = rotPontos.value
@@ -1286,7 +1298,7 @@ function desenharMarcadores () {
     porPonto.get(k).push(n)
   }
 
-  const ordem = s => STATUS.findIndex(x => x.val === s)
+  const ordem = s => statusLista().findIndex(x => x.val === s)
   const raio = compacto.value ? 9 : 7
   const marcadores = []
   for (const notas of porPonto.values()) {
@@ -1330,7 +1342,7 @@ function iconeCluster (cluster) {
   }
   let acc = 0
   const fatias = Object.keys(cont)
-    .sort((a, b) => STATUS.findIndex(x => x.val === a) - STATUS.findIndex(x => x.val === b))
+    .sort((a, b) => statusLista().findIndex(x => x.val === a) - statusLista().findIndex(x => x.val === b))
     .map(s => {
       const ini = acc
       acc += cont[s] / total * 360

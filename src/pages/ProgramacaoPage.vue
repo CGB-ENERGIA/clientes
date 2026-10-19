@@ -34,6 +34,10 @@
     </q-tabs>
 
     <div v-if="secao === 'painel'" class="prog-painel q-mt-md">
+      <div class="prog-painel-topo">
+        <q-btn unelevated no-caps color="primary" icon="map" label="Mapa da programação" @click="mapaAberto = true" />
+        <span class="prog-muted">{{ gruposMapa.length }} notas no mapa · {{ semCoordMapa }} obras sem ponto no mapa</span>
+      </div>
       <div class="prog-kpis">
         <div class="prog-kpi prog-kpi--destaque">
           <div class="prog-kpi-n">{{ kpis.progresso }}%</div>
@@ -272,6 +276,12 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <MapaNotas
+      v-model="mapaAberto"
+      esquema="programacao"
+      :grupos="gruposMapa"
+      :permitir-abrir="false"
+    />
   </q-page>
 </template>
 
@@ -280,6 +290,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { supabase, fetchAll } from 'boot/supabase'
 import ProgInfo from 'components/ProgInfo.vue'
+import MapaNotas from 'components/MapaNotas.vue'
 import { useNotasStore } from 'stores/notas'
 import { lerProgramacao, hashArquivo, ROTULO_PROGRAMACAO } from 'src/utils/programacao'
 
@@ -476,6 +487,41 @@ const colAgenda = [
   { name: 'situacao', label: 'Situação', field: 'dias', align: 'right' }
 ]
 
+// Liga cada obra da programação às notas do sistema pelo SAP, para desenhar no mapa com o status da planilha
+const notasPorSap = computed(() => {
+  const m = new Map()
+  for (const n of notasStore.notas) {
+    if (!n.projeto_info_sap) continue
+    if (!m.has(n.projeto_info_sap)) m.set(n.projeto_info_sap, [])
+    m.get(n.projeto_info_sap).push(n)
+  }
+  return m
+})
+
+const gruposMapa = computed(() => {
+  const out = []
+  for (const l of linhas.value) {
+    for (const n of notasPorSap.value.get(l.sap) ?? []) {
+      if (n.latitude == null || n.longitude == null) continue
+      out.push({
+        nota: n.nota,
+        projeto_info_sap: l.sap,
+        base: n.base,
+        pep: n.pep,
+        municipio: n.municipio || l.municipio,
+        postes: n.postes,
+        qtd_clientes: n.qtd_clientes,
+        status: l.status_programacao,
+        latitude: n.latitude,
+        longitude: n.longitude
+      })
+    }
+  }
+  return out
+})
+
+const semCoordMapa = computed(() => linhas.value.length - new Set(gruposMapa.value.map(g => g.projeto_info_sap)).size)
+
 const precisaAtualizar = computed(() =>
   !ultimaImportacao.value || new Date(ultimaImportacao.value.criado_em).toDateString() !== new Date().toDateString()
 )
@@ -608,7 +654,12 @@ function confirmarAplicarTodas () {
   })
 }
 
-onMounted(carregar)
+const mapaAberto = ref(false)
+
+onMounted(() => {
+  carregar()
+  notasStore.fetchNotas()
+})
 </script>
 
 <style scoped>
@@ -647,6 +698,7 @@ onMounted(carregar)
 .prog-aviso { font-size: 11.5px; color: #b26a00; font-weight: 600; }
 .prog-sis-linha { font-size: 12px; color: #334155; font-variant-numeric: tabular-nums; }
 
+.prog-painel-topo { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
 .prog-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
 .prog-kpi { border-radius: 14px; padding: 14px 16px; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,0.06); }
 .prog-kpi-n { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
