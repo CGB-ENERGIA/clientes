@@ -356,7 +356,7 @@ export const useCampoStore = defineStore('campo', () => {
         }
         if (fotos_extras.length < extras.length) continue
 
-        const { error: dbErr } = await supabase.from('campo_registros').upsert({
+        const { error: dbErr } = await supabase.from('campo_registros').insert({
           id:         r.id,
           base:       r.base,
           pep:        r.pep,
@@ -367,7 +367,7 @@ export const useCampoStore = defineStore('campo', () => {
           fotos_extras,
           created_at: r.created_at
         })
-        if (dbErr) { console.warn('[Campo] registro:', dbErr.message); continue }
+        if (dbErr && dbErr.code !== '23505') { console.warn('[Campo] registro:', dbErr.message); continue }
 
         await idbRemover(r.id).catch(() => {})
         fila.value = fila.value.filter(f => f.id !== r.id)
