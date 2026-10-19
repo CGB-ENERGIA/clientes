@@ -37,24 +37,34 @@
       <div class="prog-kpis">
         <div class="prog-kpi prog-kpi--destaque">
           <div class="prog-kpi-n">{{ kpis.progresso }}%</div>
-          <div class="prog-kpi-l">concluído · {{ kpis.concluidas }} de {{ kpis.total }}</div>
+          <div class="prog-kpi-l">concluído · {{ kpis.concluidas }} de {{ kpis.total }}
+            <ProgInfo titulo="Progresso" texto="Obras concluídas dividido pelo total de obras ativas. Canceladas não entram na conta." />
+          </div>
           <div class="prog-barra-fundo"><i :style="{ width: kpis.progresso + '%' }" /></div>
         </div>
         <div class="prog-kpi prog-kpi--parada">
           <div class="prog-kpi-n">{{ kpis.paradas }}</div>
-          <div class="prog-kpi-l">obras paradas</div>
+          <div class="prog-kpi-l">obras paradas
+            <ProgInfo titulo="Obra parada" texto='O registro mais recente da obra é "Andamento", sem visita programada depois. Os dias são contados desde esse registro.' />
+          </div>
         </div>
         <div class="prog-kpi prog-kpi--atraso">
           <div class="prog-kpi-n">{{ atrasadas.length }}</div>
-          <div class="prog-kpi-l">visitas com data vencida</div>
+          <div class="prog-kpi-l">visitas com data vencida
+            <ProgInfo titulo="Visita vencida" texto="Visita programada com data anterior a hoje, que ainda não foi executada." />
+          </div>
         </div>
         <div class="prog-kpi">
           <div class="prog-kpi-n">{{ proximas.length }}</div>
-          <div class="prog-kpi-l">previstas nos próximos 7 dias</div>
+          <div class="prog-kpi-l">previstas nos próximos 7 dias
+            <ProgInfo titulo="Próximos 7 dias" texto="Visitas programadas entre hoje e os próximos 7 dias." />
+          </div>
         </div>
         <div class="prog-kpi">
           <div class="prog-kpi-n">{{ kpis.andamento }}</div>
-          <div class="prog-kpi-l">em andamento</div>
+          <div class="prog-kpi-l">em andamento
+            <ProgInfo titulo="Em andamento" texto="Obras com status Andamento na programação. Inclui obras com parte concluída e visita nova agendada." :itens="GLOSSARIO_PROG" />
+          </div>
         </div>
       </div>
 
@@ -74,6 +84,7 @@
         <div class="prog-card">
           <div class="prog-sec-titulo"><q-icon name="pause_circle" size="18px" /> Obras paradas
             <small>último registro é "Andamento"</small>
+            <ProgInfo titulo="Obras paradas" texto="Obras cujo registro mais recente é Andamento, sem visita programada depois. Os dias são contados desde esse registro." />
           </div>
           <q-table
             flat dense
@@ -94,7 +105,9 @@
         </div>
 
         <div class="prog-card">
-          <div class="prog-sec-titulo"><q-icon name="groups" size="18px" /> Por equipe</div>
+          <div class="prog-sec-titulo"><q-icon name="groups" size="18px" /> Por equipe
+            <ProgInfo titulo="Por equipe" :itens="[['Obras', 'total de obras ativas da equipe.'], ['Concluídas', 'obras com status Concluída na programação.'], ['Paradas', 'obras paradas pela regra do painel.'], ['Progresso', 'concluídas sobre o total.']]" />
+          </div>
           <q-markup-table flat dense separator="horizontal" class="prog-eq">
             <thead>
               <tr><th>Equipe</th><th>Obras</th><th>Concluídas</th><th>Paradas</th><th>Progresso</th></tr>
@@ -116,7 +129,9 @@
 
       <div class="prog-duas q-mt-md">
         <div class="prog-card">
-          <div class="prog-sec-titulo"><q-icon name="event" size="18px" /> Visitas vencidas e próximas</div>
+          <div class="prog-sec-titulo"><q-icon name="event" size="18px" /> Visitas vencidas e próximas
+            <ProgInfo titulo="Visitas vencidas e próximas" texto="Visitas programadas com data passada (em atraso) e as previstas para hoje ou para os próximos 7 dias." />
+          </div>
           <q-table
             flat dense
             :rows="[...atrasadas, ...proximas]"
@@ -136,7 +151,9 @@
         </div>
 
         <div class="prog-card">
-          <div class="prog-sec-titulo"><q-icon name="show_chart" size="18px" /> Ritmo entre importações</div>
+          <div class="prog-sec-titulo"><q-icon name="show_chart" size="18px" /> Ritmo entre importações
+            <ProgInfo titulo="Ritmo" texto="Uma linha por dia, usando a última importação do dia. O número colorido é a variação de concluídas em relação à importação anterior." />
+          </div>
           <div v-if="!ritmo.length" class="prog-muted">
             Sem histórico ainda. O ritmo aparece quando houver importações em dias diferentes.
           </div>
@@ -156,7 +173,7 @@
     <div class="prog-tiles">
       <div v-for="t in tiles" :key="t.key" class="prog-tile" :class="`prog-tile--${t.key}`">
         <div class="prog-tile-n">{{ t.n }}</div>
-        <div class="prog-tile-l">{{ t.label }}</div>
+        <div class="prog-tile-l">{{ t.label }} <ProgInfo :titulo="t.label" :texto="t.info" /></div>
       </div>
     </div>
 
@@ -187,6 +204,16 @@
       no-data-label="Nada nesta lista"
       class="prog-tabela q-mt-sm"
     >
+      <template #header-cell-prog="props">
+        <q-th :props="props">
+          {{ props.col.label }} <ProgInfo titulo="Status da programação" :itens="GLOSSARIO_PROG" />
+        </q-th>
+      </template>
+      <template #header-cell-sis="props">
+        <q-th :props="props">
+          {{ props.col.label }} <ProgInfo titulo="Status do sistema" :itens="GLOSSARIO_SIS" />
+        </q-th>
+      </template>
       <template #body-cell-prog="props">
         <q-td :props="props">
           <span class="prog-chip" :class="`prog-chip--${props.row.status_programacao.toLowerCase()}`">
@@ -252,6 +279,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { supabase, fetchAll } from 'boot/supabase'
+import ProgInfo from 'components/ProgInfo.vue'
 import { useNotasStore } from 'stores/notas'
 import { lerProgramacao, hashArquivo, ROTULO_PROGRAMACAO } from 'src/utils/programacao'
 
@@ -298,11 +326,28 @@ const contagem = computed(() => {
 })
 
 const tiles = computed(() => [
-  { key: 'aplicar', n: contagem.value.aplicar, label: 'Para atualizar' },
-  { key: 'conferir', n: contagem.value.conferir, label: 'Para conferir' },
-  { key: 'sem_correspondencia', n: contagem.value.sem_correspondencia, label: 'Sem correspondência' },
-  { key: 'ok', n: contagem.value.ok, label: 'Em dia' }
+  { key: 'aplicar', n: contagem.value.aplicar, label: 'Para atualizar', info: 'Mudança segura que o sistema aplica sozinho, como Não Iniciado para Andamento.' },
+  { key: 'conferir', n: contagem.value.conferir, label: 'Para conferir', info: 'Situação que pede decisão da supervisão, como SAP repetido no sistema ou status divergente.' },
+  { key: 'sem_correspondencia', n: contagem.value.sem_correspondencia, label: 'Sem correspondência', info: 'Obra da programação que não existe no sistema com esse SAP.' },
+  { key: 'ok', n: contagem.value.ok, label: 'Em dia', info: 'Programação e sistema estão alinhados.' }
 ])
+
+const GLOSSARIO_PROG = [
+  ['Programada', 'visita agendada pela supervisão. A obra ainda não começou.'],
+  ['Andamento', 'a obra já começou, mas ainda tem ligações pendentes ou uma visita nova agendada.'],
+  ['Concluída', 'todas as ligações da obra foram executadas.'],
+  ['Reprogramar', 'a visita foi remarcada pela supervisão.'],
+  ['Cancelar', 'a obra saiu da programação. Não entra no progresso.']
+]
+
+const GLOSSARIO_SIS = [
+  ['Não Iniciado', 'nenhum poste registrado ainda.'],
+  ['Andamento', 'a equipe começou a obra no campo.'],
+  ['Baixar Medidor', 'obra executada em campo. Falta dar baixa do medidor.'],
+  ['Concluído', 'obra finalizada no sistema.'],
+  ['Expurgo', 'nota expurgada. A obra não será executada.'],
+  ['Sem Acesso', 'não foi possível acessar o local.']
+]
 
 const linhasAba = computed(() => {
   const q = busca.value.trim().toLowerCase()
