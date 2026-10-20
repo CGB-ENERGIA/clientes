@@ -434,7 +434,7 @@ const ESQUEMAS = {
   sistema: [
     { val: 'pendente',       label: 'Não Iniciado',   cor: '#9e9e9e' },
     { val: 'em_andamento',   label: 'Andamento',      cor: '#fb8c00' },
-    { val: 'baixar_medidor', label: 'Baixar Medidor', cor: '#1976d2' },
+    { val: 'baixar_medidor', label: 'Auditar', cor: '#1976d2' },
     { val: 'concluido',      label: 'Concluído',      cor: '#43a047' },
     { val: 'expurgo',        label: 'Expurgo',        cor: '#e53935' },
     { val: 'sem_acesso',     label: 'Sem Acesso',     cor: '#6d4c41' }

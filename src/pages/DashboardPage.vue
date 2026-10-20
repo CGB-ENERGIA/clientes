@@ -327,7 +327,7 @@ function pct (exec, prev) {
 const STATUS_CONFIG = [
   { val: 'pendente',       label: 'Não Iniciado',   cor: '#64748b' },
   { val: 'em_andamento',   label: 'Em Andamento',   cor: '#ea580c' },
-  { val: 'baixar_medidor', label: 'Baixar Medidor', cor: '#1d4ed8' },
+  { val: 'baixar_medidor', label: 'Auditar', cor: '#1d4ed8' },
   { val: 'concluido',      label: 'Concluído',      cor: '#16a34a' },
   { val: 'expurgo',        label: 'Expurgo',        cor: '#dc2626' },
   { val: 'sem_acesso',     label: 'Sem Acesso',     cor: '#7c3aed' },

@@ -648,11 +648,11 @@
               <template v-else>
                 Nota em <b>{{ labelStatus(notaAtiva.status) }}</b>.
               </template>
-              Você pode preencher e salvar como rascunho; a conclusão é liberada quando a nota estiver em <b>Baixar Medidor</b>.
+              Você pode preencher e salvar como rascunho; a conclusão é liberada quando a nota estiver em <b>Auditar</b>.
             </div>
             <q-btn
               v-if="['pendente', 'em_andamento'].includes(notaAtiva.status)"
-              label="Enviar para Baixar Medidor"
+              label="Enviar para auditoria"
               icon="speed"
               color="blue-7"
               outline dense size="sm"
@@ -660,6 +660,31 @@
             >
               <q-tooltip>Use quando a equipe concluiu o campo mas não finalizou pelo app</q-tooltip>
             </q-btn>
+          </div>
+
+          <div v-if="temServicoEquipe2" class="etapa-section">
+            <div class="etapa-label">
+              <q-icon name="build" size="16px" />
+              Serviço registrado pela Equipe 2
+            </div>
+            <div class="q-pa-sm column q-gutter-sm">
+              <q-input
+                v-model="servicoEquipe2.descricao"
+                type="textarea" autogrow outlined dense
+                label="Descrição do serviço"
+              />
+              <div class="row q-gutter-sm">
+                <div v-for="(url, i) in servicoEquipe2.fotos" :key="url" style="position: relative">
+                  <img :src="url" alt="Foto do serviço" style="width: 110px; height: 110px; object-fit: cover; border-radius: 10px" />
+                  <q-btn round dense size="xs" icon="close" color="negative" style="position: absolute; top: 4px; right: 4px" @click="removerFotoServico(i)" />
+                </div>
+                <q-btn outline color="primary" icon="add_a_photo" label="Adicionar foto" :loading="servicoSalvando" no-caps style="height: 110px; width: 130px" @click="fotoServicoInput?.click()" />
+                <input ref="fotoServicoInput" type="file" accept="image/*" hidden @change="e => { adicionarFotoServico(e.target.files?.[0]); e.target.value = '' }" />
+              </div>
+              <div>
+                <q-btn unelevated color="primary" label="Salvar serviço" icon="save" no-caps :loading="servicoSalvando" @click="salvarServico" />
+              </div>
+            </div>
           </div>
 
           <!-- ── Seção Campo (Etapa 1) ── -->
@@ -952,7 +977,7 @@
               @click="salvar(false)"
             />
             <q-tooltip v-if="!podeConcluir" class="text-body2">
-              Só notas em "Baixar Medidor" podem ser concluídas. Esta nota está em "{{ labelStatus(notaAtiva?.status) }}".
+              Só notas em "Auditar" podem ser concluídas. Esta nota está em "{{ labelStatus(notaAtiva?.status) }}".
             </q-tooltip>
           </div>
         </q-card-actions>
@@ -1004,7 +1029,7 @@ const basesOptions = computed(() =>
 const statusOptions = [
   { label: 'Não Iniciado',   value: 'pendente'       },
   { label: 'Andamento',      value: 'em_andamento'   },
-  { label: 'Baixar Medidor', value: 'baixar_medidor' },
+  { label: 'Auditar', value: 'baixar_medidor' },
   { label: 'Concluído',      value: 'concluido'      },
   { label: 'Expurgo',        value: 'expurgo'        },
   { label: 'Sem Acesso',     value: 'sem_acesso'     },
@@ -1137,7 +1162,7 @@ const tabs = computed(() => [
   { val: 'todas',          label: 'Geral',          icon: 'apps',         count: contadores.value.todas },
   { val: 'pendente',       label: 'Não Iniciado',   icon: 'schedule',     count: contadores.value.pendente },
   { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', count: contadores.value.em_andamento },
-  { val: 'baixar_medidor', label: 'Baixar Medidor', icon: 'speed',        count: contadores.value.baixar_medidor },
+  { val: 'baixar_medidor', label: 'Auditar', icon: 'speed',        count: contadores.value.baixar_medidor },
   { val: 'concluido',      label: 'Concluídos',     icon: 'check_circle', count: contadores.value.concluido }
 ])
 
@@ -1201,7 +1226,7 @@ const semNotasMsg = computed(() => {
   const labels = {
     pendente:       'Não Iniciadas',
     em_andamento:   'em Andamento',
-    baixar_medidor: 'para Baixar Medidor',
+    baixar_medidor: 'para auditoria',
     concluido:      'Concluídas',
     expurgo:        'com Expurgo',
     sem_acesso:     'Sem Acesso',
@@ -1212,14 +1237,14 @@ const semNotasMsg = computed(() => {
 const statusOpcoes = [
   { val: 'pendente',       label: 'Não Iniciado',   icon: 'schedule',     color: 'grey-6'  },
   { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', color: 'orange'  },
-  { val: 'baixar_medidor', label: 'Baixar Medidor', icon: 'speed',        color: 'blue'    },
+  { val: 'baixar_medidor', label: 'Auditar', icon: 'speed',        color: 'blue'    },
   { val: 'concluido',      label: 'Concluído',      icon: 'check_circle', color: 'positive'},
 ]
 
 const statusLegenda = [
   { val: 'pendente',       label: 'Não Iniciado',   icon: 'schedule',     color: 'grey-6',   desc: 'Nota importada, mas a equipe de campo ainda não registrou nenhum poste.' },
   { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', color: 'orange',   desc: 'A equipe registrou postes pelo app de campo ou pausou com "Concluir mais tarde". Aguarda a equipe finalizar a nota.' },
-  { val: 'baixar_medidor', label: 'Baixar Medidor', icon: 'speed',        color: 'blue',     desc: 'Campo finalizado no app (ou cliente ligado na planilha). Falta registrar o Nº do medidor e a foto de cada cliente.' },
+  { val: 'baixar_medidor', label: 'Auditar', icon: 'speed',        color: 'blue',     desc: 'Campo finalizado no app (ou cliente ligado na planilha). Falta registrar o Nº do medidor e a foto de cada cliente.' },
   { val: 'concluido',      label: 'Concluído',      icon: 'check_circle', color: 'positive', desc: 'Medidores registrados na Etapa 2 (ou finalizado no CCS). Nenhuma ação pendente.' },
   { val: 'expurgo',        label: 'Expurgo',        icon: 'block',        color: 'negative', desc: 'Nota marcada como EXPURGO na planilha. Não será executada.' },
   { val: 'sem_acesso',     label: 'Sem Acesso',     icon: 'do_not_disturb_on', color: 'deep-orange', desc: 'A equipe não conseguiu acesso ao local (retorno SEM ACESSO na planilha).' },
@@ -1288,7 +1313,7 @@ function labelStatus (s) {
   return {
     pendente:       'Não Iniciado',
     em_andamento:   'Andamento',
-    baixar_medidor: 'Baixar Medidor',
+    baixar_medidor: 'Auditar',
     concluido:      'Concluído',
     expurgo:        'Expurgo',
     sem_acesso:     'Sem Acesso',
@@ -1319,6 +1344,52 @@ const objectUrls       = []
 const tentouSalvar     = ref(false)
 const apontamentoId    = ref(null)
 const rascunhoEm       = ref(null)
+const servicoEquipe2   = ref({ descricao: '', fotos: [] })
+const servicoSalvando  = ref(false)
+const fotoServicoInput = ref(null)
+
+const temServicoEquipe2 = computed(() =>
+  !!notaAtiva.value && ['baixar_medidor', 'concluido'].includes(notaAtiva.value.status)
+)
+
+async function adicionarFotoServico (file) {
+  if (!file || !notaAtiva.value) return
+  servicoSalvando.value = true
+  try {
+    const caminho = `servico/${notaAtiva.value.nota}/${crypto.randomUUID()}.jpg`
+    const { error } = await supabase.storage.from('campo-fotos').upload(caminho, file, {
+      contentType: file.type || 'image/jpeg', upsert: true
+    })
+    if (error) throw error
+    servicoEquipe2.value.fotos.push(supabase.storage.from('campo-fotos').getPublicUrl(caminho).data.publicUrl)
+  } catch (e) {
+    $q.notify({ type: 'negative', message: 'Não foi possível enviar a foto: ' + e.message, position: 'top' })
+  } finally {
+    servicoSalvando.value = false
+  }
+}
+
+function removerFotoServico (i) {
+  servicoEquipe2.value.fotos.splice(i, 1)
+}
+
+async function salvarServico () {
+  if (!apontamentoId.value) {
+    $q.notify({ type: 'warning', message: 'Esta nota ainda não tem a Etapa 2 registrada.', position: 'top' })
+    return
+  }
+  servicoSalvando.value = true
+  const { error } = await supabase.from('apontamentos').update({
+    descricao_servico: servicoEquipe2.value.descricao.trim() || null,
+    fotos_servico: servicoEquipe2.value.fotos
+  }).eq('id', apontamentoId.value)
+  servicoSalvando.value = false
+  $q.notify({
+    type: error ? 'negative' : 'positive',
+    message: error ? 'Erro ao salvar o serviço: ' + error.message : 'Serviço atualizado.',
+    position: 'top'
+  })
+}
 
 onUnmounted(() => objectUrls.forEach(u => URL.revokeObjectURL(u)))
 
@@ -1382,6 +1453,10 @@ async function abrirNotaDialog (nota) {
   registrosCampo.value = regs
   carregandoCampo.value = false
 
+  servicoEquipe2.value = {
+    descricao: salvo?.descricao_servico ?? '',
+    fotos: [...(salvo?.fotos_servico ?? [])]
+  }
   if (salvo) {
     apontamentoId.value = salvo.id
     rascunhoEm.value = salvo.rascunho ? salvo.atualizado_em : null

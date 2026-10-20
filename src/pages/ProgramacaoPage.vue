@@ -302,7 +302,7 @@ const NOME_ARQUIVO = 'PROGRAMAÇÃO SEMANAL EQUIPE PLA.xlsx'
 const ROTULO_SISTEMA = {
   pendente: 'Não Iniciado',
   em_andamento: 'Andamento',
-  baixar_medidor: 'Baixar Medidor',
+  baixar_medidor: 'Auditar',
   concluido: 'Concluído',
   expurgo: 'Expurgo',
   sem_acesso: 'Sem Acesso'
@@ -354,7 +354,7 @@ const GLOSSARIO_PROG = [
 const GLOSSARIO_SIS = [
   ['Não Iniciado', 'nenhum poste registrado ainda.'],
   ['Andamento', 'a equipe começou a obra no campo.'],
-  ['Baixar Medidor', 'obra executada em campo. Falta dar baixa do medidor.'],
+  ['Auditar', 'obra executada em campo. Falta dar baixa do medidor.'],
   ['Concluído', 'obra finalizada no sistema.'],
   ['Expurgo', 'nota expurgada. A obra não será executada.'],
   ['Sem Acesso', 'não foi possível acessar o local.']

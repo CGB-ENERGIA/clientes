@@ -12,17 +12,20 @@
       <label class="eq2-label">Nome da equipe</label>
       <input v-model="equipe" class="eq2-input" placeholder="Ex: EQUIPE BETA" style="text-transform:uppercase" @input="equipe = equipe.toUpperCase()" @change="guardarEquipe" />
 
-      <label class="eq2-label q-mt-md">Notas em andamento</label>
+      <label class="eq2-label q-mt-md">Aguardando medidor</label>
       <input v-model="busca" class="eq2-input" placeholder="Buscar nota, SAP ou município" />
 
       <div v-if="carregando" class="eq2-vazio">Carregando notas…</div>
-      <div v-else-if="!notasLista.length" class="eq2-vazio">Nenhuma nota em andamento para concluir.</div>
-      <button v-for="n in notasLista" :key="n.nota" class="eq2-card" type="button" @click="abrirNota(n)">
+      <div v-else-if="!notasFiltradas.length" class="eq2-vazio">Nenhuma nota aguardando medidor.</div>
+      <button v-for="n in notasFiltradas" :key="n.nota" class="eq2-card" type="button" @click="abrirNota(n)">
         <div class="eq2-card-top">
           <b>{{ n.projeto_info_sap || n.nota }}</b>
-          <span class="eq2-chip">{{ n.postes_campo }} {{ n.postes_campo === 1 ? 'poste' : 'postes' }}</span>
+          <span class="eq2-chip">{{ n.postes }} {{ n.postes === 1 ? 'poste' : 'postes' }}</span>
         </div>
-        <div class="eq2-card-sub">{{ n.municipio || n.base }} · {{ n.clientes_planilha?.length || 0 }} clientes</div>
+        <div class="eq2-card-sub">
+          {{ n.municipio || n.base }} · {{ n.clientes_planilha?.length || 0 }} clientes
+          <span v-if="n.rascunho"> · rascunho salvo</span>
+        </div>
       </button>
     </section>
 
@@ -38,10 +41,17 @@
         <div class="eq2-titulo">Serviço realizado</div>
         <label class="eq2-label">Descrição do serviço</label>
         <textarea v-model="descricao" class="eq2-input eq2-textarea" rows="3" placeholder="Descreva o serviço executado" />
-        <label class="eq2-label q-mt-md">Foto do serviço</label>
-        <label class="eq2-foto" :class="{ 'eq2-foto--ok': fotoServico }">
-          <img v-if="fotoServico" :src="fotoServico" alt="Foto do serviço" />
-          <span v-else><q-icon name="photo_camera" size="24px" /> Tirar foto do serviço</span>
+        <label class="eq2-label q-mt-md">Fotos do serviço</label>
+        <div v-if="fotosServico.length" class="eq2-fotos">
+          <div v-for="(url, i) in fotosServico" :key="url" class="eq2-foto-item">
+            <img :src="url" alt="Foto do serviço" />
+            <button class="eq2-foto-x" type="button" aria-label="Remover foto" :disabled="enviando" @click="removerFotoServico(i)">
+              <q-icon name="close" size="14px" />
+            </button>
+          </div>
+        </div>
+        <label class="eq2-foto">
+          <span><q-icon name="photo_camera" size="24px" /> {{ fotosServico.length ? 'Adicionar outra foto' : 'Tirar foto do serviço' }}</span>
           <input type="file" accept="image/*" capture="environment" hidden :disabled="enviando" @change="fotoDoServico" />
         </label>
       </div>
@@ -67,7 +77,7 @@
       <div class="eq2-acoes">
         <button class="eq2-btn eq2-btn--sec" type="button" :disabled="enviando" @click="salvar(false)">Salvar rascunho</button>
         <button class="eq2-btn eq2-btn--ok" type="button" :disabled="enviando || !prontoParaEnviar" @click="salvar(true)">
-          <q-spinner v-if="enviando" size="18px" /> Enviar para Baixar Medidor
+          <q-spinner v-if="enviando" size="18px" /> Enviar para auditoria
         </button>
       </div>
       <div v-if="!prontoParaEnviar" class="eq2-dica">Para enviar: descreva e fotografe o serviço e informe medidor e foto de cada cliente.</div>
@@ -79,40 +89,36 @@
 import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { supabase } from 'boot/supabase'
-import { useNotasStore } from 'stores/notas'
 
 const $q = useQuasar()
-const notasStore = useNotasStore()
 
 const EQUIPE_KEY = 'cgb_equipe2_nome'
 const equipe = ref(localStorage.getItem(EQUIPE_KEY) || '')
 const busca = ref('')
 const carregando = ref(false)
 const enviando = ref(false)
-const comPostes = ref(new Map())
+const notas = ref([])
 
 const notaAtiva = ref(null)
 const descricao = ref('')
-const fotoServico = ref('')
+const fotosServico = ref([])
 const clientes = ref([])
 
-const notasLista = computed(() => {
+const notasFiltradas = computed(() => {
   const q = busca.value.trim().toLowerCase()
-  return notasStore.notas
-    .filter(n => n.status === 'em_andamento' && comPostes.value.has(n.nota))
-    .map(n => ({ ...n, postes_campo: comPostes.value.get(n.nota) }))
-    .filter(n => !q || [n.nota, n.projeto_info_sap, n.municipio, n.base].some(v => String(v ?? '').toLowerCase().includes(q)))
-    .sort((a, b) => String(a.projeto_info_sap || a.nota).localeCompare(String(b.projeto_info_sap || b.nota)))
+  return notas.value.filter(n =>
+    !q || [n.nota, n.projeto_info_sap, n.municipio, n.base].some(v => String(v ?? '').toLowerCase().includes(q))
+  )
 })
 
-const postesCampo = computed(() => comPostes.value.get(notaAtiva.value?.nota) ?? 0)
+const postesCampo = computed(() => notaAtiva.value?.postes ?? 0)
 const clientesProntos = computed(() => clientes.value.filter(c => c.medidor.trim() && c.foto).length)
 const prontoParaEnviar = computed(() =>
-  !!descricao.value.trim() && !!fotoServico.value && clientes.value.length > 0 && clientesProntos.value === clientes.value.length
+  !!descricao.value.trim() && fotosServico.value.length > 0 && clientes.value.length > 0 && clientesProntos.value === clientes.value.length
 )
 
 const MENSAGENS = {
-  NOTA_NAO_EM_ANDAMENTO: 'Esta nota não está mais em andamento.',
+  NOTA_NAO_AGUARDANDO_MEDIDOR: 'Esta nota não está mais aguardando medidor.',
   SEM_POSTES_REGISTRADOS: 'Esta nota ainda não tem postes registrados pela equipe de campo.',
   SERVICO_INCOMPLETO: 'Informe a descrição e a foto do serviço.',
   CLIENTES_INCOMPLETOS: 'Ainda faltam clientes desta nota.',
@@ -125,9 +131,9 @@ function guardarEquipe () {
 
 async function carregarNotas () {
   carregando.value = true
-  await notasStore.fetchNotas()
-  const { data } = await supabase.rpc('campo_resumo_notas')
-  comPostes.value = new Map((data || []).map(r => [r.nota, Number(r.total) || 0]))
+  const { data, error } = await supabase.rpc('equipe2_listar')
+  if (error) $q.notify({ type: 'negative', message: 'Não foi possível carregar as notas: ' + error.message, position: 'top' })
+  notas.value = data || []
   carregando.value = false
 }
 
@@ -139,13 +145,18 @@ async function enviarFoto (file, bucket, caminho) {
   return supabase.storage.from(bucket).getPublicUrl(caminho).data.publicUrl
 }
 
+function removerFotoServico (i) {
+  fotosServico.value = fotosServico.value.filter((_, k) => k !== i)
+}
+
 async function fotoDoServico (e) {
   const file = e.target.files?.[0]
   e.target.value = ''
   if (!file) return
   enviando.value = true
   try {
-    fotoServico.value = await enviarFoto(file, 'campo-fotos', `servico/${notaAtiva.value.nota}/${crypto.randomUUID()}.jpg`)
+    const url = await enviarFoto(file, 'campo-fotos', `servico/${notaAtiva.value.nota}/${crypto.randomUUID()}.jpg`)
+    fotosServico.value = [...fotosServico.value, url]
   } catch (err) {
     $q.notify({ type: 'negative', message: 'Não foi possível enviar a foto: ' + err.message, position: 'top' })
   } finally {
@@ -170,7 +181,7 @@ async function fotoDoMedidor (c, e) {
 async function abrirNota (n) {
   notaAtiva.value = n
   descricao.value = ''
-  fotoServico.value = ''
+  fotosServico.value = []
   clientes.value = (n.clientes_planilha || []).map((c, i) => ({
     chave: c.conta_contrato || `${i}`,
     nome: c.nome,
@@ -182,7 +193,7 @@ async function abrirNota (n) {
 
   const { data } = await supabase.rpc('equipe2_carregar', { p_nota: n.nota })
   if (data?.descricao) descricao.value = data.descricao
-  if (data?.foto_servico) fotoServico.value = data.foto_servico
+  if (data?.fotos_servico?.length) fotosServico.value = data.fotos_servico
   for (const salvo of data?.clientes || []) {
     const c = clientes.value.find(x => x.conta && x.conta === salvo.conta_contrato)
     if (c) { c.medidor = salvo.num_medidor || ''; c.foto = salvo.foto_url || '' }
@@ -207,14 +218,14 @@ async function salvar (concluir) {
     const { error } = await supabase.rpc('equipe2_salvar', {
       p_nota: notaAtiva.value.nota,
       p_descricao: descricao.value.trim(),
-      p_foto_servico: fotoServico.value || null,
+      p_fotos_servico: fotosServico.value,
       p_clientes: payload,
       p_concluir: concluir
     })
     if (error) throw error
     $q.notify({
       type: 'positive', position: 'top',
-      message: concluir ? 'Enviado para Baixar Medidor.' : 'Rascunho salvo.'
+      message: concluir ? 'Enviado para auditoria.' : 'Rascunho salvo.'
     })
     if (concluir) voltarLista()
   } catch (err) {
@@ -253,7 +264,10 @@ onMounted(carregarNotas)
 .eq2-titulo small { font-size: 12px; color: rgba(255,255,255,0.5); font-weight: 700; }
 .eq2-foto { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 110px; border-radius: 14px; border: 2px dashed rgba(255,255,255,0.18); color: rgba(255,255,255,0.6); cursor: pointer; overflow: hidden; font-size: 14px; }
 .eq2-foto img { width: 100%; max-height: 260px; object-fit: cover; display: block; }
-.eq2-foto--ok { border-style: solid; border-color: #43a047; }
+.eq2-fotos { display: flex; flex-wrap: wrap; gap: 8px; }
+.eq2-foto-item { position: relative; width: 96px; height: 96px; border-radius: 12px; overflow: hidden; border: 2px solid #43a047; }
+.eq2-foto-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.eq2-foto-x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .eq2-foto--mini { min-height: 46px; width: 56px; flex-shrink: 0; border-radius: 12px; }
 .eq2-foto--mini img { height: 46px; }
 .eq2-cliente { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
