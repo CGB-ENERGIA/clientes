@@ -648,15 +648,15 @@
               <template v-else>
                 Nota em <b>{{ labelStatus(notaAtiva.status) }}</b>.
               </template>
-              Você pode preencher e salvar como rascunho; a conclusão é liberada quando a nota estiver em <b>Auditar</b>.
+              Você pode preencher e salvar como rascunho; a conclusão é liberada quando a nota estiver em <b>Aguardando Etapa 2</b> ou <b>Auditar</b>.
             </div>
             <q-btn
               v-if="['pendente', 'em_andamento'].includes(notaAtiva.status)"
-              label="Enviar para auditoria"
+              label="Enviar para Etapa 2"
               icon="speed"
               color="blue-7"
               outline dense size="sm"
-              @click="alterarStatus('baixar_medidor')"
+              @click="alterarStatus('aguardando_etapa2')"
             >
               <q-tooltip>Use quando a equipe concluiu o campo mas não finalizou pelo app</q-tooltip>
             </q-btn>
@@ -977,7 +977,7 @@
               @click="salvar(false)"
             />
             <q-tooltip v-if="!podeConcluir" class="text-body2">
-              Só notas em "Auditar" podem ser concluídas. Esta nota está em "{{ labelStatus(notaAtiva?.status) }}".
+              Só notas em "Aguardando Etapa 2" ou "Auditar" podem ser concluídas. Esta nota está em "{{ labelStatus(notaAtiva?.status) }}".
             </q-tooltip>
           </div>
         </q-card-actions>
@@ -1029,6 +1029,7 @@ const basesOptions = computed(() =>
 const statusOptions = [
   { label: 'Não Iniciado',   value: 'pendente'       },
   { label: 'Andamento',      value: 'em_andamento'   },
+  { label: 'Aguardando Etapa 2', value: 'aguardando_etapa2' },
   { label: 'Auditar', value: 'baixar_medidor' },
   { label: 'Concluído',      value: 'concluido'      },
   { label: 'Expurgo',        value: 'expurgo'        },
@@ -1064,7 +1065,7 @@ function limparFiltros () {
 }
 
 // ── Prioridade de status (menor índice = mais urgente) ───────────
-const STATUS_PRIO = ['em_andamento', 'baixar_medidor', 'pendente', 'expurgo', 'sem_acesso', 'concluido']
+const STATUS_PRIO = ['em_andamento', 'aguardando_etapa2', 'baixar_medidor', 'pendente', 'expurgo', 'sem_acesso', 'concluido']
 
 // ── Agrupa notas pelo PROJETO SAP (ou nota individual se não tiver) ─
 const todasAgrupadas = computed(() => {
@@ -1151,6 +1152,7 @@ const contadores = computed(() => {
     todas:          gs.length,
     pendente:       gs.filter(g => g.status === 'pendente').length,
     em_andamento:   gs.filter(g => g.status === 'em_andamento').length,
+    aguardando_etapa2: gs.filter(g => g.status === 'aguardando_etapa2').length,
     baixar_medidor: gs.filter(g => g.status === 'baixar_medidor').length,
     concluido:      gs.filter(g => g.status === 'concluido').length,
     expurgo:        gs.filter(g => g.status === 'expurgo').length,
@@ -1162,6 +1164,7 @@ const tabs = computed(() => [
   { val: 'todas',          label: 'Geral',          icon: 'apps',         count: contadores.value.todas },
   { val: 'pendente',       label: 'Não Iniciado',   icon: 'schedule',     count: contadores.value.pendente },
   { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', count: contadores.value.em_andamento },
+  { val: 'aguardando_etapa2', label: 'Aguardando Etapa 2', icon: 'hourglass_empty', count: contadores.value.aguardando_etapa2 },
   { val: 'baixar_medidor', label: 'Auditar', icon: 'speed',        count: contadores.value.baixar_medidor },
   { val: 'concluido',      label: 'Concluídos',     icon: 'check_circle', count: contadores.value.concluido }
 ])
@@ -1226,6 +1229,7 @@ const semNotasMsg = computed(() => {
   const labels = {
     pendente:       'Não Iniciadas',
     em_andamento:   'em Andamento',
+    aguardando_etapa2: 'aguardando a Etapa 2',
     baixar_medidor: 'para auditoria',
     concluido:      'Concluídas',
     expurgo:        'com Expurgo',
@@ -1237,6 +1241,7 @@ const semNotasMsg = computed(() => {
 const statusOpcoes = [
   { val: 'pendente',       label: 'Não Iniciado',   icon: 'schedule',     color: 'grey-6'  },
   { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', color: 'orange'  },
+  { val: 'aguardando_etapa2', label: 'Aguardando Etapa 2', icon: 'hourglass_empty', color: 'purple' },
   { val: 'baixar_medidor', label: 'Auditar', icon: 'speed',        color: 'blue'    },
   { val: 'concluido',      label: 'Concluído',      icon: 'check_circle', color: 'positive'},
 ]
@@ -1244,6 +1249,7 @@ const statusOpcoes = [
 const statusLegenda = [
   { val: 'pendente',       label: 'Não Iniciado',   icon: 'schedule',     color: 'grey-6',   desc: 'Nota importada, mas a equipe de campo ainda não registrou nenhum poste.' },
   { val: 'em_andamento',   label: 'Andamento',      icon: 'construction', color: 'orange',   desc: 'A equipe registrou postes pelo app de campo ou pausou com "Concluir mais tarde". Aguarda a equipe finalizar a nota.' },
+  { val: 'aguardando_etapa2', label: 'Aguardando Etapa 2', icon: 'hourglass_empty', color: 'purple', desc: 'Campo finalizado no app. Falta a equipe 2 registrar a descrição, as fotos do serviço, o Nº do medidor e a foto de cada cliente.' },
   { val: 'baixar_medidor', label: 'Auditar', icon: 'speed',        color: 'blue',     desc: 'Campo finalizado no app (ou cliente ligado na planilha). Falta registrar o Nº do medidor e a foto de cada cliente.' },
   { val: 'concluido',      label: 'Concluído',      icon: 'check_circle', color: 'positive', desc: 'Medidores registrados na Etapa 2 (ou finalizado no CCS). Nenhuma ação pendente.' },
   { val: 'expurgo',        label: 'Expurgo',        icon: 'block',        color: 'negative', desc: 'Nota marcada como EXPURGO na planilha. Não será executada.' },
@@ -1313,6 +1319,7 @@ function labelStatus (s) {
   return {
     pendente:       'Não Iniciado',
     em_andamento:   'Andamento',
+    aguardando_etapa2: 'Aguardando Etapa 2',
     baixar_medidor: 'Auditar',
     concluido:      'Concluído',
     expurgo:        'Expurgo',
@@ -1349,7 +1356,7 @@ const servicoSalvando  = ref(false)
 const fotoServicoInput = ref(null)
 
 const temServicoEquipe2 = computed(() =>
-  !!notaAtiva.value && ['baixar_medidor', 'concluido'].includes(notaAtiva.value.status)
+  !!notaAtiva.value && ['aguardando_etapa2', 'baixar_medidor', 'concluido'].includes(notaAtiva.value.status)
 )
 
 async function adicionarFotoServico (file) {
@@ -1559,7 +1566,7 @@ async function removerBadge (g) {
   if (error) $q.notify({ type: 'negative', message: 'Erro ao remover marca: ' + error.message })
 }
 
-const podeConcluir = computed(() => ['baixar_medidor', 'concluido'].includes(notaAtiva.value?.status))
+const podeConcluir = computed(() => ['aguardando_etapa2', 'baixar_medidor', 'concluido'].includes(notaAtiva.value?.status))
 
 async function salvar (rascunho = false) {
   const n = notaAtiva.value
@@ -1865,6 +1872,7 @@ notasStore.fetchNotas()
 .nc-status--pendente       { background: #f5f5f5;  color: #757575; }
 .nc-status--em_andamento   { background: #fff3e0;  color: #e65100; }
 .nc-status--baixar_medidor { background: #e3f2fd;  color: #1565c0; }
+.nc-status--aguardando_etapa2 { background: #f3e5f5; color: #6a1b9a; }
 .nc-status--concluido      { background: #e8f5e9;  color: #2e7d32; }
 .nc-status--expurgo        { background: #fce4ec;  color: #b71c1c; }
 .nc-status--sem_acesso     { background: #f3e5f5;  color: #6a1b9a; }

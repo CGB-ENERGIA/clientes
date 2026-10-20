@@ -302,6 +302,7 @@ const NOME_ARQUIVO = 'PROGRAMAÇÃO SEMANAL EQUIPE PLA.xlsx'
 const ROTULO_SISTEMA = {
   pendente: 'Não Iniciado',
   em_andamento: 'Andamento',
+  aguardando_etapa2: 'Aguardando Etapa 2',
   baixar_medidor: 'Auditar',
   concluido: 'Concluído',
   expurgo: 'Expurgo',

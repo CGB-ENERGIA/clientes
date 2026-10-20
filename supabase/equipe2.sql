@@ -8,7 +8,7 @@ DROP FUNCTION IF EXISTS public.equipe2_carregar(text);
 DROP FUNCTION IF EXISTS public.equipe2_salvar(text, jsonb, boolean);
 DROP FUNCTION IF EXISTS public.equipe2_salvar(text, text, text, jsonb, boolean);
 
--- Notas que a equipe 1 finalizou (Baixar Medidor / Auditar) e cuja Etapa 2 ainda não foi concluída
+-- Notas que a equipe 1 finalizou (aguardando Etapa 2) e cuja Etapa 2 ainda não foi concluída
 CREATE OR REPLACE FUNCTION public.equipe2_listar()
 RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
   SELECT coalesce(jsonb_agg(s.x ORDER BY s.x->>'projeto_info_sap', s.x->>'nota'), '[]'::jsonb)
@@ -25,7 +25,7 @@ RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
     ) AS x
     FROM public.notas_servico n
     WHERE n.ativo
-      AND n.status = 'baixar_medidor'
+      AND n.status = 'aguardando_etapa2'
       AND EXISTS (SELECT 1 FROM public.campo_registros c WHERE c.nota = n.nota)
       AND NOT EXISTS (SELECT 1 FROM public.apontamentos a WHERE a.nota = n.nota AND NOT a.rascunho)
   ) s
@@ -46,7 +46,7 @@ RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
     '{}'::jsonb)
 $$;
 
--- Salva o rascunho ou conclui a Etapa 2. A nota continua em Baixar Medidor (Auditar).
+-- Salva o rascunho ou conclui a Etapa 2. Concluir leva a nota para Auditar (baixar_medidor).
 CREATE OR REPLACE FUNCTION public.equipe2_salvar(
   p_nota text, p_descricao text, p_fotos_servico jsonb, p_clientes jsonb, p_concluir boolean)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -60,7 +60,7 @@ DECLARE
 BEGIN
   SELECT * INTO n FROM public.notas_servico WHERE nota = p_nota AND ativo;
   IF NOT FOUND THEN RAISE EXCEPTION 'NOTA_NAO_ENCONTRADA'; END IF;
-  IF n.status <> 'baixar_medidor' THEN RAISE EXCEPTION 'NOTA_NAO_AGUARDANDO_MEDIDOR'; END IF;
+  IF n.status <> 'aguardando_etapa2' THEN RAISE EXCEPTION 'NOTA_NAO_AGUARDANDO_ETAPA2'; END IF;
 
   SELECT count(*)::int, coalesce(array_agg(c.pg_numero ORDER BY c.created_at), '{}'::text[])
     INTO v_postes, v_pgs
@@ -118,6 +118,10 @@ BEGIN
   INSERT INTO public.clientes (nome, padrao, conta_contrato, num_medidor, foto_url, apontamento_id)
   SELECT c->>'nome', coalesce(c->>'padrao', ''), c->>'conta_contrato', c->>'num_medidor', c->>'foto_url', v_apid
   FROM jsonb_array_elements(p_clientes) c;
+
+  IF p_concluir THEN
+    UPDATE public.notas_servico SET status = 'baixar_medidor', updated_at = now() WHERE nota = p_nota;
+  END IF;
 
   RETURN jsonb_build_object('ok', true, 'rascunho', NOT p_concluir, 'postes', v_postes);
 END $$;

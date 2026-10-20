@@ -600,7 +600,7 @@ function finalizarNota () {
     message: `${total} ${total === 1 ? 'poste registrado' : 'postes registrados'}` +
       (postesPrevistos.value ? ` de ${postesPrevistos.value} previstos` : '') + '. ' +
       (faltam ? `Ainda faltam ${faltam} poste(s) previsto(s). ` : '') +
-      'A nota seguirá para "Auditar" no sistema e sairá da lista "Continuar de onde parou". ' +
+      'A nota seguirá para a Etapa 2 (equipe 2) no sistema e sairá da lista "Continuar de onde parou". ' +
       'Se ainda for voltar ao local, use "Concluir mais tarde".',
     cancel: { label: 'Voltar', flat: true },
     ok: { label: 'Finalizar', color: 'positive', unelevated: true }
@@ -610,8 +610,8 @@ function finalizarNota () {
     $q.notify({
       type: enviado ? 'positive' : 'warning',
       message: enviado
-        ? `Nota ${nota} finalizada e enviada para auditoria.`
-        : `Nota ${nota} finalizada. Será enviada para auditoria quando todos os postes subirem — não desinstale o app.`,
+        ? `Nota ${nota} finalizada e enviada para a Etapa 2.`
+        : `Nota ${nota} finalizada. Seguirá para a Etapa 2 quando todos os postes subirem — não desinstale o app.`,
       position: 'top', timeout: enviado ? 2500 : 6000
     })
     avisarProxima()

@@ -372,7 +372,7 @@ async function onFile (e) {
 }
 
 const STATUS_LABEL = {
-  pendente: 'Não Iniciado', em_andamento: 'Andamento', baixar_medidor: 'Auditar',
+  pendente: 'Não Iniciado', em_andamento: 'Andamento', aguardando_etapa2: 'Aguardando Etapa 2', baixar_medidor: 'Auditar',
   concluido: 'Concluído', expurgo: 'Expurgo', sem_acesso: 'Sem Acesso'
 }
 

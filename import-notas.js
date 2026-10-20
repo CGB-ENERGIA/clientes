@@ -112,7 +112,7 @@ for (const r of dados) {
   else if (retorno === 'SEM ACESSO')    statusPlanilha = 'sem_acesso'
   else if (statusCcs === 'FINL')        statusPlanilha = 'concluido'
   else if (ligado  && baixado)          statusPlanilha = 'concluido'
-  else if (ligado  && !baixado)         statusPlanilha = 'baixar_medidor'
+  else if (ligado  && !baixado)         statusPlanilha = 'aguardando_etapa2'
   else                                  statusPlanilha = 'pendente'
 
   const postesVal = colPoste ? Number(r[colPoste] || 0) : 0
@@ -152,7 +152,7 @@ for (const r of dados) {
 
 const records = Object.values(porNota)
 const contar = s => records.filter(r => r.status_planilha === s).length
-console.log(`   ↳ ${contar('pendente')} pendente | ${contar('baixar_medidor')} baixar-medidor | ${contar('concluido')} concluído | ${contar('expurgo')} expurgo | ${contar('sem_acesso')} sem acesso`)
+console.log(`   ↳ ${contar('pendente')} pendente | ${contar('aguardando_etapa2')} aguardando-etapa2 | ${contar('baixar_medidor')} auditar | ${contar('concluido')} concluído | ${contar('expurgo')} expurgo | ${contar('sem_acesso')} sem acesso`)
 console.log(`✅  ${records.length} notas encontradas`)
 
 records.slice(0, 3).forEach(r => {

@@ -434,6 +434,7 @@ const ESQUEMAS = {
   sistema: [
     { val: 'pendente',       label: 'Não Iniciado',   cor: '#9e9e9e' },
     { val: 'em_andamento',   label: 'Andamento',      cor: '#fb8c00' },
+    { val: 'aguardando_etapa2', label: 'Aguardando Etapa 2', cor: '#8e24aa' },
     { val: 'baixar_medidor', label: 'Auditar', cor: '#1976d2' },
     { val: 'concluido',      label: 'Concluído',      cor: '#43a047' },
     { val: 'expurgo',        label: 'Expurgo',        cor: '#e53935' },
@@ -555,7 +556,7 @@ const distanciaSelecionado = computed(() => {
 })
 
 function resumoArea (notas) {
-  const abertas = notas.filter(n => ['pendente', 'em_andamento', 'baixar_medidor'].includes(n.status)).length
+  const abertas = notas.filter(n => ['pendente', 'em_andamento', 'aguardando_etapa2', 'baixar_medidor'].includes(n.status)).length
   return `${notas.length} ${notas.length === 1 ? 'nota' : 'notas'} · ${abertas} em aberto`
 }
 

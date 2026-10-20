@@ -366,7 +366,7 @@ const emAndamento = computed(() => {
   return notas.value
     .filter(n => (resumoPorNota.value.has(n.nota) || pausadas.has(n.nota) || pendentes[n.nota]) &&
                  !finalizadas.has(n.nota) &&
-                 !['baixar_medidor', 'concluido', 'expurgo', 'sem_acesso'].includes(n.status))
+                 !['aguardando_etapa2', 'baixar_medidor', 'concluido', 'expurgo', 'sem_acesso'].includes(n.status))
     .map(n => {
       const r = resumoPorNota.value.get(n.nota)
       const p = pausadas.get(n.nota)
@@ -499,7 +499,7 @@ function abrirImprevisto () {
 // ── Meu dia ──────────────────────────────────────────────────────
 const ICONE_ESTADO = { pendente: 'radio_button_unchecked', atual: 'play_circle', pausada: 'pause_circle', concluida: 'check_circle', imprevisto: 'report_problem' }
 const ROTULO_ESTADO = { pendente: 'a fazer', atual: 'em andamento', pausada: 'pausada', concluida: 'concluída', imprevisto: 'imprevisto' }
-const NOTA_FINALIZADA = ['baixar_medidor', 'concluido', 'expurgo', 'sem_acesso']
+const NOTA_FINALIZADA = ['aguardando_etapa2', 'baixar_medidor', 'concluido', 'expurgo', 'sem_acesso']
 
 const minhaPos   = ref(null)
 const otimizando = ref(false)

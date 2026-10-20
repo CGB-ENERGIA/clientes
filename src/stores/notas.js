@@ -18,7 +18,7 @@ export const useNotasStore = defineStore('notas', () => {
     if (c) notas.value = JSON.parse(c)
   } catch {}
 
-  const VALID_STATUSES = new Set(['pendente', 'em_andamento', 'baixar_medidor', 'concluido', 'expurgo', 'sem_acesso'])
+  const VALID_STATUSES = new Set(['pendente', 'em_andamento', 'aguardando_etapa2', 'baixar_medidor', 'concluido', 'expurgo', 'sem_acesso'])
 
   // Notas que receberam ao menos um registro de campo pelo PWA
   const notasViaPwa = ref(new Set())
@@ -163,7 +163,7 @@ export const useNotasStore = defineStore('notas', () => {
           else if (retorno2 === 'SEM ACESSO') statusPlanilha = 'sem_acesso'
           else if (statusCcs2 === 'FINL')     statusPlanilha = 'concluido'
           else if (ligado  && baixado)        statusPlanilha = 'concluido'
-          else if (ligado  && !baixado)       statusPlanilha = 'baixar_medidor'
+          else if (ligado  && !baixado)       statusPlanilha = 'aguardando_etapa2'
           else                                statusPlanilha = 'pendente'
 
           if (!porNota2[nota]) {
