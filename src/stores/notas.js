@@ -22,6 +22,8 @@ export const useNotasStore = defineStore('notas', () => {
 
   // Notas que receberam ao menos um registro de campo pelo PWA
   const notasViaPwa = ref(new Set())
+  // Por nota: equipe que iniciou no PWA, data do primeiro e do último registro
+  const campoInicio = ref(new Map())
   // Notas com Etapa 2 salva como rascunho ("continuar depois")
   const notasComRascunho = ref(new Set())
   // Imprevistos em aberto reportados pelo PWA, agrupados por nota (mais recente primeiro)
@@ -62,7 +64,8 @@ export const useNotasStore = defineStore('notas', () => {
         .order('nota')),
       fetchAll(() => supabase
         .from('campo_registros')
-        .select('nota')
+        .select('nota, equipe, created_at')
+        .order('created_at')
         .order('id')),
       fetchAll(() => supabase
         .from('apontamentos')
@@ -70,7 +73,16 @@ export const useNotasStore = defineStore('notas', () => {
         .eq('rascunho', true)
         .order('id'))
     ])
-    if (regs) notasViaPwa.value = new Set(regs.map(r => r.nota))
+    if (regs) {
+      notasViaPwa.value = new Set(regs.map(r => r.nota))
+      const info = new Map()
+      for (const r of regs) {
+        const atual = info.get(r.nota)
+        if (!atual) info.set(r.nota, { equipe: r.equipe || '', inicio: r.created_at, ultimo: r.created_at })
+        else atual.ultimo = r.created_at
+      }
+      campoInicio.value = info
+    }
     if (rascunhos) notasComRascunho.value = new Set(rascunhos.map(r => r.nota))
     if (!error && data) {
       // Corrige status inválidos no banco (valores legados como 'ligar_campo')
@@ -311,5 +323,5 @@ export const useNotasStore = defineStore('notas', () => {
     return data ?? []
   }
 
-  return { notas, notasViaPwa, notasComRascunho, imprevistosAbertos, resolverImprevistos, loading, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo, apagarNotas, removerMarcaApagada }
+  return { notas, notasViaPwa, campoInicio, notasComRascunho, imprevistosAbertos, resolverImprevistos, loading, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo, apagarNotas, removerMarcaApagada }
 })

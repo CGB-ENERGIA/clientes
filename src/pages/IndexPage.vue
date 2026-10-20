@@ -134,8 +134,29 @@
           <template #prepend><q-icon name="flag" size="16px" /></template>
         </q-select>
 
+        <q-select
+          v-model="ordemInicio"
+          :options="ordemOptions"
+          label="Ordem (início PWA)"
+          dense outlined clearable
+          emit-value map-options
+          style="min-width:180px"
+        >
+          <template #prepend><q-icon name="swap_vert" size="16px" /></template>
+        </q-select>
+
+        <q-input
+          v-model="dataInicio"
+          type="date"
+          label="Início no PWA"
+          dense outlined clearable
+          style="min-width:170px"
+        >
+          <template #prepend><q-icon name="event" size="16px" /></template>
+        </q-input>
+
         <q-btn
-          v-if="filtro || filtroBase || filtroPostes || filtroClientes || filtroStatus"
+          v-if="filtro || filtroBase || filtroPostes || filtroClientes || filtroStatus || ordemInicio || dataInicio"
           flat dense icon="filter_alt_off"
           color="grey-6" size="sm"
           @click="limparFiltros"
@@ -259,6 +280,9 @@
           <div class="lista-status">
             <span class="nc-status" :class="'nc-status--' + n.status">
               <span class="nc-status-dot" />{{ labelStatus(n.status) }}
+            </span>
+            <span v-if="n._equipeInicio" class="lista-equipe">
+              <q-icon name="groups" size="12px" /> {{ n._equipeInicio }} · {{ formatarDataCurta(n._inicio) }}
             </span>
             <span v-if="n._imprevistos.length" class="badge-imprevisto">
               <q-icon name="report_problem" size="11px" /> Imprevisto
@@ -986,12 +1010,30 @@ const statusOptions = [
   { label: 'Sem Acesso',     value: 'sem_acesso'     },
 ]
 
+const ordemInicio = ref(null)
+const dataInicio  = ref(null)
+const ordemOptions = [
+  { label: 'Mais recentes', value: 'recentes' },
+  { label: 'Mais antigos',  value: 'antigos'  }
+]
+
+function diaLocal (iso) {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function formatarDataCurta (iso) {
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+}
+
 function limparFiltros () {
   filtro.value           = ''
   filtroBase.value       = null
   filtroPostes.value     = null
   filtroClientes.value   = null
   filtroStatus.value     = null
+  ordemInicio.value      = null
+  dataInicio.value       = null
   somenteValidadas.value = false
   somenteImprevistos.value = false
 }
@@ -1040,6 +1082,10 @@ const todasAgrupadas = computed(() => {
     g._apagada  = g._notas.some(n => n.apagada)
     g._rascunho = g.status !== 'concluido' && g._notas.some(n => notasStore.notasComRascunho.has(n.nota))
     g._imprevistos = g._notas.flatMap(n => notasStore.imprevistosAbertos.get(n.nota) || [])
+    const inicios = g._notas.map(n => notasStore.campoInicio.get(n.nota)).filter(Boolean)
+    const primeiro = inicios.reduce((a, b) => (!a || b.inicio < a.inicio ? b : a), null)
+    g._inicio       = primeiro?.inicio ?? null
+    g._equipeInicio = primeiro?.equipe ?? ''
   }
   return [...grupos.values()]
 })
@@ -1134,6 +1180,18 @@ const notasFiltradas = computed(() => {
   }
 
   if (filtroStatus.value) lista = lista.filter(g => g.status === filtroStatus.value)
+
+  if (dataInicio.value) lista = lista.filter(g => g._inicio && diaLocal(g._inicio) === dataInicio.value)
+
+  if (ordemInicio.value) {
+    const sinal = ordemInicio.value === 'recentes' ? -1 : 1
+    lista = [...lista].sort((a, b) => {
+      if (!a._inicio && !b._inicio) return 0
+      if (!a._inicio) return 1
+      if (!b._inicio) return -1
+      return sinal * (a._inicio < b._inicio ? -1 : a._inicio > b._inicio ? 1 : 0)
+    })
+  }
 
   return lista
 })
@@ -1829,6 +1887,8 @@ notasStore.fetchNotas()
 .info-destaque--cliente { background: #e8f5e9; color: #2e7d32; box-shadow: 0 0 6px rgba(46,125,50,0.3); }
 .lista-status { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; }
 .lista-status .badge-apagada { margin-left: 0; }
+.lista-equipe { display: inline-flex; align-items: center; gap: 3px; width: 100%; justify-content: center; font-size: 11px; font-weight: 700; color: #5d4037; background: #fff8e1; border-radius: 8px; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.body--dark .lista-equipe { background: rgba(255,202,40,0.12); color: #ffe082; }
 .lista-acao { display: flex; justify-content: center; align-items: center; gap: 2px; }
 
 @media (max-width: 700px) {
