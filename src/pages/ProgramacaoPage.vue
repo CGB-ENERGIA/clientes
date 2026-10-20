@@ -512,6 +512,7 @@ const gruposMapa = computed(() => {
         postes: n.postes,
         qtd_clientes: n.qtd_clientes,
         status: l.status_programacao,
+        data_programada: l.data_programada,
         latitude: n.latitude,
         longitude: n.longitude
       })

@@ -87,6 +87,14 @@
             </q-select>
           </div>
 
+          <q-input
+            v-if="esquema === 'programacao'"
+            v-model="filtroData"
+            dense outlined clearable type="date"
+            label="Data programada"
+            class="mapa-filtro-data"
+          />
+
           <div class="mapa-legenda">
             <button
               v-for="s in statusVisiveis"
@@ -491,6 +499,12 @@ const semCoordenada = computed(() => todasNotas.value.filter(n => !Number.isFini
 // ── Filtro por área (base / município) ───────────────────────────
 const filtroBase      = ref([])
 const filtroMunicipio = ref(null)
+const hojeISO = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+// Mapa da programação começa mostrando só o dia de hoje; limpar o campo mostra todas as datas
+const filtroData = ref(props.esquema === 'programacao' ? hojeISO() : null)
 const avisoArea       = ref('')
 const areaAtual       = ref(null)
 const buscaMunicipio  = ref('')
@@ -519,6 +533,7 @@ function filtrarMunicipios (val, update) {
 }
 
 const notasDaArea = computed(() => comCoordenada.value.filter(n =>
+  (!filtroData.value || n.data_programada === filtroData.value) &&
   (!filtroBase.value.length || filtroBase.value.includes(n.base)) &&
   (!filtroMunicipio.value || chaveMunicipio(n.municipio) === chaveMunicipio(filtroMunicipio.value))
 ))
@@ -1510,6 +1525,7 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 .mapa-filtros   { display: contents; }
 .mapa-filtro     { width: 162px; }
 .mapa-filtro--mun { width: 206px; }
+.mapa-filtro-data { width: 170px; }
 :deep(.mapa-filtro .q-field__control),
 :deep(.mapa-filtro--mun .q-field__control) {
   border-radius: 22px !important; background: #eef2f9 !important; height: 36px;
