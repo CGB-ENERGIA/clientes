@@ -347,7 +347,7 @@
               />
             </template>
             <q-btn
-              v-if="n.status === 'concluido'"
+              v-if="['em_andamento', 'aguardando_etapa2', 'baixar_medidor', 'concluido'].includes(n.status)"
               icon="delete_outline"
               color="negative"
               flat round dense size="sm"
@@ -456,7 +456,7 @@
             />
             <span v-else class="nc-hint">Não iniciado</span>
             <q-btn
-              v-if="n.status === 'concluido'"
+              v-if="['em_andamento', 'aguardando_etapa2', 'baixar_medidor', 'concluido'].includes(n.status)"
               icon="delete_outline"
               color="negative"
               flat round dense size="sm"
@@ -1543,7 +1543,7 @@ function confirmarApagar (g) {
   const lista = g._notas.map(n => n.nota)
   const alvo  = lista.length > 1 ? `as ${lista.length} notas do projeto ${g.projeto_info_sap}` : `a nota ${lista[0]}`
   $q.dialog({
-    title: 'Apagar nota concluída',
+    title: 'Apagar trabalho da nota',
     message: `Isto vai apagar ${alvo}: postes registrados em campo, clientes, números de medidor e fotos. ` +
              'Ela voltará para "Não Iniciado" com a marca "Apagada". Esta ação não pode ser desfeita.',
     cancel: { label: 'Cancelar', flat: true, color: 'grey-7' },
