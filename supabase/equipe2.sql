@@ -53,7 +53,7 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   n record;
   v_postes int;
-  v_pgs jsonb;
+  v_pgs text[];
   v_apid uuid;
   v_esperados int;
   v_atendidos int;
@@ -62,7 +62,7 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'NOTA_NAO_ENCONTRADA'; END IF;
   IF n.status <> 'baixar_medidor' THEN RAISE EXCEPTION 'NOTA_NAO_AGUARDANDO_MEDIDOR'; END IF;
 
-  SELECT count(*)::int, coalesce(jsonb_agg(c.pg_numero ORDER BY c.created_at), '[]'::jsonb)
+  SELECT count(*)::int, coalesce(array_agg(c.pg_numero ORDER BY c.created_at), '{}'::text[])
     INTO v_postes, v_pgs
   FROM public.campo_registros c WHERE c.nota = p_nota;
   IF v_postes = 0 THEN RAISE EXCEPTION 'SEM_POSTES_REGISTRADOS'; END IF;
