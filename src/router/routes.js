@@ -16,6 +16,7 @@ const routes = [
   // ── PWA Campo (sem autenticação Supabase) ─────────────────────
   { path: '/campo', component: () => import('pages/CampoLoginPage.vue'), meta: { public: true } },
   { path: '/campo/registro', component: () => import('pages/CampoPage.vue'), meta: { public: true } },
+  { path: '/campo/equipe2', component: () => import('pages/CampoEquipe2Page.vue'), meta: { public: true } },
   { path: '/:catchAll(.*)*', redirect: '/' }
 ]
 

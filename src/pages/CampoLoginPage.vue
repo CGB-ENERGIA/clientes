@@ -249,6 +249,11 @@
         Reportar imprevisto
       </button>
 
+      <button class="cl-btn-equipe2" type="button" @click="router.push('/campo/equipe2')">
+        <q-icon name="fact_check" size="18px" />
+        Equipe 2: concluir serviço e clientes
+      </button>
+
     </div>
 
     <MapaNotas
@@ -701,6 +706,14 @@ onUnmounted(() => {
   .cl-desloc-mapa { padding: 0 9px; }
 }
 .cl-desloc-sem { font-size: 12px; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 4px; }
+
+.cl-btn-equipe2 {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  border: 1px solid rgba(129,199,132,0.45); border-radius: 14px; padding: 13px;
+  background: rgba(67,160,71,0.12); color: #a5d6a7; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 700;
+}
+.cl-btn-equipe2:active { transform: scale(0.98); }
 
 /* ── Meu dia ── */
 .cl-dia {
