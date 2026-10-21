@@ -1429,12 +1429,25 @@ function abrirRoteiroDoPonto (lat, lng) {
   abrirRoteiroDe([{ id: chavePonto(lat, lng), lat, lng, notas }], L.latLngBounds([[lat, lng]]))
 }
 
-function abrirRoteiro (cluster) {
-  const paradas = cluster.getAllChildMarkers().map(m => {
+function paradasDoCluster (cluster) {
+  return cluster.getAllChildMarkers().map(m => {
     const { lat, lng } = m.getLatLng()
     return { id: chavePonto(lat, lng), lat, lng, notas: m.options.notasPonto ?? [] }
   })
-  abrirRoteiroDe(paradas, cluster.getBounds())
+}
+
+function abrirRoteiro (cluster) {
+  abrirRoteiroDe(paradasDoCluster(cluster), cluster.getBounds())
+}
+
+// Com o roteiro aberto, clicar em outro ponto acrescenta as notas ao roteiro em vez de abrir outro
+function acrescentarAoRoteiro (paradas) {
+  if (!roteiro.value) return
+  const atuais = new Set(roteiro.value.paradas.map(p => p.id))
+  const novas = paradas.filter(p => p.notas.length && !atuais.has(p.id))
+  if (!novas.length) return
+  const total = roteiro.value.paradas.length + novas.length
+  roteiro.value = { ...roteiro.value, paradas: [...roteiro.value.paradas, ...novas], grande: total > LIMITE_ROTEIRO }
 }
 
 async function abrirRoteiroDe (paradas, bounds) {
@@ -1661,7 +1674,9 @@ function desenharMarcadores () {
     const equipe = equipesDe(notas)
     const titulo = notas.length > 1 ? `${notas.length} notas` : `Nota ${principal.nota}`
     if (temHover) m.bindTooltip(equipe ? `${titulo}<br>Equipe ${equipe}` : titulo, { direction: 'top', offset: [0, -6] })
-    m.on('click', () => abrirRoteiroDoPonto(principal.latitude, principal.longitude))
+    m.on('click', () => roteiro.value
+      ? acrescentarAoRoteiro([{ id: chavePonto(principal.latitude, principal.longitude), lat: principal.latitude, lng: principal.longitude, notas }])
+      : abrirRoteiroDoPonto(principal.latitude, principal.longitude))
     marcadores.push(m)
   }
   camadaMarcadores.addLayers ? camadaMarcadores.addLayers(marcadores) : marcadores.forEach(m => m.addTo(camadaMarcadores))
@@ -1743,7 +1758,7 @@ async function montarMapa () {
       chunkedLoading: true
     })
     : L.layerGroup()).addTo(mapa)
-  camadaMarcadores.on('clusterclick', e => abrirRoteiro(e.layer))
+  camadaMarcadores.on('clusterclick', e => roteiro.value ? acrescentarAoRoteiro(paradasDoCluster(e.layer)) : abrirRoteiro(e.layer))
   camadaDestaque = L.layerGroup().addTo(mapa)
   camadaRota = L.layerGroup().addTo(mapa)
   rendererRoteiro = L.svg({ pane: 'roteiroLinha' })
