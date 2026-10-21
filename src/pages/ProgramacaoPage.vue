@@ -402,17 +402,17 @@ const linhasCompletas = computed(() => {
 })
 
 const colCompletas = [
-  { name: 'data', label: 'Data', field: 'data_programada', align: 'left', sortable: true, format: formatarData },
-  { name: 'sap', label: 'Projeto SAP', field: 'sap', align: 'left', sortable: true },
-  { name: 'notaSap', label: 'Nota SAP', field: 'notas_sistema', align: 'left' },
-  { name: 'pep', label: 'PEP', field: 'pep', align: 'left', sortable: true },
-  { name: 'postes', label: 'Poste', field: 'postes', align: 'right', sortable: true, format: v => v ?? '—' },
-  { name: 'municipio', label: 'Município', field: 'municipio', align: 'left', sortable: true },
-  { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'left', sortable: true },
-  { name: 'supervisor', label: 'Supervisor', field: 'supervisor', align: 'left', sortable: true },
-  { name: 'prog', label: 'Programação', field: 'status_programacao', align: 'left', sortable: true },
-  { name: 'sis', label: 'Sistema', field: 'status_sistema', align: 'left', sortable: true },
-  { name: 'ultimo', label: 'Último registro', field: 'ultimo_evento', align: 'left', sortable: true, format: formatarData }
+  { name: 'data', label: 'Data', field: 'data_programada', align: 'center', sortable: true, format: formatarData },
+  { name: 'pep', label: 'PEP', field: 'pep', align: 'center', sortable: true },
+  { name: 'sap', label: 'Projeto SAP', field: 'sap', align: 'center', sortable: true },
+  { name: 'notaSap', label: 'Nota SAP', field: 'notas_sistema', align: 'center' },
+  { name: 'postes', label: 'Poste', field: 'postes', align: 'center', sortable: true, format: v => v ?? '—' },
+  { name: 'municipio', label: 'Município', field: 'municipio', align: 'center', sortable: true },
+  { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center', sortable: true },
+  { name: 'supervisor', label: 'Supervisor', field: 'supervisor', align: 'center', sortable: true },
+  { name: 'prog', label: 'Programação', field: 'status_programacao', align: 'center', sortable: true },
+  { name: 'sis', label: 'Sistema', field: 'status_sistema', align: 'center', sortable: true },
+  { name: 'ultimo', label: 'Último registro', field: 'ultimo_evento', align: 'center', sortable: true, format: formatarData }
 ]
 
 const contagem = computed(() => {
