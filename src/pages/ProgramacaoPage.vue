@@ -269,6 +269,8 @@
         </q-input>
         <q-select v-model="equipeCompleta" dense outlined clearable emit-value map-options :options="equipesOpcoes" label="Equipe" class="prog-filtro" />
         <q-select v-model="statusCompleta" dense outlined clearable emit-value map-options :options="statusOpcoes" label="Programação" class="prog-filtro" />
+        <q-input v-model="dataInicioCompleta" dense outlined clearable type="date" label="Data de" stack-label class="prog-filtro" />
+        <q-input v-model="dataFimCompleta" dense outlined clearable type="date" label="Data até" stack-label class="prog-filtro" />
       </div>
       <div class="prog-muted q-mt-sm">{{ linhasCompletas.length }} de {{ linhas.length }} notas</div>
 
@@ -374,6 +376,8 @@ const colunas = [
 const buscaCompleta = ref('')
 const equipeCompleta = ref(null)
 const statusCompleta = ref(null)
+const dataInicioCompleta = ref(null)
+const dataFimCompleta = ref(null)
 
 const equipesOpcoes = computed(() => [...new Set(linhas.value.map(l => l.equipe).filter(Boolean))]
   .sort()
@@ -385,6 +389,8 @@ const linhasCompletas = computed(() => {
   return linhas.value.filter(l =>
     (!equipeCompleta.value || l.equipe === equipeCompleta.value) &&
     (!statusCompleta.value || l.status_programacao === statusCompleta.value) &&
+    (!dataInicioCompleta.value || (l.data_programada && l.data_programada >= dataInicioCompleta.value)) &&
+    (!dataFimCompleta.value || (l.data_programada && l.data_programada <= dataFimCompleta.value)) &&
     (!q || [l.sap, l.municipio, l.equipe, l.supervisor].some(v => String(v ?? '').toLowerCase().includes(q)))
   )
 })
