@@ -87,13 +87,26 @@
             </q-select>
           </div>
 
-          <q-input
+          <q-select
             v-if="esquema === 'programacao'"
-            v-model="filtroData"
-            dense outlined clearable type="date"
+            v-model="filtroDatas"
+            :options="datasOpcoes"
+            multiple
+            dense outlined clearable
+            :display-value="filtroDatas.length > 1 ? `${filtroDatas.length} datas` : (filtroDatas[0] ? dataBr(filtroDatas[0]) : undefined)"
             label="Data programada"
             class="mapa-filtro-data"
-          />
+            options-dense
+            behavior="menu"
+          >
+            <template #prepend><q-icon name="event" size="18px" /></template>
+            <template #option="{ itemProps, opt }">
+              <q-item v-bind="itemProps" dense>
+                <q-item-section side><q-checkbox :model-value="filtroDatas.includes(opt)" dense color="primary" /></q-item-section>
+                <q-item-section><q-item-label>{{ dataBr(opt) }}</q-item-label></q-item-section>
+              </q-item>
+            </template>
+          </q-select>
           <q-select
             v-if="esquema === 'programacao'"
             v-model="filtroEquipe"
@@ -290,6 +303,51 @@
             </div>
 
             <template v-else>
+              <div class="rot-trecho">
+                <q-select
+                  v-model="rotDe"
+                  :options="opcoesDe"
+                  option-label="rotulo"
+                  option-value="id"
+                  use-input input-debounce="0"
+                  stack-label
+                  dense outlined clearable
+                  behavior="menu"
+                  options-dense
+                  label="De"
+                  placeholder="Minha posição"
+                  class="rot-trecho-campo"
+                  @filter="(val, update) => filtrarPontos('de', val, update)"
+                >
+                  <template #prepend><q-icon name="trip_origin" size="16px" /></template>
+                </q-select>
+                <q-select
+                  v-model="rotPara"
+                  :options="opcoesPara"
+                  option-label="rotulo"
+                  option-value="id"
+                  use-input input-debounce="0"
+                  stack-label
+                  dense outlined clearable
+                  behavior="menu"
+                  options-dense
+                  label="Para"
+                  placeholder="Ordem mais curta"
+                  class="rot-trecho-campo"
+                  @filter="(val, update) => filtrarPontos('para', val, update)"
+                >
+                  <template #prepend><q-icon name="flag" size="16px" /></template>
+                </q-select>
+                <div v-if="rotDe && rotPara" class="rot-dist">
+                  <q-icon name="straighten" size="16px" />
+                  <span>Distância: <b>{{ formatarDistancia(distanciaReta) }}</b> em linha reta</span>
+                  <template v-if="distanciaPorEstrada?.estado === 'ok'">
+                    <span>· <b>{{ formatarDistancia(distanciaPorEstrada.km) }}</b> por estrada ({{ formatarDuracao(distanciaPorEstrada.minutos) }})</span>
+                  </template>
+                  <q-spinner-dots v-else-if="distanciaPorEstrada?.estado === 'carregando'" size="14px" />
+                </div>
+              </div>
+
               <div class="rot-ctrl">
                 <div v-if="rotAtivas.length > 1" class="rot-seg">
                   <button :class="{ 'rot-seg--on': rotOrdem === 'otima' }" @click="rotOrdem = 'otima'">
@@ -298,7 +356,7 @@
                   <button :class="{ 'rot-seg--on': rotOrdem === 'nota' }" @click="rotOrdem = 'nota'">Por nota</button>
                 </div>
                 <q-space v-else />
-                <button v-if="rotAtivas.length > 1" class="rot-ico" title="Inverter sequência" aria-label="Inverter sequência" @click="rotInvertido = !rotInvertido">
+                <button v-if="rotAtivas.length > 1 && !rotDe && !rotPara" class="rot-ico" title="Inverter sequência" aria-label="Inverter sequência" @click="rotInvertido = !rotInvertido">
                   <q-icon name="swap_vert" size="20px" />
                 </button>
                 <button class="rot-ico" title="Ampliar o grupo no mapa" aria-label="Ampliar o grupo no mapa" @click="ampliarRoteiro">
@@ -308,7 +366,7 @@
 
               <div class="rot-scroll">
                 <div class="rot-lista">
-                  <div v-if="roteiro.origem" class="rot-item">
+                  <div v-if="roteiro.origem && !rotDe" class="rot-item">
                     <span class="rot-num rot-num--eu"><q-icon name="my_location" size="17px" /></span>
                     <div class="rot-info">
                       <div class="rot-top"><span class="rot-nota">Sua posição</span></div>
@@ -518,7 +576,11 @@ const hojeISO = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 // Mapa da programação começa mostrando só o dia de hoje; limpar o campo mostra todas as datas
-const filtroData = ref(props.esquema === 'programacao' ? hojeISO() : null)
+const filtroDatas = ref(props.esquema === 'programacao' ? [hojeISO()] : [])
+const datasOpcoes = computed(() =>
+  [...new Set(todasNotas.value.map(n => n.data_programada).filter(Boolean))].sort()
+)
+const dataBr = iso => iso.split('-').reverse().join('/')
 const filtroEquipe = ref(null)
 const equipesOpcoes = computed(() =>
   [...new Set(todasNotas.value.map(n => n.equipe).filter(Boolean))].sort()
@@ -551,7 +613,7 @@ function filtrarMunicipios (val, update) {
 }
 
 const notasDaArea = computed(() => comCoordenada.value.filter(n =>
-  (!filtroData.value || n.data_programada === filtroData.value) &&
+  (!filtroDatas.value.length || filtroDatas.value.includes(n.data_programada)) &&
   (!filtroEquipe.value || n.equipe === filtroEquipe.value) &&
   (!filtroBase.value.length || filtroBase.value.includes(n.base)) &&
   (!filtroMunicipio.value || chaveMunicipio(n.municipio) === chaveMunicipio(filtroMunicipio.value))
@@ -840,6 +902,59 @@ const LIMITE_ROTEIRO = 200
 const roteiro = ref(null)
 const rotOrdem = ref('otima')
 const rotInvertido = ref(false)
+// Partida e chegada escolhidas pelo usuário (null = posição atual e ordem mais curta)
+const rotDe = ref(null)
+const rotPara = ref(null)
+const buscaDe = ref('')
+const buscaPara = ref('')
+
+// Cada ponto do mapa com notas, para escolher como partida ou chegada
+const pontosDoMapa = computed(() => {
+  const m = new Map()
+  for (const n of comCoordenada.value) {
+    const id = chavePonto(n.latitude, n.longitude)
+    if (!m.has(id)) m.set(id, { id, lat: n.latitude, lng: n.longitude, notas: [] })
+    m.get(id).notas.push(n)
+  }
+  return [...m.values()]
+    .map(p => {
+      const rotulo = `Nota ${p.notas.map(n => n.nota).join(', ')}${p.notas[0].municipio ? ' · ' + p.notas[0].municipio : ''}`
+      const busca = [rotulo, ...p.notas.map(n => n.projeto_info_sap)].join(' ').toLowerCase()
+      return { ...p, rotulo, busca }
+    })
+    .sort((a, b) => a.rotulo.localeCompare(b.rotulo, undefined, { numeric: true }))
+})
+function pontosFiltrados (q, excluir) {
+  return pontosDoMapa.value.filter(p => p.id !== excluir?.id && (!q || p.busca.includes(q))).slice(0, 200)
+}
+const opcoesDe = computed(() => pontosFiltrados(buscaDe.value, rotPara.value))
+const opcoesPara = computed(() => pontosFiltrados(buscaPara.value, rotDe.value))
+
+// Distância entre a partida e a chegada escolhidas: em linha reta na hora e por estrada quando a rota chega
+const distanciaReta = computed(() => rotDe.value && rotPara.value ? distanciaKm(rotDe.value, rotPara.value) : null)
+const distanciaPorEstrada = ref(null)
+let distanciaTimer = null
+let distanciaAbort = null
+watch([rotDe, rotPara], ([de, para]) => {
+  clearTimeout(distanciaTimer)
+  distanciaAbort?.abort()
+  distanciaPorEstrada.value = null
+  if (!de || !para) return
+  distanciaPorEstrada.value = { estado: 'carregando' }
+  distanciaTimer = setTimeout(async () => {
+    if (!navigator.onLine) { distanciaPorEstrada.value = { estado: 'reta' }; return }
+    distanciaAbort = new AbortController()
+    try {
+      const r = await buscarRota(de, para, distanciaAbort.signal)
+      distanciaPorEstrada.value = { estado: 'ok', km: r.km, minutos: r.minutos }
+    } catch (e) {
+      if (e.name !== 'AbortError') distanciaPorEstrada.value = { estado: 'reta' }
+    }
+  }, 350)
+})
+function filtrarPontos (campo, val, update) {
+  update(() => { (campo === 'de' ? buscaDe : buscaPara).value = val.trim().toLowerCase() })
+}
 const rotExcluidas = ref(new Set())
 const rotReal = ref({ estado: null })
 const rotSelecionada = ref(null)
@@ -869,14 +984,19 @@ const rotForaDoRoteiro = computed(() =>
 
 const rotSequencia = computed(() => {
   if (!roteiro.value || roteiro.value.grande) return []
-  const seq = rotOrdem.value === 'otima'
-    ? ordenarRoteiro(rotAtivas.value, roteiro.value.origem)
-    : [...rotAtivas.value].sort(porNotaParada)
-  return rotInvertido.value ? seq.reverse() : seq
+  // Partida e chegada escolhidas ficam fixas; as demais paradas são ordenadas entre elas
+  const fixos = new Set([rotDe.value?.id, rotPara.value?.id])
+  const livres = rotAtivas.value.filter(p => !fixos.has(p.id))
+  const meio = rotOrdem.value === 'otima'
+    ? ordenarRoteiro(livres, rotDe.value ?? roteiro.value.origem, rotPara.value)
+    : [...livres].sort(porNotaParada)
+  const seq = [...(rotDe.value ? [rotDe.value] : []), ...meio, ...(rotPara.value ? [rotPara.value] : [])]
+  return rotInvertido.value && !rotDe.value && !rotPara.value ? seq.reverse() : seq
 })
 
-// Origem (se houver) + paradas, na ordem em que serão percorridas
-const rotPontos = computed(() => [...(roteiro.value?.origem ? [roteiro.value.origem] : []), ...rotSequencia.value])
+// Origem (posição atual, se não houver partida escolhida) + paradas, na ordem em que serão percorridas
+const rotPontos = computed(() => [...(roteiro.value?.origem && !rotDe.value ? [roteiro.value.origem] : []), ...rotSequencia.value])
+const rotOffset = computed(() => rotPontos.value.length - rotSequencia.value.length)
 const rotNotas = computed(() => rotSequencia.value.flatMap(p => p.notas))
 const rotPostes = computed(() => rotNotas.value.reduce((s, n) => s + (Number(n.postes) || 0), 0))
 const rotMix = computed(() => {
@@ -897,6 +1017,9 @@ const rotTotais = computed(() => {
 })
 const rotSubtitulo = computed(() => {
   const base = rotOrdem.value === 'otima' ? 'sequência mais curta' : 'ordem por número da nota'
+  const partida = rotDe.value ? `de nota ${rotDe.value.notas[0].nota}` : (roteiro.value?.origem ? 'saindo de você' : '')
+  const chegada = rotPara.value ? `até nota ${rotPara.value.notas[0].nota}` : ''
+  if (partida || chegada) return [base, partida, chegada].filter(Boolean).join(' · ')
   if (roteiro.value?.origem) return `${base} · saindo de você`
   if (rotLocalizando.value) return `${base} · obtendo sua localização…`
   return rotSemGps.value ? `${base} · sem sua localização` : base
@@ -907,7 +1030,7 @@ const rotJaNoDia = computed(() => {
   return rotCodigosNotas.value.length > 0 && rotCodigosNotas.value.every(c => no.has(c))
 })
 const rotTrechos = computed(() =>
-  trechosGoogle(rotSequencia.value, { daPosicaoAtual: !!roteiro.value?.origem }))
+  trechosGoogle(rotSequencia.value, { daPosicaoAtual: !!roteiro.value?.origem && !rotDe.value }))
 
 // Equipes distintas das notas de um ponto, para mostrar junto do número da nota
 function equipesDe (notas) {
@@ -922,7 +1045,7 @@ function rotLocal (p) {
 }
 
 function rotPerna (i) {
-  const k = i + (roteiro.value?.origem ? 1 : 0) - 1
+  const k = i + rotOffset.value - 1
   if (k < 0) return ''
   const r = rotReal.value
   if (r.estado === 'ok' && r.pernas?.[k]) return `${formatarDistancia(r.pernas[k].km)} · ${formatarDuracao(r.pernas[k].minutos)}`
@@ -1032,7 +1155,7 @@ function desenharRoteiro () {
   }
 
   // No modo campo a bolinha azul da equipe já está no mapa
-  const origem = roteiro.value.origem
+  const origem = rotDe.value ? null : roteiro.value.origem
   if (origem && !marcadorEu) {
     L.marker([origem.lat, origem.lng], {
       icon: L.divIcon({
@@ -1145,6 +1268,10 @@ async function abrirRoteiroDe (paradas, bounds) {
   fecharSelecao()
   rotOrdem.value = 'otima'
   rotInvertido.value = false
+  rotDe.value = null
+  rotPara.value = null
+  buscaDe.value = ''
+  buscaPara.value = ''
   rotExcluidas.value = new Set()
   rotSelecionada.value = null
   copiado.value = ''
@@ -1189,6 +1316,9 @@ function ampliarRoteiro () {
 }
 
 function fecharRoteiro () {
+  clearTimeout(distanciaTimer)
+  distanciaAbort?.abort()
+  distanciaPorEstrada.value = null
   clearTimeout(rotTimer)
   rotAbort?.abort()
   rotAbort = null
@@ -1775,6 +1905,10 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 .rot-mix i { display: block; min-width: 4px; }
 
 .rot-ctrl { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; flex-shrink: 0; }
+.rot-trecho { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px 0; flex-shrink: 0; }
+.rot-trecho-campo { flex: 1 1 160px; min-width: 0; }
+.rot-dist { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: #37474f; }
+.rot-dist b { color: #0d47a1; }
 .rot-seg { display: inline-flex; flex: 1; min-width: 0; background: #eef2f9; border-radius: 22px; padding: 3px; }
 .rot-seg button {
   flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;

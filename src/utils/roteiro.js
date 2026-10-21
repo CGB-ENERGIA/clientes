@@ -5,11 +5,14 @@ export const linkCurto = (lat, lng) => `google.com/maps?q=${lat.toFixed(5)},${ln
 export const urlWhatsApp = texto => `https://wa.me/?text=${encodeURIComponent(texto)}`
 
 // Sequência de visita mais curta: vizinho mais próximo + refinamento 2-opt.
-// Com `origem`, ela é o ponto de partida fixo (não entra no resultado).
-export function ordenarRoteiro (paradas, origem = null) {
-  if (paradas.length < 2 && !origem) return [...paradas]
-  const nos = origem ? [origem, ...paradas] : [...paradas]
+// `origem` e `destino` são pontos fixos de partida e chegada: não entram no resultado.
+export function ordenarRoteiro (paradas, origem = null, destino = null) {
+  if (!paradas.length) return []
+  if (paradas.length < 2 && !origem && !destino) return [...paradas]
+  const nos = [...(origem ? [origem] : []), ...paradas, ...(destino ? [destino] : [])]
   const m = nos.length
+  const fim = destino ? m - 1 : -1            // o destino fixo é sempre o último da rota
+  const ultimo = destino ? m - 2 : m - 1      // último índice que ainda pode trocar de lugar
 
   const D = Array.from({ length: m }, () => new Float64Array(m))
   for (let i = 0; i < m; i++) {
@@ -21,22 +24,25 @@ export function ordenarRoteiro (paradas, origem = null) {
     const usado = new Uint8Array(m)
     const r = [ini]
     usado[ini] = 1
-    for (let k = 1; k < m; k++) {
+    if (fim >= 0) usado[fim] = 1
+    const cabe = fim >= 0 ? m - 1 : m
+    for (let k = 1; k < cabe; k++) {
       const a = r[k - 1]
       let b = -1, d = Infinity
       for (let j = 0; j < m; j++) if (!usado[j] && D[a][j] < d) { d = D[a][j]; b = j }
       r.push(b)
       usado[b] = 1
     }
+    if (fim >= 0) r.push(fim)
     return r
   }
 
   let inicios
   if (origem) inicios = [0]
-  else if (m <= 80) inicios = Array.from({ length: m }, (_, i) => i)
+  else if (ultimo + 1 <= 80) inicios = Array.from({ length: ultimo + 1 }, (_, i) => i)
   else {
     let o = 0
-    for (let i = 1; i < m; i++) if (nos[i].lng < nos[o].lng) o = i
+    for (let i = 1; i <= ultimo; i++) if (nos[i].lng < nos[o].lng) o = i
     inicios = [o]
   }
 
@@ -52,8 +58,8 @@ export function ordenarRoteiro (paradas, origem = null) {
   let melhorou = true
   for (let passo = 0; melhorou && passo < 60; passo++) {
     melhorou = false
-    for (let i = base; i < m - 1; i++) {
-      for (let j = i + 1; j < m; j++) {
+    for (let i = base; i < ultimo; i++) {
+      for (let j = i + 1; j <= ultimo; j++) {
         const antes = (i > 0 ? D[rota[i - 1]][rota[i]] : 0) + (j < m - 1 ? D[rota[j]][rota[j + 1]] : 0)
         const depois = (i > 0 ? D[rota[i - 1]][rota[j]] : 0) + (j < m - 1 ? D[rota[i]][rota[j + 1]] : 0)
         if (depois < antes - 1e-9) {
@@ -64,7 +70,7 @@ export function ordenarRoteiro (paradas, origem = null) {
     }
   }
 
-  return (origem ? rota.slice(1) : rota).map(i => nos[i])
+  return rota.slice(origem ? 1 : 0, fim >= 0 ? rota.length - 1 : rota.length).map(i => nos[i])
 }
 
 // O Google Maps aceita no máximo 9 pontos intermediários por link: roteiros longos viram trechos encadeados
