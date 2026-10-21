@@ -31,6 +31,7 @@
     <q-tabs v-model="secao" dense no-caps active-color="primary" indicator-color="primary" align="left" class="q-mt-md prog-secoes">
       <q-tab name="painel" icon="insights" label="Painel" />
       <q-tab name="conferencia" icon="fact_check" label="Conferência" />
+      <q-tab name="completa" icon="list_alt" label="Programação completa" />
     </q-tabs>
 
     <div v-if="secao === 'painel'" class="prog-painel q-mt-md">
@@ -261,6 +262,45 @@
     </q-table>
     </template>
 
+    <template v-if="secao === 'completa'">
+      <div class="prog-barra q-mt-md">
+        <q-input v-model="buscaCompleta" dense outlined clearable placeholder="Buscar nota, município, equipe ou supervisor" class="prog-busca">
+          <template #prepend><q-icon name="search" /></template>
+        </q-input>
+        <q-select v-model="equipeCompleta" dense outlined clearable emit-value map-options :options="equipesOpcoes" label="Equipe" class="prog-filtro" />
+        <q-select v-model="statusCompleta" dense outlined clearable emit-value map-options :options="statusOpcoes" label="Programação" class="prog-filtro" />
+      </div>
+      <div class="prog-muted q-mt-sm">{{ linhasCompletas.length }} de {{ linhas.length }} notas</div>
+
+      <q-table
+        flat bordered
+        :rows="linhasCompletas"
+        :columns="colCompletas"
+        row-key="sap"
+        :pagination="{ rowsPerPage: 50, sortBy: 'data' }"
+        no-data-label="Nenhuma nota com esses filtros"
+        class="prog-tabela q-mt-sm"
+      >
+        <template #body-cell-prog="props">
+          <q-td :props="props">
+            <span class="prog-chip" :class="`prog-chip--${props.row.status_programacao.toLowerCase()}`">
+              {{ ROTULO_PROGRAMACAO[props.row.status_programacao] }}
+            </span>
+            <q-tooltip v-if="props.row.motivo || props.row.observacao" anchor="top middle" self="bottom middle">
+              {{ [props.row.motivo, props.row.observacao].filter(Boolean).join(' · ') }}
+            </q-tooltip>
+          </q-td>
+        </template>
+        <template #body-cell-sis="props">
+          <q-td :props="props">
+            <span v-if="props.row.status_sistema" class="prog-sis">{{ ROTULO_SISTEMA[props.row.status_sistema] }}</span>
+            <span v-else class="prog-muted">—</span>
+            <div v-if="props.row.qtd > 1" class="prog-aviso">{{ props.row.qtd }} notas com este SAP</div>
+          </q-td>
+        </template>
+      </q-table>
+    </template>
+
     <q-dialog v-model="configAberta">
       <q-card style="width: 460px; max-width: 94vw">
         <q-card-section>
@@ -329,6 +369,35 @@ const colunas = [
   { name: 'prog', label: 'Programação', field: 'status_programacao', align: 'left', sortable: true },
   { name: 'sis', label: 'Sistema', field: 'status_sistema', align: 'left' },
   { name: 'acao', label: '', field: 'acao', align: 'right' }
+]
+
+const buscaCompleta = ref('')
+const equipeCompleta = ref(null)
+const statusCompleta = ref(null)
+
+const equipesOpcoes = computed(() => [...new Set(linhas.value.map(l => l.equipe).filter(Boolean))]
+  .sort()
+  .map(e => ({ label: e, value: e })))
+const statusOpcoes = Object.entries(ROTULO_PROGRAMACAO).map(([value, label]) => ({ label, value }))
+
+const linhasCompletas = computed(() => {
+  const q = buscaCompleta.value.trim().toLowerCase()
+  return linhas.value.filter(l =>
+    (!equipeCompleta.value || l.equipe === equipeCompleta.value) &&
+    (!statusCompleta.value || l.status_programacao === statusCompleta.value) &&
+    (!q || [l.sap, l.municipio, l.equipe, l.supervisor].some(v => String(v ?? '').toLowerCase().includes(q)))
+  )
+})
+
+const colCompletas = [
+  { name: 'data', label: 'Data', field: 'data_programada', align: 'left', sortable: true, format: formatarData },
+  { name: 'sap', label: 'Nota SAP', field: 'sap', align: 'left', sortable: true },
+  { name: 'municipio', label: 'Município', field: 'municipio', align: 'left', sortable: true },
+  { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'left', sortable: true },
+  { name: 'supervisor', label: 'Supervisor', field: 'supervisor', align: 'left', sortable: true },
+  { name: 'prog', label: 'Programação', field: 'status_programacao', align: 'left', sortable: true },
+  { name: 'sis', label: 'Sistema', field: 'status_sistema', align: 'left', sortable: true },
+  { name: 'ultimo', label: 'Último registro', field: 'ultimo_evento', align: 'left', sortable: true, format: formatarData }
 ]
 
 const contagem = computed(() => {
@@ -685,6 +754,7 @@ onMounted(() => {
 
 .prog-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .prog-busca { min-width: 260px; }
+.prog-filtro { min-width: 180px; }
 
 .prog-chip {
   display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 10px;
