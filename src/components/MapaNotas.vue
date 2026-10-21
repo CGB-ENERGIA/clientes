@@ -384,11 +384,14 @@
 
               <div class="rot-scroll">
                 <div class="rot-lista">
-                  <div v-if="rotPartidaSolta" class="rot-item" :class="{ 'rot-item--ativo': marcado(rotPartidaSolta.id) }" @click="rotMarcar(rotPartidaSolta)">
+                  <div v-if="rotLinhaPartida" class="rot-item" :class="{ 'rot-item--ativo': marcado(rotLinhaPartida.id), 'rot-item--desligado': !rotPartidaSolta }" @click="rotMarcar(rotLinhaPartida)">
                     <span class="rot-num rot-num--eu"><q-icon name="my_location" size="17px" /></span>
                     <div class="rot-info">
-                      <div class="rot-top"><span class="rot-nota">{{ rotPartidaSolta.nome ?? 'Sua posição' }}</span></div>
-                      <div class="rot-sub">Ponto de partida</div>
+                      <div class="rot-top"><span class="rot-nota">{{ rotLinhaPartida.nome ?? 'Sua posição' }}</span></div>
+                      <div class="rot-sub">{{ rotPartidaSolta ? 'Ponto de partida' : 'Desligada: o roteiro começa na primeira parada' }}</div>
+                    </div>
+                    <div v-if="!rotDe" class="rot-partida-chave" @click.stop>
+                      <q-toggle v-model="rotUsarPosicao" dense color="primary" :aria-label="rotUsarPosicao ? 'Desativar sua posição' : 'Ativar sua posição'" />
                     </div>
                   </div>
 
@@ -1056,10 +1059,15 @@ const pontoGps = computed(() => roteiro.value?.origem
   : null)
 const marcado = id => rotMarcados.value.some(m => m.id === id)
 const rotuloPonto = p => p.notas?.length ? `Nota ${p.notas[0].nota}` : (p.nome ?? 'Sua posição')
-// Ponto de partida que não é parada da lista: a posição atual ou um local livre escolhido em De
-const rotPartidaSolta = computed(() => rotDe.value
+// Linha de partida da lista: a posição atual ou um local livre escolhido em De
+const rotUsarPosicao = ref(true)
+const rotLinhaPartida = computed(() => rotDe.value
   ? (rotDe.value.notas.length ? null : rotDe.value)
   : pontoGps.value)
+// Partida que entra no cálculo: a posição atual só conta quando estiver ativada
+const rotPartidaSolta = computed(() => rotDe.value
+  ? rotLinhaPartida.value
+  : (rotUsarPosicao.value ? pontoGps.value : null))
 function rotMarcar (p) {
   if (!p) return
   rotMarcados.value = marcado(p.id) ? rotMarcados.value.filter(m => m.id !== p.id) : [...rotMarcados.value, p]
@@ -1113,7 +1121,7 @@ const rotSequencia = computed(() => {
   const fixos = new Set([rotDe.value?.id, rotPara.value?.id])
   const livres = rotAtivas.value.filter(p => !fixos.has(p.id))
   const meio = rotOrdem.value === 'otima'
-    ? ordenarRoteiro(livres, rotDe.value ?? roteiro.value.origem, rotPara.value)
+    ? ordenarRoteiro(livres, rotDe.value ?? rotPartidaSolta.value, rotPara.value)
     : [...livres].sort(porNotaParada)
   // Partida só entra na lista quando é uma nota; posição atual e locais livres são só o ponto de saída
   const seq = [...(rotDe.value?.notas.length ? [rotDe.value] : []), ...meio, ...(rotPara.value ? [rotPara.value] : [])]
@@ -1139,16 +1147,16 @@ const rotKmReta = computed(() => {
 const rotTotais = computed(() => {
   const r = rotReal.value
   if (r.estado === 'ok') return { real: true, km: formatarDistancia(r.km), tempo: formatarDuracao(r.minutos) }
-  return { real: false, km: rotSequencia.value.length > 1 || roteiro.value?.origem ? `≈ ${formatarDistancia(rotKmReta.value)}` : '—', tempo: '—' }
+  return { real: false, km: rotSequencia.value.length > 1 || rotPartidaSolta.value ?`≈ ${formatarDistancia(rotKmReta.value)}` : '—', tempo: '—' }
 })
 const rotSubtitulo = computed(() => {
   const base = rotOrdem.value === 'otima' ? 'sequência mais curta' : 'ordem por número da nota'
   const partida = rotDe.value
     ? (rotDe.value.notas.length ? `de nota ${rotDe.value.notas[0].nota}` : `de ${rotDe.value.nome}`)
-    : (roteiro.value?.origem ? 'saindo de você' : '')
+    : (rotPartidaSolta.value ? 'saindo de você' : '')
   const chegada = rotPara.value ? `até nota ${rotPara.value.notas[0].nota}` : ''
   if (partida || chegada) return [base, partida, chegada].filter(Boolean).join(' · ')
-  if (roteiro.value?.origem) return `${base} · saindo de você`
+  if (rotPartidaSolta.value) return `${base} · saindo de você`
   if (rotLocalizando.value) return `${base} · obtendo sua localização…`
   return rotSemGps.value ? `${base} · sem sua localização` : base
 })
@@ -1160,7 +1168,7 @@ const rotJaNoDia = computed(() => {
 const rotTrechos = computed(() =>
   rotDe.value && !rotDe.value.notas.length
     ? trechosGoogle([rotDe.value, ...rotSequencia.value])
-    : trechosGoogle(rotSequencia.value, { daPosicaoAtual: !!roteiro.value?.origem && !rotDe.value }))
+    : trechosGoogle(rotSequencia.value, { daPosicaoAtual: !!rotPartidaSolta.value && !rotDe.value }))
 
 // Equipes distintas das notas de um ponto, para mostrar junto do número da nota
 function equipesDe (notas) {
@@ -2076,6 +2084,8 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 .rot-dist b { color: #0d47a1; }
 .rot-par { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 12px 0; padding: 8px 10px; border-radius: 12px; background: #eef2f9; font-size: 13px; color: #37474f; flex-shrink: 0; }
 .rot-par b { color: #0d47a1; }
+.rot-item--desligado { opacity: 0.6; }
+.rot-partida-chave { margin-left: auto; display: flex; align-items: center; flex-shrink: 0; }
 .rot-par-limpar { margin-left: auto; border: 0; background: none; color: #1565c0; font-weight: 600; cursor: pointer; }
 :deep(.rot-dist-pin) { background: none; border: 0; }
 :deep(.rot-dist-etiqueta) {
