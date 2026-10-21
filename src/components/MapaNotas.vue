@@ -320,6 +320,13 @@
                   @filter="(val, update) => filtrarPontos('de', val, update)"
                 >
                   <template #prepend><q-icon name="trip_origin" size="16px" /></template>
+                  <template #no-option>
+                    <q-item>
+                      <q-item-section class="text-grey">
+                        {{ buscandoLocal ? 'Buscando local…' : (buscaDe.length >= 3 ? 'Nenhum local encontrado no Maranhão' : 'Digite pelo menos 3 letras para buscar um local') }}
+                      </q-item-section>
+                    </q-item>
+                  </template>
                 </q-select>
                 <q-select
                   v-model="rotPara"
@@ -967,37 +974,43 @@ function municipiosFiltrados (q, excluir) {
 const locaisBusca = ref([])
 let buscaLocalTimer = null
 let buscaLocalAbort = null
+const buscandoLocal = ref(false)
 watch(buscaDe, texto => {
   clearTimeout(buscaLocalTimer)
   buscaLocalAbort?.abort()
   locaisBusca.value = []
+  buscandoLocal.value = false
   if (texto.length < 3 || !navigator.onLine) return
+  buscandoLocal.value = true
   buscaLocalTimer = setTimeout(async () => {
     buscaLocalAbort = new AbortController()
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=br&q=${encodeURIComponent(`${texto}, Maranhão`)}`
+      // bounded=1 com a caixa do Maranhão: só resultados dentro do estado
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=8&countrycodes=br&bounded=1&viewbox=-48.8,-1.0,-41.8,-10.3&q=${encodeURIComponent(texto)}`
       const r = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' }, signal: buscaLocalAbort.signal })
       const lista = await r.json()
-      locaisBusca.value = lista
-        .filter(x => /Maranh/i.test(x.display_name))
-        .map(x => {
-          const nome = x.display_name.split(',').slice(0, 2).join(',').trim()
-          const rotulo = `Local · ${nome}`
-          return { id: `local:${Number(x.lat).toFixed(5)},${Number(x.lon).toFixed(5)}`, lat: Number(x.lat), lng: Number(x.lon), notas: [], nome, rotulo, busca: rotulo.toLowerCase() }
-        })
+      locaisBusca.value = lista.map(x => {
+        const nome = x.display_name.split(',').slice(0, 2).join(',').trim()
+        const rotulo = `Local · ${nome}`
+        return { id: `local:${Number(x.lat).toFixed(5)},${Number(x.lon).toFixed(5)}`, lat: Number(x.lat), lng: Number(x.lon), notas: [], nome, rotulo, busca: rotulo.toLowerCase() }
+      })
+      buscandoLocal.value = false
     } catch (e) {
-      if (e.name !== 'AbortError') locaisBusca.value = []
+      if (e.name !== 'AbortError') {
+        locaisBusca.value = []
+        buscandoLocal.value = false
+      }
     }
-  }, 500)
+  }, 400)
 })
 
 // Opções da partida: notas do mapa, municípios e locais encontrados pela busca digitada
 const opcoesDe = computed(() => {
   const q = buscaDe.value
   return [
-    ...pontosFiltrados(q, rotPara.value),
+    ...locaisBusca.value,
     ...(q ? municipiosFiltrados(q, rotPara.value) : []),
-    ...locaisBusca.value
+    ...pontosFiltrados(q, rotPara.value)
   ]
 })
 const opcoesPara = computed(() => pontosFiltrados(buscaPara.value, rotDe.value))
@@ -1241,6 +1254,22 @@ function rotFocarNoMapa (p) {
 }
 
 
+// Ponto no meio do percurso (pela distância acumulada): onde a etiqueta da distância fica
+function pontoMeio (linha) {
+  const pts = linha.map(([lat, lng]) => ({ lat, lng }))
+  const total = pts.slice(1).reduce((s, p, i) => s + distanciaKm(pts[i], p), 0)
+  let acumulado = 0
+  for (let i = 1; i < pts.length; i++) {
+    const d = distanciaKm(pts[i - 1], pts[i])
+    if (acumulado + d >= total / 2) {
+      const f = d ? (total / 2 - acumulado) / d : 0
+      return [pts[i - 1].lat + (pts[i].lat - pts[i - 1].lat) * f, pts[i - 1].lng + (pts[i].lng - pts[i - 1].lng) * f]
+    }
+    acumulado += d
+  }
+  return linha[0]
+}
+
 function desenharRoteiro () {
   camadaRoteiro?.clearLayers()
   rotMarcadores.clear()
@@ -1284,10 +1313,24 @@ function desenharRoteiro () {
   if (soPar) {
     const [a, b] = rotMarcados.value
     const porEstrada = par?.estado === 'ok' && par.pontos
-    L.polyline(porEstrada ? par.pontos : [[a.lat, a.lng], [b.lat, b.lng]], {
+    const linha = porEstrada ? par.pontos : [[a.lat, a.lng], [b.lat, b.lng]]
+    L.polyline(linha, {
       renderer: rendererRoteiro, pane: 'roteiroLinha', interactive: false,
       color: '#f57c00', weight: 5, opacity: 0.95, lineCap: 'round',
       dashArray: porEstrada ? null : '2 8'
+    }).addTo(camadaRoteiro)
+    // Etiqueta com a distância no meio do trecho
+    const rotulo = porEstrada
+      ? `<b>${formatarDistancia(par.km)}</b> · ${formatarDuracao(par.minutos)} de carro`
+      : `<b>${formatarDistancia(distanciaKm(a, b))}</b> em linha reta`
+    L.marker(pontoMeio(linha), {
+      pane: 'roteiroPontos', interactive: false, keyboard: false, zIndexOffset: 1000,
+      icon: L.divIcon({
+        className: 'rot-dist-pin',
+        html: `<span class="rot-dist-etiqueta">${rotulo}</span>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+      })
     }).addTo(camadaRoteiro)
   }
 
@@ -2034,6 +2077,13 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 .rot-par { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 12px 0; padding: 8px 10px; border-radius: 12px; background: #eef2f9; font-size: 13px; color: #37474f; flex-shrink: 0; }
 .rot-par b { color: #0d47a1; }
 .rot-par-limpar { margin-left: auto; border: 0; background: none; color: #1565c0; font-weight: 600; cursor: pointer; }
+:deep(.rot-dist-pin) { background: none; border: 0; }
+:deep(.rot-dist-etiqueta) {
+  position: absolute; transform: translate(-50%, -50%); white-space: nowrap;
+  padding: 6px 12px; border-radius: 16px; background: #0f172a; color: #fff;
+  font-size: 13px; font-weight: 600; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.35);
+}
+:deep(.rot-dist-etiqueta b) { color: #ffb74d; }
 .rot-seg { display: inline-flex; flex: 1; min-width: 0; background: #eef2f9; border-radius: 22px; padding: 3px; }
 .rot-seg button {
   flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;

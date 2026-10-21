@@ -79,7 +79,7 @@
         <q-input
           v-model="filtro"
           dense outlined
-          placeholder="Buscar nota ou PEP..."
+          placeholder="Buscar nota, SAP, PEP, base ou cliente..."
           style="min-width:200px;flex:1"
           clearable
         >
@@ -1188,10 +1188,10 @@ const notasFiltradas = computed(() => {
   const q = filtro.value?.trim().toLowerCase()
   if (q) lista = lista.filter(g =>
     g._notas.some(n =>
-      n.nota?.toLowerCase().includes(q) ||
-      n.projeto_info_sap?.toLowerCase().includes(q) ||
-      n.pep?.toLowerCase().includes(q) ||
-      n.base?.toLowerCase().includes(q)
+      [
+        n.nota, n.projeto_info_sap, n.pep, n.base, n.municipio,
+        ...(n.clientes_planilha ?? []).flatMap(c => [c.nome, c.conta_contrato, c.endereco, c.bairro])
+      ].some(v => String(v ?? '').toLowerCase().includes(q))
     )
   )
 
