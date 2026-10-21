@@ -388,8 +388,9 @@ const autocompleteRef = ref(null)
 
 const notasFiltradas = computed(() => {
   const q = buscaNota.value.trim().toLowerCase()
-  if (!q) return notas.value.slice(0, 20)
-  return notas.value.filter(n =>
+  const disponiveis = notas.value.filter(n => !NOTA_FINALIZADA.includes(n.status))
+  if (!q) return disponiveis.slice(0, 20)
+  return disponiveis.filter(n =>
     n.nota.includes(q) ||
     (n.pep  && n.pep.toLowerCase().includes(q)) ||
     (n.base && n.base.toLowerCase().includes(q))
@@ -469,6 +470,7 @@ function validar () {
   erros.equipe  = form.equipe.trim() ? '' : 'Informe o nome da equipe'
   erros.nota    = form.nota          ? '' : 'Selecione uma nota de serviço'
   erros.cliente = (clientesNota.value.length === 0 || form.cliente) ? '' : 'Selecione o cliente'
+  if (notaInfo.value && NOTA_FINALIZADA.includes(notaInfo.value.status)) erros.nota = 'Esta nota já foi finalizada pela equipe 1'
   return !erros.equipe && !erros.nota && !erros.cliente
 }
 
