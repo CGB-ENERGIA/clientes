@@ -348,6 +348,17 @@
                 </div>
               </div>
 
+              <div v-if="rotMarcados.length" class="rot-par">
+                <template v-if="rotMarcados.length === 2">
+                  <q-icon name="straighten" size="16px" />
+                  <span><b>{{ rotuloPonto(rotMarcados[0]) }}</b> até <b>{{ rotuloPonto(rotMarcados[1]) }}</b>: <b>{{ formatarDistancia(distanciaMarcadosReta) }}</b> em linha reta</span>
+                  <span v-if="distanciaMarcados?.estado === 'ok'">· <b>{{ formatarDistancia(distanciaMarcados.km) }}</b> por estrada ({{ formatarDuracao(distanciaMarcados.minutos) }})</span>
+                  <q-spinner-dots v-else-if="distanciaMarcados?.estado === 'carregando'" size="14px" />
+                </template>
+                <span v-else>{{ rotMarcados.length }} marcado · marque mais um ponto para ver a distância</span>
+                <button class="rot-par-limpar" @click="limparMarcados">Limpar</button>
+              </div>
+
               <div class="rot-ctrl">
                 <div v-if="rotAtivas.length > 1" class="rot-seg">
                   <button :class="{ 'rot-seg--on': rotOrdem === 'otima' }" @click="rotOrdem = 'otima'">
@@ -366,10 +377,10 @@
 
               <div class="rot-scroll">
                 <div class="rot-lista">
-                  <div v-if="roteiro.origem && !rotDe" class="rot-item">
+                  <div v-if="rotPartidaSolta" class="rot-item" :class="{ 'rot-item--ativo': marcado(rotPartidaSolta.id) }" @click="rotMarcar(rotPartidaSolta)">
                     <span class="rot-num rot-num--eu"><q-icon name="my_location" size="17px" /></span>
                     <div class="rot-info">
-                      <div class="rot-top"><span class="rot-nota">Sua posição</span></div>
+                      <div class="rot-top"><span class="rot-nota">{{ rotPartidaSolta.nome ?? 'Sua posição' }}</span></div>
                       <div class="rot-sub">Ponto de partida</div>
                     </div>
                   </div>
@@ -380,12 +391,13 @@
                     </div>
                     <div
                       class="rot-item"
-                      :class="{ 'rot-item--ativo': rotSelecionada === p.id }"
+                      :class="{ 'rot-item--ativo': marcado(p.id) }"
                       :data-id="p.id"
+                      @click="rotMarcar(p)"
                       @mouseenter="realcar(p.id)"
                       @mouseleave="realcar(null)"
                     >
-                      <button class="rot-num" :style="{ '--cor': corDe(p.notas[0]?.status) }" :aria-label="`Ir para a parada ${i + 1}`" @click="rotFocarNoMapa(p)">{{ i + 1 }}</button>
+                      <button class="rot-num" :style="{ '--cor': corDe(p.notas[0]?.status) }" :aria-label="`Ir para a parada ${i + 1}`" @click.stop="rotFocarNoMapa(p)">{{ i + 1 }}</button>
                       <div class="rot-info">
                         <div class="rot-top">
                           <div class="rot-notas">
@@ -401,14 +413,14 @@
                             </button>
                             <span v-if="p.notas.length > 3" class="rot-mais">+{{ p.notas.length - 3 }}</span>
                           </div>
-                          <div class="rot-acoes">
+                          <div class="rot-acoes" @click.stop>
                             <a :href="urlPontoGoogle(p.lat, p.lng)" target="_blank" rel="noopener" title="Abrir no Google Maps" aria-label="Abrir no Google Maps"><q-icon name="map" size="18px" /></a>
                             <a :href="urlWaze(p.lat, p.lng)" target="_blank" rel="noopener" title="Navegar com Waze" aria-label="Navegar com Waze"><q-icon name="navigation" size="18px" /></a>
                             <button title="Tirar do roteiro" aria-label="Tirar do roteiro" @click="rotAlternar(p.id)"><q-icon name="remove_circle_outline" size="18px" /></button>
                           </div>
                         </div>
                         <div class="rot-sub">{{ rotLocal(p) }}</div>
-                        <button class="rot-link" :class="{ 'rot-link--ok': copiado === p.id }" title="Copiar link" @click="copiar(urlPontoGoogle(p.lat, p.lng), p.id)">
+                        <button class="rot-link" :class="{ 'rot-link--ok': copiado === p.id }" title="Copiar link" @click.stop="copiar(urlPontoGoogle(p.lat, p.lng), p.id)">
                           <span>{{ linkCurto(p.lat, p.lng) }}</span>
                           <q-icon :name="copiado === p.id ? 'check' : 'content_copy'" size="14px" />
                         </button>
@@ -477,7 +489,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { urlGoogleMaps, urlWaze, distanciaKm, formatarDistancia, formatarDuracao, buscarRota, buscarRotaMulti } from 'src/utils/rota'
 import { ordenarRoteiro, trechosGoogle, urlPontoGoogle, linkCurto, urlWhatsApp } from 'src/utils/roteiro'
-import { chaveMunicipio, limitesDe } from 'src/utils/limites'
+import { carregarMalha, chaveMunicipio, limitesDe } from 'src/utils/limites'
 import { booleanPointInPolygon } from '@turf/boolean-point-in-polygon'
 
 const props = defineProps({
@@ -927,37 +939,137 @@ const pontosDoMapa = computed(() => {
 function pontosFiltrados (q, excluir) {
   return pontosDoMapa.value.filter(p => p.id !== excluir?.id && (!q || p.busca.includes(q))).slice(0, 200)
 }
-const opcoesDe = computed(() => pontosFiltrados(buscaDe.value, rotPara.value))
+// Municípios do Maranhão como ponto de partida livre (ponto médio do contorno)
+const municipiosMapa = ref([])
+function centroDe (geom) {
+  let soma = { lat: 0, lng: 0 }, n = 0
+  const varre = c => {
+    if (typeof c[0] === 'number') { soma.lng += c[0]; soma.lat += c[1]; n++ } else c.forEach(varre)
+  }
+  varre(geom.coordinates)
+  return { lat: soma.lat / n, lng: soma.lng / n }
+}
+async function carregarMunicipios () {
+  if (municipiosMapa.value.length) return
+  const malha = await carregarMalha()
+  municipiosMapa.value = [...malha.values()].map(f => {
+    const c = centroDe(f.geometry)
+    const nome = f.properties.nome
+    const rotulo = `Município · ${nome}`
+    return { id: `mun:${chaveMunicipio(nome)}`, lat: c.lat, lng: c.lng, notas: [], nome, rotulo, busca: rotulo.toLowerCase() }
+  })
+}
+function municipiosFiltrados (q, excluir) {
+  return municipiosMapa.value.filter(p => p.id !== excluir?.id && p.busca.includes(q)).slice(0, 60)
+}
+
+// Local digitado livremente (rua, posto, bairro): busca no OpenStreetMap, restrita ao Maranhão
+const locaisBusca = ref([])
+let buscaLocalTimer = null
+let buscaLocalAbort = null
+watch(buscaDe, texto => {
+  clearTimeout(buscaLocalTimer)
+  buscaLocalAbort?.abort()
+  locaisBusca.value = []
+  if (texto.length < 3 || !navigator.onLine) return
+  buscaLocalTimer = setTimeout(async () => {
+    buscaLocalAbort = new AbortController()
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=br&q=${encodeURIComponent(`${texto}, Maranhão`)}`
+      const r = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' }, signal: buscaLocalAbort.signal })
+      const lista = await r.json()
+      locaisBusca.value = lista
+        .filter(x => /Maranh/i.test(x.display_name))
+        .map(x => {
+          const nome = x.display_name.split(',').slice(0, 2).join(',').trim()
+          const rotulo = `Local · ${nome}`
+          return { id: `local:${Number(x.lat).toFixed(5)},${Number(x.lon).toFixed(5)}`, lat: Number(x.lat), lng: Number(x.lon), notas: [], nome, rotulo, busca: rotulo.toLowerCase() }
+        })
+    } catch (e) {
+      if (e.name !== 'AbortError') locaisBusca.value = []
+    }
+  }, 500)
+})
+
+// Opções da partida: notas do mapa, municípios e locais encontrados pela busca digitada
+const opcoesDe = computed(() => {
+  const q = buscaDe.value
+  return [
+    ...pontosFiltrados(q, rotPara.value),
+    ...(q ? municipiosFiltrados(q, rotPara.value) : []),
+    ...locaisBusca.value
+  ]
+})
 const opcoesPara = computed(() => pontosFiltrados(buscaPara.value, rotDe.value))
+
+// Distância por estrada entre dois pontos; espera a seleção parar de mudar antes de consultar a rota
+function criarMedidor () {
+  const resultado = ref(null)
+  let timer = null
+  let abort = null
+  const parar = () => { clearTimeout(timer); abort?.abort(); resultado.value = null }
+  const medir = (a, b) => {
+    parar()
+    if (!a || !b) return
+    resultado.value = { estado: 'carregando' }
+    timer = setTimeout(async () => {
+      if (!navigator.onLine) { resultado.value = { estado: 'reta' }; return }
+      abort = new AbortController()
+      try {
+        const r = await buscarRota(a, b, abort.signal)
+        resultado.value = { estado: 'ok', km: r.km, minutos: r.minutos, pontos: r.pontos }
+      } catch (e) {
+        if (e.name !== 'AbortError') resultado.value = { estado: 'reta' }
+      }
+    }, 350)
+  }
+  return { resultado, medir, parar }
+}
 
 // Distância entre a partida e a chegada escolhidas: em linha reta na hora e por estrada quando a rota chega
 const distanciaReta = computed(() => rotDe.value && rotPara.value ? distanciaKm(rotDe.value, rotPara.value) : null)
-const distanciaPorEstrada = ref(null)
-let distanciaTimer = null
-let distanciaAbort = null
-watch([rotDe, rotPara], ([de, para]) => {
-  clearTimeout(distanciaTimer)
-  distanciaAbort?.abort()
-  distanciaPorEstrada.value = null
-  if (!de || !para) return
-  distanciaPorEstrada.value = { estado: 'carregando' }
-  distanciaTimer = setTimeout(async () => {
-    if (!navigator.onLine) { distanciaPorEstrada.value = { estado: 'reta' }; return }
-    distanciaAbort = new AbortController()
-    try {
-      const r = await buscarRota(de, para, distanciaAbort.signal)
-      distanciaPorEstrada.value = { estado: 'ok', km: r.km, minutos: r.minutos }
-    } catch (e) {
-      if (e.name !== 'AbortError') distanciaPorEstrada.value = { estado: 'reta' }
-    }
-  }, 350)
+const medidorDeAPara = criarMedidor()
+const distanciaPorEstrada = medidorDeAPara.resultado
+watch([rotDe, rotPara], ([de, para]) => medidorDeAPara.medir(de, para))
+
+// Pontos marcados na lista do roteiro (vários, na ordem em que foram marcados)
+const rotMarcados = ref([])
+const medidorMarcados = criarMedidor()
+const distanciaMarcados = medidorMarcados.resultado
+const distanciaMarcadosReta = computed(() =>
+  rotMarcados.value.length === 2 ? distanciaKm(rotMarcados.value[0], rotMarcados.value[1]) : null)
+const pontoGps = computed(() => roteiro.value?.origem
+  ? { id: 'gps', lat: roteiro.value.origem.lat, lng: roteiro.value.origem.lng, notas: [] }
+  : null)
+const marcado = id => rotMarcados.value.some(m => m.id === id)
+const rotuloPonto = p => p.notas?.length ? `Nota ${p.notas[0].nota}` : (p.nome ?? 'Sua posição')
+// Ponto de partida que não é parada da lista: a posição atual ou um local livre escolhido em De
+const rotPartidaSolta = computed(() => rotDe.value
+  ? (rotDe.value.notas.length ? null : rotDe.value)
+  : pontoGps.value)
+function rotMarcar (p) {
+  if (!p) return
+  rotMarcados.value = marcado(p.id) ? rotMarcados.value.filter(m => m.id !== p.id) : [...rotMarcados.value, p]
+  if (marcado(p.id)) {
+    nextTick(() => {
+      const el = [...(rotEl.value?.querySelectorAll('[data-id]') ?? [])].find(e => e.dataset.id === p.id)
+      el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    })
+  }
+}
+function limparMarcados () { rotMarcados.value = [] }
+watch(rotMarcados, m => {
+  marcarAtivo()
+  if (m.length === 2) medidorMarcados.medir(m[0], m[1])
+  else medidorMarcados.parar()
 })
+// A rota por estrada entre os dois pontos marcados aparece no mapa quando chega
+watch(() => medidorMarcados.resultado.value, () => desenharRoteiro())
 function filtrarPontos (campo, val, update) {
   update(() => { (campo === 'de' ? buscaDe : buscaPara).value = val.trim().toLowerCase() })
 }
 const rotExcluidas = ref(new Set())
 const rotReal = ref({ estado: null })
-const rotSelecionada = ref(null)
 const copiado = ref('')
 const rotEl = ref(null)
 let camadaRoteiro = null
@@ -990,12 +1102,13 @@ const rotSequencia = computed(() => {
   const meio = rotOrdem.value === 'otima'
     ? ordenarRoteiro(livres, rotDe.value ?? roteiro.value.origem, rotPara.value)
     : [...livres].sort(porNotaParada)
-  const seq = [...(rotDe.value ? [rotDe.value] : []), ...meio, ...(rotPara.value ? [rotPara.value] : [])]
+  // Partida só entra na lista quando é uma nota; posição atual e locais livres são só o ponto de saída
+  const seq = [...(rotDe.value?.notas.length ? [rotDe.value] : []), ...meio, ...(rotPara.value ? [rotPara.value] : [])]
   return rotInvertido.value && !rotDe.value && !rotPara.value ? seq.reverse() : seq
 })
 
 // Origem (posição atual, se não houver partida escolhida) + paradas, na ordem em que serão percorridas
-const rotPontos = computed(() => [...(roteiro.value?.origem && !rotDe.value ? [roteiro.value.origem] : []), ...rotSequencia.value])
+const rotPontos = computed(() => [...(rotPartidaSolta.value ? [rotPartidaSolta.value] : []), ...rotSequencia.value])
 const rotOffset = computed(() => rotPontos.value.length - rotSequencia.value.length)
 const rotNotas = computed(() => rotSequencia.value.flatMap(p => p.notas))
 const rotPostes = computed(() => rotNotas.value.reduce((s, n) => s + (Number(n.postes) || 0), 0))
@@ -1017,7 +1130,9 @@ const rotTotais = computed(() => {
 })
 const rotSubtitulo = computed(() => {
   const base = rotOrdem.value === 'otima' ? 'sequência mais curta' : 'ordem por número da nota'
-  const partida = rotDe.value ? `de nota ${rotDe.value.notas[0].nota}` : (roteiro.value?.origem ? 'saindo de você' : '')
+  const partida = rotDe.value
+    ? (rotDe.value.notas.length ? `de nota ${rotDe.value.notas[0].nota}` : `de ${rotDe.value.nome}`)
+    : (roteiro.value?.origem ? 'saindo de você' : '')
   const chegada = rotPara.value ? `até nota ${rotPara.value.notas[0].nota}` : ''
   if (partida || chegada) return [base, partida, chegada].filter(Boolean).join(' · ')
   if (roteiro.value?.origem) return `${base} · saindo de você`
@@ -1030,7 +1145,9 @@ const rotJaNoDia = computed(() => {
   return rotCodigosNotas.value.length > 0 && rotCodigosNotas.value.every(c => no.has(c))
 })
 const rotTrechos = computed(() =>
-  trechosGoogle(rotSequencia.value, { daPosicaoAtual: !!roteiro.value?.origem && !rotDe.value }))
+  rotDe.value && !rotDe.value.notas.length
+    ? trechosGoogle([rotDe.value, ...rotSequencia.value])
+    : trechosGoogle(rotSequencia.value, { daPosicaoAtual: !!roteiro.value?.origem && !rotDe.value }))
 
 // Equipes distintas das notas de um ponto, para mostrar junto do número da nota
 function equipesDe (notas) {
@@ -1095,6 +1212,7 @@ async function copiar (texto, chave) {
 const copiarTodos = () => copiar(rotTexto.value, 'todos')
 
 function rotAlternar (id) {
+  rotMarcados.value = rotMarcados.value.filter(m => m.id !== id)
   const novo = new Set(rotExcluidas.value)
   novo.has(id) ? novo.delete(id) : novo.add(id)
   rotExcluidas.value = novo
@@ -1108,13 +1226,11 @@ function realcar (id) {
 
 function marcarAtivo () {
   for (const [id, m] of rotMarcadores) {
-    m.getElement()?.firstElementChild?.classList.toggle('rot-pin--ativo', id === rotSelecionada.value)
+    m.getElement()?.firstElementChild?.classList.toggle('rot-pin--ativo', marcado(id))
   }
 }
 
 function rotFocarNoMapa (p) {
-  rotSelecionada.value = p.id
-  marcarAtivo()
   const lateral = !compacto.value && rotEl.value ? rotEl.value.offsetWidth + 24 : 0
   const base = compacto.value ? (rotEl.value?.offsetHeight ?? 0) : 0
   const alvo = L.latLng(p.lat, p.lng)
@@ -1124,14 +1240,6 @@ function rotFocarNoMapa (p) {
   mapa.flyTo(mapa.unproject(pt, zoom), zoom, { duration: 0.7 })
 }
 
-function rotFocarNaLista (p) {
-  rotSelecionada.value = p.id
-  marcarAtivo()
-  nextTick(() => {
-    const el = [...(rotEl.value?.querySelectorAll('[data-id]') ?? [])].find(e => e.dataset.id === p.id)
-    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  })
-}
 
 function desenharRoteiro () {
   camadaRoteiro?.clearLayers()
@@ -1155,7 +1263,7 @@ function desenharRoteiro () {
   }
 
   // No modo campo a bolinha azul da equipe já está no mapa
-  const origem = rotDe.value ? null : roteiro.value.origem
+  const origem = rotPartidaSolta.value
   if (origem && !marcadorEu) {
     L.marker([origem.lat, origem.lng], {
       icon: L.divIcon({
@@ -1166,6 +1274,15 @@ function desenharRoteiro () {
       interactive: false,
       keyboard: false,
       zIndexOffset: 900
+    }).addTo(camadaRoteiro)
+  }
+
+  // Rota por estrada entre os dois pontos marcados
+  const par = medidorMarcados.resultado.value
+  if (rotMarcados.value.length === 2 && par?.estado === 'ok' && par.pontos) {
+    L.polyline(par.pontos, {
+      renderer: rendererRoteiro, pane: 'roteiroLinha', interactive: false,
+      color: '#f57c00', weight: 5, opacity: 0.95, lineCap: 'round'
     }).addTo(camadaRoteiro)
   }
 
@@ -1187,7 +1304,7 @@ function desenharRoteiro () {
     const equipe = equipesDe(p.notas)
     const titulo = p.notas.map(n => `Nota ${n.nota}`).join(', ')
     if (temHover) m.bindTooltip(equipe ? `${titulo}<br>Equipe ${equipe}` : titulo, { direction: 'top', offset: [0, -14] })
-    m.on('click', () => rotFocarNaLista(p))
+    m.on('click', () => rotMarcar(p))
     m.addTo(camadaRoteiro)
     rotMarcadores.set(p.id, m)
   })
@@ -1270,10 +1387,11 @@ async function abrirRoteiroDe (paradas, bounds) {
   rotInvertido.value = false
   rotDe.value = null
   rotPara.value = null
+  carregarMunicipios()
   buscaDe.value = ''
   buscaPara.value = ''
   rotExcluidas.value = new Set()
-  rotSelecionada.value = null
+  rotMarcados.value = []
   copiado.value = ''
   rotAnimar = true
   const geracao = ++rotGeracao
@@ -1316,9 +1434,8 @@ function ampliarRoteiro () {
 }
 
 function fecharRoteiro () {
-  clearTimeout(distanciaTimer)
-  distanciaAbort?.abort()
-  distanciaPorEstrada.value = null
+  medidorDeAPara.parar()
+  medidorMarcados.parar()
   clearTimeout(rotTimer)
   rotAbort?.abort()
   rotAbort = null
@@ -1327,7 +1444,7 @@ function fecharRoteiro () {
   rotLocalizando.value = false
   roteiro.value = null
   rotReal.value = { estado: null }
-  rotSelecionada.value = null
+  rotMarcados.value = []
   camadaRoteiro?.clearLayers()
   rotMarcadores.clear()
   rotRealcado = null
@@ -1670,7 +1787,7 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 }
 
 /* ── Search ── */
-.mapa-busca { width: 226px; }
+.mapa-busca { width: 270px; }
 :deep(.mapa-busca .q-field__control) {
   border-radius: 22px !important; background: #eef2f9 !important; height: 36px;
 }
@@ -1682,10 +1799,10 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 /* ── Filters ── */
 .mapa-controles { display: contents; }
 .mapa-filtros   { display: contents; }
-.mapa-filtro     { width: 162px; }
-.mapa-filtro--mun { width: 206px; }
-.mapa-filtro--equipe { width: 220px; }
-.mapa-filtro-data { width: 170px; }
+.mapa-filtro     { width: 170px; }
+.mapa-filtro--mun { width: 240px; }
+.mapa-filtro--equipe { width: 240px; }
+.mapa-filtro-data { width: 240px; }
 :deep(.mapa-filtro .q-field__control),
 :deep(.mapa-filtro--mun .q-field__control) {
   border-radius: 22px !important; background: #eef2f9 !important; height: 36px;
@@ -1909,6 +2026,9 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 .rot-trecho-campo { flex: 1 1 160px; min-width: 0; }
 .rot-dist { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: #37474f; }
 .rot-dist b { color: #0d47a1; }
+.rot-par { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 12px 0; padding: 8px 10px; border-radius: 12px; background: #eef2f9; font-size: 13px; color: #37474f; flex-shrink: 0; }
+.rot-par b { color: #0d47a1; }
+.rot-par-limpar { margin-left: auto; border: 0; background: none; color: #1565c0; font-weight: 600; cursor: pointer; }
 .rot-seg { display: inline-flex; flex: 1; min-width: 0; background: #eef2f9; border-radius: 22px; padding: 3px; }
 .rot-seg button {
   flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
@@ -2101,10 +2221,12 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 .mapa-card--compacto .mapa-controles {
   display: flex; flex-wrap: wrap; align-items: center; gap: 7px; flex-basis: 100%; min-width: 0;
 }
-.mapa-card--compacto .mapa-filtros { display: flex; gap: 7px; flex-basis: 100%; min-width: 0; }
+.mapa-card--compacto .mapa-filtros { display: flex; flex-wrap: wrap; gap: 7px; flex-basis: 100%; min-width: 0; }
 .mapa-card--compacto .mapa-filtro,
-.mapa-card--compacto .mapa-filtro--mun { flex: 1 1 0; width: auto; min-width: 0; overflow: hidden; }
-.mapa-card--compacto .mapa-filtros :deep(.q-field__native) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mapa-card--compacto .mapa-filtro--mun,
+.mapa-card--compacto .mapa-filtro--equipe,
+.mapa-card--compacto .mapa-filtro-data { flex: 1 1 170px; width: auto; min-width: 160px; }
+.mapa-card--compacto .mapa-filtros :deep(.q-field__native) { min-width: 0; white-space: nowrap; }
 .mapa-card--compacto .mapa-legenda {
   flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0;
   margin-left: -10px; padding-left: 10px;

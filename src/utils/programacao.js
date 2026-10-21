@@ -21,6 +21,16 @@ function dataISO (v) {
 
 const maisRecentePrimeiro = (a, b) => (b.data_programada || '').localeCompare(a.data_programada || '')
 
+// Postes de concreto da nota: cada cliente conta uma vez, com o maior valor entre as visitas dele
+function postesDa (linhas) {
+  const porCliente = new Map()
+  for (const l of linhas) {
+    const chave = l.conta || l.cliente || '-'
+    porCliente.set(chave, Math.max(porCliente.get(chave) ?? 0, l.concreto))
+  }
+  return [...porCliente.values()].reduce((s, v) => s + v, 0)
+}
+
 // Cada linha da planilha é um cliente (conta contrato) dentro da nota. Por cliente vale a situação mais recente
 // (ignorando cancelamentos); a nota fica CONCLUÍDA só quando todos os clientes concluíram.
 function resumirNota (linhas) {
@@ -83,7 +93,8 @@ export function lerProgramacao (buffer) {
       motivo: texto(r.MOTIVO),
       observacao: texto(r['OBSERVAÇÃO']),
       conta: texto(r['CONTA CONTRATO']),
-      cliente: texto(r['NOME CLIENTE'])
+      cliente: texto(r['NOME CLIENTE']),
+      concreto: Number(r.CONCRETO) || 0
     })
   }
 
@@ -101,6 +112,7 @@ export function lerProgramacao (buffer) {
       motivo: r.motivo,
       observacao: r.observacao,
       linhas: grupo.length,
+      postes: postesDa(grupo),
       ultimo_status: r.ultimo_status,
       ultimo_evento: r.ultimo_evento
     })

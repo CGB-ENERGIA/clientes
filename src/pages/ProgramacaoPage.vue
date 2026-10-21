@@ -397,7 +397,7 @@ const linhasCompletas = computed(() => {
     (!statusCompleta.value || l.status_programacao === statusCompleta.value) &&
     (!dataInicioCompleta.value || (l.data_programada && l.data_programada >= dataInicioCompleta.value)) &&
     (!dataFimCompleta.value || (l.data_programada && l.data_programada <= dataFimCompleta.value)) &&
-    (!q || [l.sap, l.municipio, l.equipe, l.supervisor, ...(l.notas_sistema ?? []).map(n => n.nota)].some(v => String(v ?? '').toLowerCase().includes(q)))
+    (!q || [l.sap, l.pep, l.municipio, l.equipe, l.supervisor, ...(l.notas_sistema ?? []).map(n => n.nota)].some(v => String(v ?? '').toLowerCase().includes(q)))
   )
 })
 
@@ -405,6 +405,8 @@ const colCompletas = [
   { name: 'data', label: 'Data', field: 'data_programada', align: 'left', sortable: true, format: formatarData },
   { name: 'sap', label: 'Projeto SAP', field: 'sap', align: 'left', sortable: true },
   { name: 'notaSap', label: 'Nota SAP', field: 'notas_sistema', align: 'left' },
+  { name: 'pep', label: 'PEP', field: 'pep', align: 'left', sortable: true },
+  { name: 'postes', label: 'Poste', field: 'postes', align: 'right', sortable: true, format: v => v ?? '—' },
   { name: 'municipio', label: 'Município', field: 'municipio', align: 'left', sortable: true },
   { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'left', sortable: true },
   { name: 'supervisor', label: 'Supervisor', field: 'supervisor', align: 'left', sortable: true },
