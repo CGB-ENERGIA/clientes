@@ -278,6 +278,8 @@
         flat bordered
         :rows="linhasTabela"
         :columns="colCompletas"
+        :visible-columns="colunasVisiveis"
+        :dense="$q.screen.lt.md"
         row-key="sap"
         :pagination="{ rowsPerPage: 50, sortBy: 'data' }"
         no-data-label="Nenhuma nota com esses filtros"
@@ -285,7 +287,7 @@
       >
         <template #top-row>
           <q-tr class="prog-filtros-colunas">
-            <q-td v-for="c in colCompletas" :key="c.name">
+            <q-td v-for="c in colunasTabela" :key="c.name">
               <q-input v-model="filtrosColunas[c.name]" dense outlined clearable placeholder="Filtrar" class="prog-filtro-coluna" />
             </q-td>
           </q-tr>
@@ -390,7 +392,8 @@ const buscaCompleta = ref('')
 const equipeCompleta = ref(null)
 const statusCompleta = ref(null)
 const linhasTabela = computed(() => {
-  const ativos = Object.entries(filtrosColunas.value).filter(([, v]) => String(v ?? '').trim())
+  const ativos = Object.entries(filtrosColunas.value).filter(([col, v]) =>
+    colunasVisiveis.value.includes(col) && String(v ?? '').trim())
   if (!ativos.length) return linhasCompletas.value
   return linhasCompletas.value.filter(l => ativos.every(([col, v]) =>
     String(TEXTO_COLUNA[col](l) ?? '').toLowerCase().includes(String(v).trim().toLowerCase())))
@@ -443,6 +446,13 @@ const colCompletas = [
   { name: 'sis', label: 'Sistema', field: 'status_sistema', align: 'center', sortable: true },
   { name: 'ultimo', label: 'Último registro', field: 'ultimo_evento', align: 'center', sortable: true, format: formatarData }
 ]
+
+// No celular a tabela mostra só as colunas principais; o restante fica no desktop
+const COLUNAS_CELULAR = ['data', 'pep', 'sap', 'notaSap', 'municipio', 'equipe', 'prog', 'sis']
+const colunasVisiveis = computed(() => $q.screen.lt.md
+  ? COLUNAS_CELULAR
+  : colCompletas.map(c => c.name))
+const colunasTabela = computed(() => colCompletas.filter(c => colunasVisiveis.value.includes(c.name)))
 
 const contagem = computed(() => {
   const c = { aplicar: 0, conferir: 0, sem_correspondencia: 0, ok: 0 }
@@ -802,6 +812,17 @@ onMounted(() => {
 .prog-filtro { min-width: 180px; }
 .prog-filtros-colunas td { padding: 6px 8px; }
 .prog-filtro-coluna { min-width: 110px; }
+
+@media (max-width: 1023px) {
+  .prog-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .prog-acoes { width: 100%; flex-wrap: wrap; }
+  .prog-acoes > * { flex: 1 1 200px; }
+  .prog-barra > * { flex: 1 1 100%; min-width: 0; }
+  .prog-busca, .prog-filtro { min-width: 0; }
+  .prog-filtro-coluna { min-width: 90px; }
+  .prog-tabela :deep(th),
+  .prog-tabela :deep(td) { white-space: normal; padding: 6px 8px; font-size: 13px; }
+}
 .prog-filtro-coluna :deep(input) { text-align: center; }
 
 .prog-chip {

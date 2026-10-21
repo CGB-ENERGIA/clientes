@@ -93,7 +93,7 @@
             v-model="filtroDatas"
             :options="datasOpcoes"
             multiple
-            dense outlined clearable
+            dense outlined
             :display-value="filtroDatas.length > 1 ? `${filtroDatas.length} datas` : (filtroDatas[0] ? dataBr(filtroDatas[0]) : undefined)"
             label="Data programada"
             class="mapa-filtro-data"
@@ -108,6 +108,14 @@
               </q-item>
             </template>
           </q-select>
+          <q-btn
+            v-if="esquema === 'programacao' && filtroDatas.length"
+            flat dense round icon="filter_alt_off"
+            aria-label="Mostrar todas as datas"
+            @click="filtroDatas = []"
+          >
+            <q-tooltip>Mostrar todas as datas</q-tooltip>
+          </q-btn>
           <q-select
             v-if="esquema === 'programacao'"
             v-model="filtroEquipe"
