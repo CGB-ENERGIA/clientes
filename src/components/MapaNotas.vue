@@ -100,7 +100,7 @@
             :options="equipesOpcoes"
             dense outlined clearable
             label="Equipe"
-            class="mapa-filtro"
+            class="mapa-filtro mapa-filtro--equipe"
             options-dense
             behavior="menu"
           >
@@ -1554,6 +1554,7 @@ watch([painelAberto, () => $q.screen.width, () => $q.screen.height, areaAtual, e
 .mapa-filtros   { display: contents; }
 .mapa-filtro     { width: 162px; }
 .mapa-filtro--mun { width: 206px; }
+.mapa-filtro--equipe { width: 220px; }
 .mapa-filtro-data { width: 170px; }
 :deep(.mapa-filtro .q-field__control),
 :deep(.mapa-filtro--mun .q-field__control) {
