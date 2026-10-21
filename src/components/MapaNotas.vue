@@ -892,6 +892,11 @@ const rotJaNoDia = computed(() => {
 const rotTrechos = computed(() =>
   trechosGoogle(rotSequencia.value, { daPosicaoAtual: !!roteiro.value?.origem }))
 
+// Equipes distintas das notas de um ponto, para mostrar junto do número da nota
+function equipesDe (notas) {
+  return [...new Set(notas.map(n => n.equipe).filter(Boolean))].join(', ')
+}
+
 function rotLocal (p) {
   const mun = p.notas[0]?.municipio
   const postes = p.notas.reduce((s, n) => s + (Number(n.postes) || 0), 0)
@@ -1039,7 +1044,9 @@ function desenharRoteiro () {
         iconAnchor: [15, 15]
       })
     })
-    if (temHover) m.bindTooltip(p.notas.map(n => `Nota ${n.nota}`).join(', '), { direction: 'top', offset: [0, -14] })
+    const equipe = equipesDe(p.notas)
+    const titulo = p.notas.map(n => `Nota ${n.nota}`).join(', ')
+    if (temHover) m.bindTooltip(equipe ? `${titulo}<br>Equipe ${equipe}` : titulo, { direction: 'top', offset: [0, -14] })
     m.on('click', () => rotFocarNaLista(p))
     m.addTo(camadaRoteiro)
     rotMarcadores.set(p.id, m)
@@ -1330,7 +1337,9 @@ function desenharMarcadores () {
       statusNotas: notas.map(n => n.status),
       notasPonto: [...notas].sort((a, b) => ordem(a.status) - ordem(b.status))
     })
-    if (temHover) m.bindTooltip(notas.length > 1 ? `${notas.length} notas` : `Nota ${principal.nota}`, { direction: 'top', offset: [0, -6] })
+    const equipe = equipesDe(notas)
+    const titulo = notas.length > 1 ? `${notas.length} notas` : `Nota ${principal.nota}`
+    if (temHover) m.bindTooltip(equipe ? `${titulo}<br>Equipe ${equipe}` : titulo, { direction: 'top', offset: [0, -6] })
     m.on('click', () => abrirRoteiroDoPonto(principal.latitude, principal.longitude))
     marcadores.push(m)
   }
