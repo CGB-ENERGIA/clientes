@@ -1059,7 +1059,7 @@ function rotMarcar (p) {
 }
 function limparMarcados () { rotMarcados.value = [] }
 watch(rotMarcados, m => {
-  marcarAtivo()
+  desenharRoteiro()
   if (m.length === 2) medidorMarcados.medir(m[0], m[1])
   else medidorMarcados.parar()
 })
@@ -1248,8 +1248,10 @@ function desenharRoteiro () {
   if (!mapa || !roteiro.value || roteiro.value.grande) return
 
   const seq = rotSequencia.value
-  const pts = rotPontos.value.map(p => [p.lat, p.lng])
-  if (rotReal.value.estado === 'ok' && rotRealPontos) {
+  // Com dois pontos marcados, o roteiro inteiro sai do mapa e fica só o trecho entre eles
+  const soPar = rotMarcados.value.length === 2
+  const pts = soPar ? [] : rotPontos.value.map(p => [p.lat, p.lng])
+  if (!soPar && rotReal.value.estado === 'ok' && rotRealPontos) {
     const base = { renderer: rendererRoteiro, pane: 'roteiroLinha', interactive: false }
     L.polyline(rotRealPontos, { ...base, color: '#fff', weight: 9, opacity: 0.9, className: 'mapa-rota-linha mapa-rota-linha--borda' }).addTo(camadaRoteiro)
     L.polyline(rotRealPontos, { ...base, color: '#1e88e5', weight: 5, opacity: 1, className: 'mapa-rota-linha' }).addTo(camadaRoteiro)
@@ -1264,7 +1266,7 @@ function desenharRoteiro () {
 
   // No modo campo a bolinha azul da equipe já está no mapa
   const origem = rotPartidaSolta.value
-  if (origem && !marcadorEu) {
+  if (origem && !marcadorEu && rotMarcados.value.length !== 2) {
     L.marker([origem.lat, origem.lng], {
       icon: L.divIcon({
         className: 'mapa-eu',
@@ -1277,12 +1279,15 @@ function desenharRoteiro () {
     }).addTo(camadaRoteiro)
   }
 
-  // Rota por estrada entre os dois pontos marcados
+  // Entre dois pontos marcados: rota por estrada, ou linha reta tracejada enquanto ela não chega
   const par = medidorMarcados.resultado.value
-  if (rotMarcados.value.length === 2 && par?.estado === 'ok' && par.pontos) {
-    L.polyline(par.pontos, {
+  if (soPar) {
+    const [a, b] = rotMarcados.value
+    const porEstrada = par?.estado === 'ok' && par.pontos
+    L.polyline(porEstrada ? par.pontos : [[a.lat, a.lng], [b.lat, b.lng]], {
       renderer: rendererRoteiro, pane: 'roteiroLinha', interactive: false,
-      color: '#f57c00', weight: 5, opacity: 0.95, lineCap: 'round'
+      color: '#f57c00', weight: 5, opacity: 0.95, lineCap: 'round',
+      dashArray: porEstrada ? null : '2 8'
     }).addTo(camadaRoteiro)
   }
 

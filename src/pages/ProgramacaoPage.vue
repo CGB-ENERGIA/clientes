@@ -272,17 +272,24 @@
         <q-input v-model="dataInicioCompleta" dense outlined clearable type="date" label="Data de" stack-label class="prog-filtro" />
         <q-input v-model="dataFimCompleta" dense outlined clearable type="date" label="Data até" stack-label class="prog-filtro" />
       </div>
-      <div class="prog-muted q-mt-sm">{{ linhasCompletas.length }} de {{ linhas.length }} notas</div>
+      <div class="prog-muted q-mt-sm">{{ linhasTabela.length }} de {{ linhas.length }} notas</div>
 
       <q-table
         flat bordered
-        :rows="linhasCompletas"
+        :rows="linhasTabela"
         :columns="colCompletas"
         row-key="sap"
         :pagination="{ rowsPerPage: 50, sortBy: 'data' }"
         no-data-label="Nenhuma nota com esses filtros"
         class="prog-tabela q-mt-sm"
       >
+        <template #top-row>
+          <q-tr class="prog-filtros-colunas">
+            <q-td v-for="c in colCompletas" :key="c.name">
+              <q-input v-model="filtrosColunas[c.name]" dense outlined clearable placeholder="Filtrar" class="prog-filtro-coluna" />
+            </q-td>
+          </q-tr>
+        </template>
         <template #body-cell-prog="props">
           <q-td :props="props">
             <span class="prog-chip" :class="`prog-chip--${props.row.status_programacao.toLowerCase()}`">
@@ -382,6 +389,12 @@ const colunas = [
 const buscaCompleta = ref('')
 const equipeCompleta = ref(null)
 const statusCompleta = ref(null)
+const linhasTabela = computed(() => {
+  const ativos = Object.entries(filtrosColunas.value).filter(([, v]) => String(v ?? '').trim())
+  if (!ativos.length) return linhasCompletas.value
+  return linhasCompletas.value.filter(l => ativos.every(([col, v]) =>
+    String(TEXTO_COLUNA[col](l) ?? '').toLowerCase().includes(String(v).trim().toLowerCase())))
+})
 const dataInicioCompleta = ref(null)
 const dataFimCompleta = ref(null)
 
@@ -400,6 +413,22 @@ const linhasCompletas = computed(() => {
     (!q || [l.sap, l.pep, l.municipio, l.equipe, l.supervisor, ...(l.notas_sistema ?? []).map(n => n.nota)].some(v => String(v ?? '').toLowerCase().includes(q)))
   )
 })
+
+// Filtro digitado em cada coluna da programação completa
+const filtrosColunas = ref({})
+const TEXTO_COLUNA = {
+  data: l => formatarData(l.data_programada),
+  pep: l => l.pep,
+  sap: l => l.sap,
+  notaSap: l => (l.notas_sistema ?? []).map(n => n.nota).join(' '),
+  postes: l => l.postes,
+  municipio: l => l.municipio,
+  equipe: l => l.equipe,
+  supervisor: l => l.supervisor,
+  prog: l => ROTULO_PROGRAMACAO[l.status_programacao],
+  sis: l => ROTULO_SISTEMA[l.status_sistema],
+  ultimo: l => formatarData(l.ultimo_evento)
+}
 
 const colCompletas = [
   { name: 'data', label: 'Data', field: 'data_programada', align: 'center', sortable: true, format: formatarData },
@@ -771,6 +800,9 @@ onMounted(() => {
 .prog-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .prog-busca { min-width: 260px; }
 .prog-filtro { min-width: 180px; }
+.prog-filtros-colunas td { padding: 6px 8px; }
+.prog-filtro-coluna { min-width: 110px; }
+.prog-filtro-coluna :deep(input) { text-align: center; }
 
 .prog-chip {
   display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 10px;
