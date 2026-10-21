@@ -8,7 +8,7 @@ DROP FUNCTION IF EXISTS public.equipe2_carregar(text);
 DROP FUNCTION IF EXISTS public.equipe2_salvar(text, jsonb, boolean);
 DROP FUNCTION IF EXISTS public.equipe2_salvar(text, text, text, jsonb, boolean);
 
--- Notas que a equipe 1 finalizou (aguardando Etapa 2) e cuja Etapa 2 ainda não foi concluída
+-- Notas aguardando Etapa 2 (finalizadas pela equipe 1 ou marcadas pela planilha) cuja Etapa 2 ainda não foi concluída
 CREATE OR REPLACE FUNCTION public.equipe2_listar()
 RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
   SELECT coalesce(jsonb_agg(s.x ORDER BY s.x->>'projeto_info_sap', s.x->>'nota'), '[]'::jsonb)
@@ -26,7 +26,6 @@ RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
     FROM public.notas_servico n
     WHERE n.ativo
       AND n.status = 'aguardando_etapa2'
-      AND EXISTS (SELECT 1 FROM public.campo_registros c WHERE c.nota = n.nota)
       AND NOT EXISTS (SELECT 1 FROM public.apontamentos a WHERE a.nota = n.nota AND NOT a.rascunho)
   ) s
 $$;
@@ -65,7 +64,6 @@ BEGIN
   SELECT count(*)::int, coalesce(array_agg(c.pg_numero ORDER BY c.created_at), '{}'::text[])
     INTO v_postes, v_pgs
   FROM public.campo_registros c WHERE c.nota = p_nota;
-  IF v_postes = 0 THEN RAISE EXCEPTION 'SEM_POSTES_REGISTRADOS'; END IF;
 
   IF jsonb_typeof(p_clientes) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'CLIENTES_INVALIDOS'; END IF;
   IF jsonb_typeof(p_fotos_servico) IS DISTINCT FROM 'array' THEN p_fotos_servico := '[]'::jsonb; END IF;
