@@ -94,6 +94,18 @@
             label="Data programada"
             class="mapa-filtro-data"
           />
+          <q-select
+            v-if="esquema === 'programacao'"
+            v-model="filtroEquipe"
+            :options="equipesOpcoes"
+            dense outlined clearable
+            label="Equipe"
+            class="mapa-filtro"
+            options-dense
+            behavior="menu"
+          >
+            <template #prepend><q-icon name="groups" size="18px" /></template>
+          </q-select>
 
           <div class="mapa-legenda">
             <button
@@ -507,6 +519,10 @@ const hojeISO = () => {
 }
 // Mapa da programação começa mostrando só o dia de hoje; limpar o campo mostra todas as datas
 const filtroData = ref(props.esquema === 'programacao' ? hojeISO() : null)
+const filtroEquipe = ref(null)
+const equipesOpcoes = computed(() =>
+  [...new Set(todasNotas.value.map(n => n.equipe).filter(Boolean))].sort()
+)
 const avisoArea       = ref('')
 const areaAtual       = ref(null)
 const buscaMunicipio  = ref('')
@@ -515,7 +531,7 @@ let geracaoArea = 0
 let municipiosDaArea = []
 
 const filtrosAtivos = computed(() =>
-  filtroBase.value.length + (filtroMunicipio.value ? 1 : 0) + ocultos.value.size
+  filtroBase.value.length + (filtroMunicipio.value ? 1 : 0) + (filtroEquipe.value ? 1 : 0) + ocultos.value.size
 )
 
 const basesOpcoes = computed(() =>
@@ -536,6 +552,7 @@ function filtrarMunicipios (val, update) {
 
 const notasDaArea = computed(() => comCoordenada.value.filter(n =>
   (!filtroData.value || n.data_programada === filtroData.value) &&
+  (!filtroEquipe.value || n.equipe === filtroEquipe.value) &&
   (!filtroBase.value.length || filtroBase.value.includes(n.base)) &&
   (!filtroMunicipio.value || chaveMunicipio(n.municipio) === chaveMunicipio(filtroMunicipio.value))
 ))
