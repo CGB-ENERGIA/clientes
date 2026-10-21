@@ -2,6 +2,7 @@
   <q-dialog
     :model-value="modelValue"
     maximized
+    persistent
     transition-show="slide-up"
     transition-hide="slide-down"
     @update:model-value="v => emit('update:modelValue', v)"
