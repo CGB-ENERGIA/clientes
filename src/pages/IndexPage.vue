@@ -1544,13 +1544,26 @@ function confirmarApagar (g) {
   const alvo  = lista.length > 1 ? `as ${lista.length} notas do projeto ${g.projeto_info_sap}` : `a nota ${lista[0]}`
   $q.dialog({
     title: 'Apagar trabalho da nota',
-    message: `Isto vai apagar ${alvo}: postes registrados em campo, clientes, números de medidor e fotos. ` +
-             'Ela voltará para "Não Iniciado" com a marca "Apagada". Esta ação não pode ser desfeita.',
+    message: `Isto vai apagar postes registrados em campo, clientes, números de medidor e fotos de ${alvo}. ` +
+             'Para qual status ela deve voltar? Não Iniciado volta sem nenhuma marcação. Esta ação não pode ser desfeita.',
+    options: {
+      type: 'radio',
+      model: 'pendente',
+      items: [
+        { label: 'Não Iniciado (sem marcação)', value: 'pendente' },
+        { label: 'Andamento', value: 'em_andamento' },
+        { label: 'Aguardando Etapa 2', value: 'aguardando_etapa2' },
+        { label: 'Auditar', value: 'baixar_medidor' },
+        { label: 'Concluído', value: 'concluido' },
+        { label: 'Expurgo', value: 'expurgo' },
+        { label: 'Sem Acesso', value: 'sem_acesso' }
+      ]
+    },
     cancel: { label: 'Cancelar', flat: true, color: 'grey-7' },
     ok: { label: 'Apagar', color: 'negative', unelevated: true },
     persistent: true
-  }).onOk(async () => {
-    const { error } = await notasStore.apagarNotas(lista)
+  }).onOk(async (destino) => {
+    const { error } = await notasStore.apagarNotas(lista, { destino })
     if (error) {
       $q.notify({ type: 'negative', message: 'Erro ao apagar: ' + error.message })
       return

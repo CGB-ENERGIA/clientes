@@ -275,7 +275,8 @@ export const useNotasStore = defineStore('notas', () => {
   }
 
   // Remove o trabalho feito na ferramenta e devolve as notas para "Não Iniciado"
-  async function apagarNotas (lista) {
+  async function apagarNotas (lista, { destino = 'pendente' } = {}) {
+    const marcar = destino !== 'pendente'
     const { data: aps, error: e1 } = await supabase.from('apontamentos').select('id').in('nota', lista)
     if (e1) return { error: e1 }
     const ids = (aps || []).map(a => a.id)
@@ -288,17 +289,18 @@ export const useNotasStore = defineStore('notas', () => {
     const { error: e4 } = await supabase.from('campo_registros').delete().in('nota', lista)
     if (e4) return { error: e4 }
 
-    const apagada_em = new Date().toISOString()
+    const apagada_em = marcar ? new Date().toISOString() : null
     const { error } = await supabase
       .from('notas_servico')
-      .update({ status: 'pendente', apagada: true, apagada_em })
+      .update({ status: destino, apagada: marcar, apagada_em })
       .in('nota', lista)
     if (error) return { error }
 
     const set = new Set(lista)
-    notas.value.forEach(n => { if (set.has(n.nota)) Object.assign(n, { status: 'pendente', apagada: true, apagada_em }) })
+    notas.value.forEach(n => { if (set.has(n.nota)) Object.assign(n, { status: destino, apagada: marcar, apagada_em }) })
     notasViaPwa.value = new Set([...notasViaPwa.value].filter(n => !set.has(n)))
     notasComRascunho.value = new Set([...notasComRascunho.value].filter(n => !set.has(n)))
+    campoInicio.value = new Map([...campoInicio.value].filter(([n]) => !set.has(n)))
     return { error: null }
   }
 
