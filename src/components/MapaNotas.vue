@@ -188,6 +188,7 @@
                 </div>
                 <div v-if="n.projeto_info_sap" class="mapa-sheet-linha">SAP {{ n.projeto_info_sap }}</div>
                 <div class="mapa-sheet-linha">{{ n.base }}<template v-if="n.municipio"> · {{ n.municipio }}</template></div>
+                <div v-if="n.equipe" class="mapa-sheet-linha">Equipe {{ n.equipe }}</div>
                 <div class="mapa-sheet-linha">{{ Number(n.postes) || 0 }} postes · {{ Number(n.qtd_clientes) || 0 }} clientes</div>
                 <q-btn
                   v-if="permitirAbrir"
@@ -894,7 +895,8 @@ const rotTrechos = computed(() =>
 function rotLocal (p) {
   const mun = p.notas[0]?.municipio
   const postes = p.notas.reduce((s, n) => s + (Number(n.postes) || 0), 0)
-  return `${mun ? mun + ' · ' : ''}${postes} ${postes === 1 ? 'poste' : 'postes'}`
+  const equipes = [...new Set(p.notas.map(n => n.equipe).filter(Boolean))].join(', ')
+  return `${mun ? mun + ' · ' : ''}${equipes ? equipes + ' · ' : ''}${postes} ${postes === 1 ? 'poste' : 'postes'}`
 }
 
 function rotPerna (i) {

@@ -293,6 +293,12 @@
             </q-tooltip>
           </q-td>
         </template>
+        <template #body-cell-notaSap="props">
+          <q-td :props="props">
+            <div v-for="n in props.row.notas_sistema" :key="n.nota" class="prog-sis-linha">{{ n.nota }}</div>
+            <span v-if="!props.row.notas_sistema?.length" class="prog-muted">—</span>
+          </q-td>
+        </template>
         <template #body-cell-sis="props">
           <q-td :props="props">
             <span v-if="props.row.status_sistema" class="prog-sis">{{ ROTULO_SISTEMA[props.row.status_sistema] }}</span>
@@ -391,13 +397,14 @@ const linhasCompletas = computed(() => {
     (!statusCompleta.value || l.status_programacao === statusCompleta.value) &&
     (!dataInicioCompleta.value || (l.data_programada && l.data_programada >= dataInicioCompleta.value)) &&
     (!dataFimCompleta.value || (l.data_programada && l.data_programada <= dataFimCompleta.value)) &&
-    (!q || [l.sap, l.municipio, l.equipe, l.supervisor].some(v => String(v ?? '').toLowerCase().includes(q)))
+    (!q || [l.sap, l.municipio, l.equipe, l.supervisor, ...(l.notas_sistema ?? []).map(n => n.nota)].some(v => String(v ?? '').toLowerCase().includes(q)))
   )
 })
 
 const colCompletas = [
   { name: 'data', label: 'Data', field: 'data_programada', align: 'left', sortable: true, format: formatarData },
-  { name: 'sap', label: 'Nota SAP', field: 'sap', align: 'left', sortable: true },
+  { name: 'sap', label: 'Projeto SAP', field: 'sap', align: 'left', sortable: true },
+  { name: 'notaSap', label: 'Nota SAP', field: 'notas_sistema', align: 'left' },
   { name: 'municipio', label: 'Município', field: 'municipio', align: 'left', sortable: true },
   { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'left', sortable: true },
   { name: 'supervisor', label: 'Supervisor', field: 'supervisor', align: 'left', sortable: true },
@@ -589,6 +596,7 @@ const gruposMapa = computed(() => {
         qtd_clientes: n.qtd_clientes,
         status: l.status_programacao,
         data_programada: l.data_programada,
+        equipe: l.equipe,
         latitude: n.latitude,
         longitude: n.longitude
       })
