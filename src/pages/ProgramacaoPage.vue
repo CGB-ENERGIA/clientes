@@ -948,6 +948,8 @@ function isoLocal (d) {
 const implInicio = ref(isoLocal(new Date()))
 const implFim = ref(isoLocal(new Date()))
 const implDados = ref(null)
+// Primeiro dia com registros no app de campo (PWA)
+const INICIO_PWA = '2026-10-19'
 const implCarregando = ref(false)
 
 function periodoRapido (tipo) {
@@ -1077,12 +1079,11 @@ const colPostes = [
 
 // Previsão da programação (planilha) no período, por obra: não é produção registrada no app
 const implProgramado = computed(() => {
-  // Só entram os dias sem nenhuma informação no app; dias com produção registrada ficam de fora
-  const diasComApp = new Set((implDados.value?.dias ?? []).map(d => d.data))
+  // Só entram datas anteriores ao início dos registros no app: antes disso não há produção registrada
   const lista = linhas.value
     .filter(l => l.status_programacao !== 'CANCELAR' && l.data_programada &&
       l.data_programada >= implInicio.value && l.data_programada <= implFim.value &&
-      !diasComApp.has(l.data_programada))
+      l.data_programada < INICIO_PWA)
     .map(l => ({ ...l, key: l.sap }))
     .sort((a, b) => b.data_programada.localeCompare(a.data_programada) || String(a.equipe).localeCompare(String(b.equipe)))
   return {
