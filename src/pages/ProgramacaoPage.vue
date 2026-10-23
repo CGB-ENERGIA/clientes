@@ -399,6 +399,35 @@
         class="prog-tabela q-mt-sm"
       />
 
+      <div class="prog-barra q-mt-lg">
+        <div class="prog-sec-titulo">
+          <q-icon name="history" size="18px" /> Postes antigos
+          <small>não contam como implantados; a evidência fica guardada</small>
+        </div>
+      </div>
+      <div v-if="!implAntigos.length" class="prog-muted q-mt-sm">Nenhum poste antigo neste período.</div>
+      <q-table
+        v-else
+        flat bordered
+        :rows="implAntigos"
+        :columns="colAntigos"
+        row-key="key"
+        :pagination="{ rowsPerPage: 50, sortBy: 'data', descending: true }"
+        class="prog-tabela q-mt-sm"
+      >
+        <template #body-cell-foto="props">
+          <q-td :props="props">
+            <a v-if="props.row.foto" :href="props.row.foto" target="_blank" rel="noopener">Ver foto</a>
+            <span v-else class="prog-muted">—</span>
+          </q-td>
+        </template>
+        <template #body-cell-acao="props">
+          <q-td :props="props">
+            <q-btn flat dense no-caps color="primary" label="Voltar a contar" @click="voltarAContar(props.row)" />
+          </q-td>
+        </template>
+      </q-table>
+
       <q-dialog v-model="pgDialogAberto">
         <q-card style="width: 440px; max-width: 94vw">
           <q-card-section>
@@ -424,6 +453,12 @@
             />
           </q-card-section>
           <q-card-actions align="right">
+            <q-btn
+              outline no-caps color="orange-9" icon="history" label="Poste antigo"
+              :disable="pgSalvando"
+              @click="marcarAntigo"
+            />
+            <q-space />
             <q-btn flat no-caps label="Cancelar" v-close-popup />
             <q-btn
               unelevated no-caps color="primary" label="Salvar PG"
@@ -848,6 +883,45 @@ function abrirEdicaoPg (p) {
   pgEdicao.value = p
   pgNovo.value = ''
   pgDialogAberto.value = true
+}
+
+// Poste antigo: já existia; some da contagem de implantados, mas a evidência fica guardada
+const implAntigos = computed(() => (implDados.value?.antigos ?? []).map(a => ({ ...a, key: `${a.nota}-${a.pg}` })))
+const colAntigos = [
+  { name: 'data', label: 'Data', field: 'data', align: 'center', sortable: true, format: formatarData },
+  { name: 'hora', label: 'Hora', field: 'hora', align: 'center' },
+  { name: 'nota', label: 'Nota', field: 'nota', align: 'center' },
+  { name: 'pep', label: 'PEP', field: 'pep', align: 'center' },
+  { name: 'pg', label: 'PG', field: 'pg', align: 'center' },
+  { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center' },
+  { name: 'foto', label: 'Foto', field: 'foto', align: 'center' },
+  { name: 'acao', label: '', field: 'acao', align: 'center' }
+]
+
+async function atualizarAntigo (p, antigo) {
+  const { error } = await supabase.rpc('implantacao_marcar_antigo', { p_nota: p.nota, p_pg: p.pg, p_antigo: antigo })
+  if (error) {
+    $q.notify({ type: 'negative', message: 'Não foi possível atualizar: ' + error.message, position: 'top', timeout: 5000 })
+    return false
+  }
+  return true
+}
+
+async function marcarAntigo () {
+  if (!pgEdicao.value) return
+  pgSalvando.value = true
+  const ok = await atualizarAntigo(pgEdicao.value, true)
+  pgSalvando.value = false
+  if (!ok) return
+  $q.notify({ type: 'positive', message: 'Marcado como poste antigo. Não entra na contagem de implantados.', position: 'top', timeout: 3500 })
+  pgDialogAberto.value = false
+  carregarImplantacao()
+}
+
+async function voltarAContar (p) {
+  if (!await atualizarAntigo(p, false)) return
+  $q.notify({ type: 'positive', message: 'Poste voltou a contar como implantado', position: 'top', timeout: 2500 })
+  carregarImplantacao()
 }
 
 async function salvarPg () {
