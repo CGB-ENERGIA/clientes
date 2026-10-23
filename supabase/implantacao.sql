@@ -97,6 +97,7 @@ RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
           SELECT jsonb_agg(jsonb_build_object(
             'nota', p.nota,
             'pep', (SELECT n.pep FROM public.notas_servico n WHERE n.nota = p.nota LIMIT 1),
+            'projeto', (SELECT n.projeto_info_sap FROM public.notas_servico n WHERE n.nota = p.nota LIMIT 1),
             'pg', p.pg_numero,
             'equipe', COALESCE(NULLIF(trim(p.equipe), ''), '—'),
             'hora', to_char(p.primeiro AT TIME ZONE 'America/Sao_Paulo', 'HH24:MI'),
@@ -113,6 +114,7 @@ RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
         'hora', to_char(a.primeiro AT TIME ZONE 'America/Sao_Paulo', 'HH24:MI'),
         'nota', a.nota,
         'pep', (SELECT n.pep FROM public.notas_servico n WHERE n.nota = a.nota LIMIT 1),
+        'projeto', (SELECT n.projeto_info_sap FROM public.notas_servico n WHERE n.nota = a.nota LIMIT 1),
         'pg', a.pg_numero,
         'equipe', COALESCE(NULLIF(trim(a.equipe), ''), '—'),
         'foto', a.foto

@@ -338,13 +338,12 @@
         <q-input v-model="implFim" dense outlined type="date" label="Até" stack-label class="prog-filtro" />
       </div>
 
-      <div class="prog-card q-mt-md">
+      <div v-if="implProgramado.lista.length" class="prog-card q-mt-md">
         <div class="prog-sec-titulo">
           <q-icon name="event_note" size="18px" /> Programado na planilha
           <small>previsão da programação, não é produção registrada no app</small>
         </div>
-        <div v-if="!implProgramado.lista.length" class="prog-muted">Nenhuma obra programada neste período.</div>
-        <template v-else>
+        <template v-if="implProgramado.lista.length">
           <div class="prog-muted q-mb-sm">
             {{ implProgramado.obras }} {{ implProgramado.obras === 1 ? 'obra' : 'obras' }} ·
             {{ implProgramado.postes }} postes previstos ·
@@ -997,6 +996,7 @@ const colPgIncorreto = [
   { name: 'data', label: 'Data', field: 'data', align: 'center', sortable: true, format: formatarData },
   { name: 'hora', label: 'Hora', field: 'hora', align: 'center' },
   { name: 'nota', label: 'Nota', field: 'nota', align: 'center' },
+  { name: 'projeto', label: 'Projeto SAP', field: 'projeto', align: 'center' },
   { name: 'pep', label: 'PEP', field: 'pep', align: 'center' },
   { name: 'pg', label: 'PG atual', field: 'pg', align: 'center' },
   { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center' },
@@ -1015,6 +1015,7 @@ const colAntigos = [
   { name: 'data', label: 'Data', field: 'data', align: 'center', sortable: true, format: formatarData },
   { name: 'hora', label: 'Hora', field: 'hora', align: 'center' },
   { name: 'nota', label: 'Nota', field: 'nota', align: 'center' },
+  { name: 'projeto', label: 'Projeto SAP', field: 'projeto', align: 'center' },
   { name: 'pep', label: 'PEP', field: 'pep', align: 'center' },
   { name: 'pg', label: 'PG', field: 'pg', align: 'center' },
   { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center' },
@@ -1068,6 +1069,7 @@ const colPostes = [
   { name: 'data', label: 'Data', field: 'data', align: 'center', sortable: true, format: formatarData },
   { name: 'hora', label: 'Hora', field: 'hora', align: 'center', sortable: true },
   { name: 'nota', label: 'Nota', field: 'nota', align: 'center', sortable: true },
+  { name: 'projeto', label: 'Projeto SAP', field: 'projeto', align: 'center', sortable: true },
   { name: 'pep', label: 'PEP', field: 'pep', align: 'center', sortable: true },
   { name: 'pg', label: 'Poste (PG)', field: 'pg', align: 'center', sortable: true },
   { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center', sortable: true }
@@ -1075,9 +1077,12 @@ const colPostes = [
 
 // Previsão da programação (planilha) no período, por obra: não é produção registrada no app
 const implProgramado = computed(() => {
+  // Só entram os dias sem nenhuma informação no app; dias com produção registrada ficam de fora
+  const diasComApp = new Set((implDados.value?.dias ?? []).map(d => d.data))
   const lista = linhas.value
     .filter(l => l.status_programacao !== 'CANCELAR' && l.data_programada &&
-      l.data_programada >= implInicio.value && l.data_programada <= implFim.value)
+      l.data_programada >= implInicio.value && l.data_programada <= implFim.value &&
+      !diasComApp.has(l.data_programada))
     .map(l => ({ ...l, key: l.sap }))
     .sort((a, b) => b.data_programada.localeCompare(a.data_programada) || String(a.equipe).localeCompare(String(b.equipe)))
   return {
