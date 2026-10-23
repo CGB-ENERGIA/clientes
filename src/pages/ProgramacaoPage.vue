@@ -343,6 +343,33 @@
         </div>
       </div>
 
+      <div class="prog-card q-mt-md">
+        <div class="prog-sec-titulo">
+          <q-icon name="warning" color="orange-9" size="18px" /> PG incorreto
+          <small>número com menos de 8 dígitos</small>
+        </div>
+        <div v-if="!implPgIncorretos.length" class="prog-muted">Nenhum PG incorreto neste período.</div>
+        <template v-else>
+          <div class="prog-aviso q-mb-sm">
+            {{ implPgIncorretos.length }} {{ implPgIncorretos.length === 1 ? 'poste precisa' : 'postes precisam' }} de correção. Clique em Editar para ver a foto e corrigir o número.
+          </div>
+          <q-table
+            flat dense bordered
+            :rows="implPgIncorretos"
+            :columns="colPgIncorreto"
+            row-key="key"
+            :pagination="{ rowsPerPage: 20, sortBy: 'data', descending: true }"
+            class="prog-tabela"
+          >
+            <template #body-cell-acao="props">
+              <q-td :props="props">
+                <q-btn unelevated dense no-caps color="primary" icon="edit" label="Editar" @click="abrirEdicaoPg(props.row)" />
+              </q-td>
+            </template>
+          </q-table>
+        </template>
+      </div>
+
       <q-table
         flat bordered
         :rows="implLinhas"
@@ -371,6 +398,42 @@
         no-data-label="Nenhum poste neste período"
         class="prog-tabela q-mt-sm"
       />
+
+      <q-dialog v-model="pgDialogAberto">
+        <q-card style="width: 440px; max-width: 94vw">
+          <q-card-section>
+            <div class="text-h6">Corrigir PG</div>
+            <div class="text-caption text-grey-7">Nota {{ pgEdicao?.nota }} · PEP {{ pgEdicao?.pep }} · PG atual {{ pgEdicao?.pg }}</div>
+          </q-card-section>
+          <q-card-section class="q-pt-none">
+            <img
+              v-if="pgEdicao?.foto"
+              :src="pgEdicao.foto"
+              alt="Foto do poste"
+              style="width: 100%; max-height: 340px; object-fit: contain; border-radius: 12px; background: #f1f5f9"
+            />
+            <div v-else class="prog-muted">Sem foto registrada para este poste.</div>
+          </q-card-section>
+          <q-card-section class="q-pt-none">
+            <q-input
+              v-model="pgNovo"
+              outlined dense
+              label="Número do PG (8 dígitos)"
+              mask="########"
+              :rules="[v => PG_VALIDO.test(v || '') || 'Informe exatamente 8 dígitos']"
+            />
+          </q-card-section>
+          <q-card-actions align="right">
+            <q-btn flat no-caps label="Cancelar" v-close-popup />
+            <q-btn
+              unelevated no-caps color="primary" label="Salvar PG"
+              :disable="!pgNovoValido || pgSalvando"
+              :loading="pgSalvando"
+              @click="salvarPg"
+            />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
     </template>
 
     <q-dialog v-model="configAberta">
@@ -762,6 +825,47 @@ const implLinhas = computed(() => (implDados.value?.dias ?? []).map(d => ({
 const implPostes = computed(() => (implDados.value?.dias ?? []).flatMap(d =>
   (d.postes_lista ?? []).map(p => ({ ...p, data: d.data, key: `${p.nota}-${p.pg}` }))))
 const implBusca = ref('')
+
+// PG incorreto: o número do poste precisa ter exatamente 8 dígitos
+const PG_VALIDO = /^[0-9]{8}$/
+const implPgIncorretos = computed(() => implPostes.value.filter(p => !PG_VALIDO.test(String(p.pg))))
+const pgDialogAberto = ref(false)
+const pgEdicao = ref(null)
+const pgNovo = ref('')
+const pgSalvando = ref(false)
+const pgNovoValido = computed(() => PG_VALIDO.test(pgNovo.value || ''))
+const colPgIncorreto = [
+  { name: 'data', label: 'Data', field: 'data', align: 'center', sortable: true, format: formatarData },
+  { name: 'hora', label: 'Hora', field: 'hora', align: 'center' },
+  { name: 'nota', label: 'Nota', field: 'nota', align: 'center' },
+  { name: 'pep', label: 'PEP', field: 'pep', align: 'center' },
+  { name: 'pg', label: 'PG atual', field: 'pg', align: 'center' },
+  { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center' },
+  { name: 'acao', label: '', field: 'acao', align: 'center' }
+]
+
+function abrirEdicaoPg (p) {
+  pgEdicao.value = p
+  pgNovo.value = ''
+  pgDialogAberto.value = true
+}
+
+async function salvarPg () {
+  if (!pgNovoValido.value || !pgEdicao.value) return
+  pgSalvando.value = true
+  const { error } = await supabase.rpc('implantacao_corrigir_pg', {
+    p_nota: pgEdicao.value.nota, p_pg_atual: pgEdicao.value.pg, p_pg_novo: pgNovo.value
+  })
+  pgSalvando.value = false
+  if (error) {
+    const msg = error.message.includes('PG_JA_EXISTE') ? 'Este PG já existe nesta nota.' : 'Não foi possível salvar: ' + error.message
+    $q.notify({ type: 'negative', message: msg, position: 'top', timeout: 5000 })
+    return
+  }
+  $q.notify({ type: 'positive', message: 'PG corrigido', position: 'top', timeout: 2500 })
+  pgDialogAberto.value = false
+  carregarImplantacao()
+}
 const colPostes = [
   { name: 'data', label: 'Data', field: 'data', align: 'center', sortable: true, format: formatarData },
   { name: 'hora', label: 'Hora', field: 'hora', align: 'center', sortable: true },
