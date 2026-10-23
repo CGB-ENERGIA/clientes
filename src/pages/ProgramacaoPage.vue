@@ -286,10 +286,20 @@
         no-data-label="Nenhuma nota com esses filtros"
         class="prog-tabela q-mt-sm"
       >
+        <template #body-cell-acao="props">
+          <q-td :props="props">
+            <q-btn
+              v-if="!props.row.postes_campo"
+              outline dense no-caps color="primary" icon="edit_note" label="Apontar postes"
+              @click="abrirApontar(props.row)"
+            />
+            <span v-else class="prog-muted">No app de campo</span>
+          </q-td>
+        </template>
         <template #top-row>
           <q-tr class="prog-filtros-colunas">
             <q-td v-for="c in colunasTabela" :key="c.name">
-              <q-input v-model="filtrosColunas[c.name]" dense outlined clearable placeholder="Filtrar" class="prog-filtro-coluna" />
+              <q-input v-if="c.name !== 'acao'" v-model="filtrosColunas[c.name]" dense outlined clearable placeholder="Filtrar" class="prog-filtro-coluna" />
             </q-td>
           </q-tr>
         </template>
@@ -471,6 +481,35 @@
       </q-dialog>
     </template>
 
+    <q-dialog v-model="apontarDialog">
+      <q-card style="width: 400px; max-width: 94vw">
+        <q-card-section>
+          <div class="text-h6">Apontar postes</div>
+          <div class="text-caption text-grey-7">Projeto SAP {{ apontarLinha?.sap }} · {{ apontarLinha?.municipio }}</div>
+        </q-card-section>
+        <q-card-section class="q-pt-none">
+          <div class="prog-muted q-mb-sm">Programado na planilha: <b>{{ apontarLinha?.postes ?? 0 }}</b> postes</div>
+          <q-input
+            v-model="apontarQtd"
+            type="number"
+            outlined dense
+            label="Postes realmente utilizados"
+            :min="0"
+            :rules="[() => apontarValido || 'Informe a quantidade de postes']"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancelar" v-close-popup />
+          <q-btn
+            unelevated no-caps color="primary" label="Salvar"
+            :disable="!apontarValido || apontarSalvando"
+            :loading="apontarSalvando"
+            @click="salvarApontar"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <q-dialog v-model="configAberta">
       <q-card style="width: 460px; max-width: 94vw">
         <q-card-section>
@@ -570,6 +609,38 @@ const linhasCompletas = computed(() => {
   )
 })
 
+// Apontar postes: obras sem registro no app de campo, com a quantidade realmente utilizada
+const apontarDialog = ref(false)
+const apontarLinha = ref(null)
+const apontarQtd = ref(null)
+const apontarSalvando = ref(false)
+const apontarValido = computed(() => {
+  const n = Number(apontarQtd.value)
+  return apontarQtd.value !== null && apontarQtd.value !== '' && Number.isInteger(n) && n >= 0
+})
+
+function abrirApontar (l) {
+  apontarLinha.value = l
+  apontarQtd.value = l.postes_apontados ?? null
+  apontarDialog.value = true
+}
+
+async function salvarApontar () {
+  if (!apontarValido.value || !apontarLinha.value) return
+  apontarSalvando.value = true
+  const { error } = await supabase.rpc('programacao_apontar_postes', {
+    p_sap: apontarLinha.value.sap, p_qtd: Number(apontarQtd.value)
+  })
+  apontarSalvando.value = false
+  if (error) {
+    $q.notify({ type: 'negative', message: 'Não foi possível salvar: ' + error.message, position: 'top', timeout: 5000 })
+    return
+  }
+  $q.notify({ type: 'positive', message: 'Postes apontados', position: 'top', timeout: 2500 })
+  apontarDialog.value = false
+  carregar()
+}
+
 // Filtro digitado em cada coluna da programação completa
 const filtrosColunas = ref({})
 const TEXTO_COLUNA = {
@@ -583,7 +654,9 @@ const TEXTO_COLUNA = {
   supervisor: l => l.supervisor,
   prog: l => ROTULO_PROGRAMACAO[l.status_programacao],
   sis: l => ROTULO_SISTEMA[l.status_sistema],
-  ultimo: l => formatarData(l.ultimo_evento)
+  ultimo: l => formatarData(l.ultimo_evento),
+  apontados: l => l.postes_apontados,
+  acao: () => ''
 }
 
 const colCompletas = [
@@ -592,16 +665,18 @@ const colCompletas = [
   { name: 'sap', label: 'Projeto SAP', field: 'sap', align: 'center', sortable: true },
   { name: 'notaSap', label: 'Nota SAP', field: 'notas_sistema', align: 'center' },
   { name: 'postes', label: 'Poste', field: 'postes', align: 'center', sortable: true, format: v => v ?? '—' },
+  { name: 'apontados', label: 'Apontados', field: 'postes_apontados', align: 'center', sortable: true, format: v => v ?? '—' },
   { name: 'municipio', label: 'Município', field: 'municipio', align: 'center', sortable: true },
   { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center', sortable: true },
   { name: 'supervisor', label: 'Supervisor', field: 'supervisor', align: 'center', sortable: true },
   { name: 'prog', label: 'Programação', field: 'status_programacao', align: 'center', sortable: true },
   { name: 'sis', label: 'Sistema', field: 'status_sistema', align: 'center', sortable: true },
-  { name: 'ultimo', label: 'Último registro', field: 'ultimo_evento', align: 'center', sortable: true, format: formatarData }
+  { name: 'ultimo', label: 'Último registro', field: 'ultimo_evento', align: 'center', sortable: true, format: formatarData },
+  { name: 'acao', label: '', field: 'acao', align: 'center' }
 ]
 
 // No celular a tabela mostra só as colunas principais; o restante fica no desktop
-const COLUNAS_CELULAR = ['data', 'pep', 'sap', 'notaSap', 'municipio', 'equipe', 'prog', 'sis']
+const COLUNAS_CELULAR = ['data', 'pep', 'sap', 'notaSap', 'municipio', 'equipe', 'prog', 'sis', 'acao']
 const colunasVisiveis = computed(() => $q.screen.lt.md
   ? COLUNAS_CELULAR
   : colCompletas.map(c => c.name))
@@ -952,6 +1027,7 @@ const colPostes = [
 const colImplantacao = [
   { name: 'data', label: 'Data', field: 'data', align: 'center', sortable: true, format: formatarData },
   { name: 'postes', label: 'Postes', field: 'postes', align: 'center', sortable: true },
+  { name: 'apontados', label: 'Apontados', field: 'apontados', align: 'center', sortable: true },
   { name: 'clientes', label: 'Clientes', field: 'clientes', align: 'center', sortable: true },
   { name: 'equipesTexto', label: 'Por equipe', field: 'equipesTexto', align: 'center' }
 ]
