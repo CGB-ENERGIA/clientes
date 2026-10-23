@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/pages/ProgramacaoPage.vue"
+        ],
+        "createdAt": "2026-10-23T12:02:07.148Z",
+        "reason": "Faixas de gravidade dos cards de obras paradas e visitas vencidas no Painel; intencionais e anteriores a esta sessão. Não confirmado explicitamente pelo usuário."
+      }
+    ]
+  }
+}

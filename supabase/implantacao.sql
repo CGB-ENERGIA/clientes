@@ -1,5 +1,6 @@
 -- Implantação: postes e clientes feitos por dia (fuso de São Paulo) e por equipe, em qualquer período.
 -- Um poste = um número PG distinto dentro da nota. Fotos com rótulo (MEDIDOR, VIZINHO, etc.) não contam.
+-- Cada dia traz também a lista dos postes: nota, PEP, número PG, equipe e hora.
 -- Executar no SQL Editor do Supabase. Pode ser executado mais de uma vez.
 
 CREATE OR REPLACE FUNCTION public.implantacao_resumo(p_inicio DATE, p_fim DATE)
@@ -47,7 +48,17 @@ RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
         'clientes', COALESCE((SELECT sum(c.qtd) FROM clientes c WHERE c.dia = d.dia), 0),
         'equipes', COALESCE((
           SELECT jsonb_agg(jsonb_build_object('equipe', p.equipe, 'postes', p.qtd) ORDER BY p.equipe)
-          FROM postes p WHERE p.dia = d.dia), '[]'::jsonb)
+          FROM postes p WHERE p.dia = d.dia), '[]'::jsonb),
+        'postes_lista', COALESCE((
+          SELECT jsonb_agg(jsonb_build_object(
+            'nota', p.nota,
+            'pep', (SELECT n.pep FROM public.notas_servico n WHERE n.nota = p.nota LIMIT 1),
+            'pg', p.pg_numero,
+            'equipe', COALESCE(NULLIF(trim(p.equipe), ''), '—'),
+            'hora', to_char(p.primeiro AT TIME ZONE 'America/Sao_Paulo', 'HH24:MI')
+          ) ORDER BY p.primeiro)
+          FROM pg p
+          WHERE (p.primeiro AT TIME ZONE 'America/Sao_Paulo')::date = d.dia), '[]'::jsonb)
       ) ORDER BY d.dia DESC)
       FROM dias d
     ), '[]'::jsonb)

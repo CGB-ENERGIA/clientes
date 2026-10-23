@@ -353,6 +353,24 @@
         no-data-label="Nenhum poste ou cliente registrado neste período"
         class="prog-tabela q-mt-md"
       />
+
+      <div class="prog-barra q-mt-lg">
+        <div class="prog-sec-titulo"><q-icon name="electric_bolt" size="18px" /> Postes instalados no período</div>
+        <q-space />
+        <q-input v-model="implBusca" dense outlined clearable placeholder="Buscar nota, PEP, poste ou equipe" class="prog-busca">
+          <template #prepend><q-icon name="search" /></template>
+        </q-input>
+      </div>
+      <q-table
+        flat bordered
+        :rows="implPostes"
+        :columns="colPostes"
+        row-key="key"
+        :filter="implBusca"
+        :pagination="{ rowsPerPage: 50, sortBy: 'data', descending: true }"
+        no-data-label="Nenhum poste neste período"
+        class="prog-tabela q-mt-sm"
+      />
     </template>
 
     <q-dialog v-model="configAberta">
@@ -739,6 +757,19 @@ const implLinhas = computed(() => (implDados.value?.dias ?? []).map(d => ({
   ...d,
   equipesTexto: d.equipes.map(e => `${e.equipe}: ${e.postes}`).join(' · ') || '—'
 })))
+
+// Cada poste do período, com nota, PEP, número PG, equipe e hora
+const implPostes = computed(() => (implDados.value?.dias ?? []).flatMap(d =>
+  (d.postes_lista ?? []).map(p => ({ ...p, data: d.data, key: `${p.nota}-${p.pg}` }))))
+const implBusca = ref('')
+const colPostes = [
+  { name: 'data', label: 'Data', field: 'data', align: 'center', sortable: true, format: formatarData },
+  { name: 'hora', label: 'Hora', field: 'hora', align: 'center', sortable: true },
+  { name: 'nota', label: 'Nota', field: 'nota', align: 'center', sortable: true },
+  { name: 'pep', label: 'PEP', field: 'pep', align: 'center', sortable: true },
+  { name: 'pg', label: 'Poste (PG)', field: 'pg', align: 'center', sortable: true },
+  { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center', sortable: true }
+]
 
 const colImplantacao = [
   { name: 'data', label: 'Data', field: 'data', align: 'center', sortable: true, format: formatarData },
