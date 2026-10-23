@@ -338,6 +338,28 @@
         <q-input v-model="implFim" dense outlined type="date" label="Até" stack-label class="prog-filtro" />
       </div>
 
+      <div class="prog-card q-mt-md">
+        <div class="prog-sec-titulo">
+          <q-icon name="event_note" size="18px" /> Programado na planilha
+          <small>previsão da programação, não é produção registrada no app</small>
+        </div>
+        <div v-if="!implProgramado.lista.length" class="prog-muted">Nenhuma obra programada neste período.</div>
+        <template v-else>
+          <div class="prog-muted q-mb-sm">
+            {{ implProgramado.obras }} {{ implProgramado.obras === 1 ? 'obra' : 'obras' }} e
+            {{ implProgramado.postes }} postes previstos neste período.
+          </div>
+          <q-table
+            flat dense bordered
+            :rows="implProgramado.lista"
+            :columns="colProgramado"
+            row-key="data"
+            :pagination="{ rowsPerPage: 31 }"
+            class="prog-tabela"
+          />
+        </template>
+      </div>
+
       <div class="prog-kpis q-mt-md">
         <div class="prog-kpi prog-kpi--destaque">
           <div class="prog-kpi-n">{{ implDados?.total_postes ?? 0 }}</div>
@@ -1037,6 +1059,30 @@ const colPostes = [
   { name: 'pep', label: 'PEP', field: 'pep', align: 'center', sortable: true },
   { name: 'pg', label: 'Poste (PG)', field: 'pg', align: 'center', sortable: true },
   { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center', sortable: true }
+]
+
+// Previsão da programação (planilha) no período: não é produção registrada no app
+const implProgramado = computed(() => {
+  const dias = new Map()
+  for (const l of linhas.value) {
+    if (l.status_programacao === 'CANCELAR' || !l.data_programada) continue
+    if (l.data_programada < implInicio.value || l.data_programada > implFim.value) continue
+    const d = dias.get(l.data_programada) ?? { data: l.data_programada, obras: 0, postes: 0 }
+    d.obras++
+    d.postes += Number(l.postes) || 0
+    dias.set(l.data_programada, d)
+  }
+  const lista = [...dias.values()].sort((a, b) => b.data.localeCompare(a.data))
+  return {
+    lista,
+    obras: lista.reduce((s, d) => s + d.obras, 0),
+    postes: lista.reduce((s, d) => s + d.postes, 0)
+  }
+})
+const colProgramado = [
+  { name: 'data', label: 'Data programada', field: 'data', align: 'center', format: formatarData },
+  { name: 'obras', label: 'Obras', field: 'obras', align: 'center' },
+  { name: 'postes', label: 'Postes previstos', field: 'postes', align: 'center' }
 ]
 
 const colImplantacao = [
