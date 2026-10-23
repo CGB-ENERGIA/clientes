@@ -1,15 +1,24 @@
 -- Implantação: postes e clientes feitos por dia (fuso de São Paulo) e por equipe, em qualquer período.
+-- Um poste = um número PG distinto dentro da nota. Fotos com rótulo (MEDIDOR, VIZINHO, etc.) não contam.
 -- Executar no SQL Editor do Supabase. Pode ser executado mais de uma vez.
 
 CREATE OR REPLACE FUNCTION public.implantacao_resumo(p_inicio DATE, p_fim DATE)
 RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
-  WITH postes AS (
-    -- Cada registro de campo é um poste
-    SELECT (c.created_at AT TIME ZONE 'America/Sao_Paulo')::date AS dia,
-           COALESCE(NULLIF(trim(c.equipe), ''), '—') AS equipe,
-           count(*) AS qtd
+  WITH pg AS (
+    -- Cada número PG da nota é um poste; o dia é o do primeiro registro dele
+    SELECT c.nota, c.pg_numero,
+           min(c.created_at) AS primeiro,
+           min(c.equipe) AS equipe
     FROM public.campo_registros c
-    WHERE (c.created_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN p_inicio AND p_fim
+    WHERE c.pg_numero ~ '^[0-9]+$'
+    GROUP BY c.nota, c.pg_numero
+  ),
+  postes AS (
+    SELECT (p.primeiro AT TIME ZONE 'America/Sao_Paulo')::date AS dia,
+           COALESCE(NULLIF(trim(p.equipe), ''), '—') AS equipe,
+           count(*) AS qtd
+    FROM pg p
+    WHERE (p.primeiro AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN p_inicio AND p_fim
     GROUP BY 1, 2
   ),
   clientes AS (

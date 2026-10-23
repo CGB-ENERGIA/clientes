@@ -25,7 +25,7 @@ RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
     ) AS x
     FROM public.notas_servico n
     WHERE n.ativo
-      AND n.status = 'aguardando_etapa2'
+      AND n.status IN ('pendente', 'em_andamento', 'aguardando_etapa2')
       AND NOT EXISTS (SELECT 1 FROM public.apontamentos a WHERE a.nota = n.nota AND NOT a.rascunho)
   ) s
 $$;
@@ -45,7 +45,8 @@ RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
     '{}'::jsonb)
 $$;
 
--- Salva o rascunho ou conclui a Etapa 2. Concluir leva a nota para Auditar (baixar_medidor).
+-- Salva o rascunho ou conclui a Etapa 2. Concluir leva a nota direto para Auditar (baixar_medidor),
+-- com ou sem a Etapa 1 concluída pela equipe 1.
 CREATE OR REPLACE FUNCTION public.equipe2_salvar(
   p_nota text, p_descricao text, p_fotos_servico jsonb, p_clientes jsonb, p_concluir boolean)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -59,7 +60,7 @@ DECLARE
 BEGIN
   SELECT * INTO n FROM public.notas_servico WHERE nota = p_nota AND ativo;
   IF NOT FOUND THEN RAISE EXCEPTION 'NOTA_NAO_ENCONTRADA'; END IF;
-  IF n.status <> 'aguardando_etapa2' THEN RAISE EXCEPTION 'NOTA_NAO_AGUARDANDO_ETAPA2'; END IF;
+  IF n.status NOT IN ('pendente', 'em_andamento', 'aguardando_etapa2') THEN RAISE EXCEPTION 'NOTA_NAO_AGUARDANDO_ETAPA2'; END IF;
 
   SELECT count(*)::int, coalesce(array_agg(c.pg_numero ORDER BY c.created_at), '{}'::text[])
     INTO v_postes, v_pgs

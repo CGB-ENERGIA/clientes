@@ -118,7 +118,7 @@ const prontoParaEnviar = computed(() =>
 )
 
 const MENSAGENS = {
-  NOTA_NAO_AGUARDANDO_ETAPA2: 'Esta nota não está mais aguardando medidor.',
+  NOTA_NAO_AGUARDANDO_ETAPA2: 'Esta nota já foi concluída ou não está disponível para a equipe 2.',
   SEM_POSTES_REGISTRADOS: 'Esta nota ainda não tem postes registrados pela equipe de campo.',
   SERVICO_INCOMPLETO: 'Informe a descrição e a foto do serviço.',
   CLIENTES_INCOMPLETOS: 'Ainda faltam clientes desta nota.',
