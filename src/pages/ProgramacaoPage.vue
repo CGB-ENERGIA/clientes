@@ -427,7 +427,7 @@
       >
         <template #body-cell-foto="props">
           <q-td :props="props">
-            <a v-if="props.row.foto" :href="props.row.foto" target="_blank" rel="noopener">Ver foto</a>
+            <a v-if="props.row.foto" href="#" @click.prevent="fotoAmpliada = props.row.foto">Ver foto</a>
             <span v-else class="prog-muted">—</span>
           </q-td>
         </template>
@@ -437,6 +437,18 @@
           </q-td>
         </template>
       </q-table>
+
+      <q-dialog :model-value="!!fotoAmpliada" maximized @hide="fotoAmpliada = null">
+        <q-card class="column items-center justify-center" style="background: #0b1220; position: relative">
+          <img
+            v-if="fotoAmpliada"
+            :src="fotoAmpliada"
+            alt="Foto do poste em tamanho completo"
+            style="max-width: 100vw; max-height: 100vh; object-fit: contain"
+          />
+          <q-btn flat round icon="close" color="white" class="absolute-top-right" v-close-popup />
+        </q-card>
+      </q-dialog>
 
       <q-dialog v-model="pgDialogAberto">
         <q-card style="width: 440px; max-width: 94vw">
@@ -449,7 +461,9 @@
               v-if="pgEdicao?.foto"
               :src="pgEdicao.foto"
               alt="Foto do poste"
-              style="width: 100%; max-height: 340px; object-fit: contain; border-radius: 12px; background: #f1f5f9"
+              title="Clique para ampliar"
+              @click="fotoAmpliada = pgEdicao.foto"
+              style="width: 100%; max-height: 340px; object-fit: contain; border-radius: 12px; background: #f1f5f9; cursor: zoom-in"
             />
             <div v-else class="prog-muted">Sem foto registrada para este poste.</div>
           </q-card-section>
@@ -943,6 +957,7 @@ const pgDialogAberto = ref(false)
 const pgEdicao = ref(null)
 const pgNovo = ref('')
 const pgSalvando = ref(false)
+const fotoAmpliada = ref(null)
 const pgNovoValido = computed(() => PG_VALIDO.test(pgNovo.value || ''))
 const colPgIncorreto = [
   { name: 'data', label: 'Data', field: 'data', align: 'center', sortable: true, format: formatarData },
