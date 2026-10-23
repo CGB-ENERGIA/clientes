@@ -32,6 +32,7 @@
       <q-tab name="painel" icon="insights" label="Painel" />
       <q-tab name="conferencia" icon="fact_check" label="Conferência" />
       <q-tab name="completa" icon="list_alt" label="Programação completa" />
+      <q-tab name="implantacao" icon="engineering" label="Implantação" />
     </q-tabs>
 
     <div v-if="secao === 'painel'" class="prog-painel q-mt-md">
@@ -318,6 +319,42 @@
       </q-table>
     </template>
 
+    <template v-if="secao === 'implantacao'">
+      <div class="prog-barra q-mt-md">
+        <q-btn outline no-caps color="primary" label="Hoje" @click="periodoRapido('hoje')" />
+        <q-btn outline no-caps color="primary" label="Ontem" @click="periodoRapido('ontem')" />
+        <q-btn outline no-caps color="primary" label="Últimos 7 dias" @click="periodoRapido('7dias')" />
+        <q-input v-model="implInicio" dense outlined type="date" label="De" stack-label class="prog-filtro" />
+        <q-input v-model="implFim" dense outlined type="date" label="Até" stack-label class="prog-filtro" />
+      </div>
+
+      <div class="prog-kpis q-mt-md">
+        <div class="prog-kpi prog-kpi--destaque">
+          <div class="prog-kpi-n">{{ implDados?.total_postes ?? 0 }}</div>
+          <div class="prog-kpi-l">postes no período</div>
+        </div>
+        <div class="prog-kpi">
+          <div class="prog-kpi-n">{{ implDados?.total_clientes ?? 0 }}</div>
+          <div class="prog-kpi-l">clientes atendidos</div>
+        </div>
+        <div class="prog-kpi">
+          <div class="prog-kpi-n">{{ implLinhas.length }}</div>
+          <div class="prog-kpi-l">dias com produção</div>
+        </div>
+      </div>
+
+      <q-table
+        flat bordered
+        :rows="implLinhas"
+        :columns="colImplantacao"
+        row-key="data"
+        :loading="implCarregando"
+        :pagination="{ rowsPerPage: 31, sortBy: 'data', descending: true }"
+        no-data-label="Nenhum poste ou cliente registrado neste período"
+        class="prog-tabela q-mt-md"
+      />
+    </template>
+
     <q-dialog v-model="configAberta">
       <q-card style="width: 460px; max-width: 94vw">
         <q-card-section>
@@ -343,7 +380,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { supabase, fetchAll } from 'boot/supabase'
 import ProgInfo from 'components/ProgInfo.vue'
@@ -665,6 +702,52 @@ function formatarData (iso) {
   const [a, m, d] = iso.split('-')
   return `${d}/${m}/${a}`
 }
+
+// ── Implantação: postes e clientes por dia e por equipe ──
+function isoLocal (d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const implInicio = ref(isoLocal(new Date()))
+const implFim = ref(isoLocal(new Date()))
+const implDados = ref(null)
+const implCarregando = ref(false)
+
+function periodoRapido (tipo) {
+  const hoje = new Date()
+  const ontem = new Date(hoje)
+  ontem.setDate(ontem.getDate() - 1)
+  const inicio7 = new Date(hoje)
+  inicio7.setDate(inicio7.getDate() - 6)
+  if (tipo === 'hoje') { implInicio.value = isoLocal(hoje); implFim.value = isoLocal(hoje) }
+  if (tipo === 'ontem') { implInicio.value = isoLocal(ontem); implFim.value = isoLocal(ontem) }
+  if (tipo === '7dias') { implInicio.value = isoLocal(inicio7); implFim.value = isoLocal(hoje) }
+}
+
+async function carregarImplantacao () {
+  if (!implInicio.value || !implFim.value) return
+  implCarregando.value = true
+  const { data, error } = await supabase.rpc('implantacao_resumo', { p_inicio: implInicio.value, p_fim: implFim.value })
+  implCarregando.value = false
+  if (error) {
+    $q.notify({ type: 'negative', message: 'Erro ao carregar a implantação: ' + error.message, position: 'top', timeout: 6000 })
+    return
+  }
+  implDados.value = data
+}
+
+const implLinhas = computed(() => (implDados.value?.dias ?? []).map(d => ({
+  ...d,
+  equipesTexto: d.equipes.map(e => `${e.equipe}: ${e.postes}`).join(' · ') || '—'
+})))
+
+const colImplantacao = [
+  { name: 'data', label: 'Data', field: 'data', align: 'center', sortable: true, format: formatarData },
+  { name: 'postes', label: 'Postes', field: 'postes', align: 'center', sortable: true },
+  { name: 'clientes', label: 'Clientes', field: 'clientes', align: 'center', sortable: true },
+  { name: 'equipesTexto', label: 'Por equipe', field: 'equipesTexto', align: 'center' }
+]
+
+watch([secao, implInicio, implFim], ([s]) => { if (s === 'implantacao') carregarImplantacao() })
 
 async function carregar () {
   const [{ data: v }, { data: imp }, { data: cfg }, { data: tend }] = await Promise.all([
