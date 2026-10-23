@@ -218,6 +218,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { usarEstadoPersistido } from 'src/utils/estadoPersistido'
 import { useQuasar } from 'quasar'
 import { useNotasStore } from 'stores/notas'
 import { supabase } from 'boot/supabase'
@@ -235,6 +236,9 @@ const syncingDropbox = ref(false)
 // URL salva no localStorage + banco de dados
 const DROPBOX_KEY = 'cgb_dropbox_url'
 const dropboxUrl  = ref(localStorage.getItem(DROPBOX_KEY) || '')
+
+// Ao recarregar, volta para o filtro que o usuário estava usando
+usarEstadoPersistido('notas', { filtro })
 
 // Carrega do banco se não estiver no localStorage
 onMounted(async () => {

@@ -1050,6 +1050,7 @@
 
 <script setup>
 import { ref, computed, reactive, onUnmounted } from 'vue'
+import { usarEstadoPersistido } from 'src/utils/estadoPersistido'
 import { useQuasar } from 'quasar'
 import { useNotasStore } from 'stores/notas'
 import { useApontamentoStore } from 'stores/apontamento'
@@ -1196,6 +1197,12 @@ function resumoImprevisto (i) {
 
 // ── Origem dos concluídos: feitos pelo PWA x já concluídos na planilha ─
 const origemConcluidos = ref('todas')
+
+// Ao recarregar, volta para os filtros e a aba que o usuário estava usando
+usarEstadoPersistido('apontamento', {
+  filtro, filtroBase, filtroPostes, filtroClientes, filtroStatus,
+  tabAtual, vista, ordemInicio, dataInicio, somenteValidadas, somenteImprevistos, origemConcluidos
+})
 const origemOpcoes = computed(() => {
   const concl = todasAgrupadas.value.filter(g => g.status === 'concluido')
   const pwa = concl.filter(g => g._viaPwa).length

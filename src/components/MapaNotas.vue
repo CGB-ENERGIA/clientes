@@ -503,6 +503,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { usarEstadoPersistido } from 'src/utils/estadoPersistido'
 import { useQuasar, copyToClipboard } from 'quasar'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -613,6 +614,10 @@ const datasOpcoes = computed(() =>
 )
 const dataBr = iso => iso.split('-').reverse().join('/')
 const filtroEquipe = ref(null)
+// Ao recarregar, volta para os filtros e a camada do mapa que o usuário estava usando (cada visão guarda os seus)
+usarEstadoPersistido(`mapa-${props.esquema}`, {
+  camada, filtroBase, filtroMunicipio, filtroDatas, filtroEquipe
+})
 const equipesOpcoes = computed(() =>
   [...new Set(todasNotas.value.map(n => n.equipe).filter(Boolean))].sort()
 )

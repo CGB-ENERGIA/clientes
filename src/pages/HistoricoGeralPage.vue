@@ -164,6 +164,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { usarEstadoPersistido } from 'src/utils/estadoPersistido'
 import { useQuasar } from 'quasar'
 import * as XLSX from 'xlsx'
 import { useApontamentoStore } from 'stores/apontamento'
@@ -174,6 +175,8 @@ const store = useApontamentoStore()
 
 const bases = ['BACABAL', 'ITAPECURU MIRIM', 'SANTA INES', 'PEDREIRAS', 'PRESIDENTE DUTRA', 'BARRA DO CORDA']
 const filtros = ref({ base: '', pep: '', nota: '', dataInicio: '', dataFim: '' })
+// Ao recarregar, volta para os filtros que o usuário estava usando
+usarEstadoPersistido('historico', { filtros })
 const editDialog = ref(false)
 const editLoading = ref(false)
 const editingId = ref(null)

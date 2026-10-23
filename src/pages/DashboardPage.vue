@@ -222,6 +222,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { usarEstadoPersistido } from 'src/utils/estadoPersistido'
 import { useNotasStore } from 'stores/notas'
 import { supabase, fetchAll } from 'boot/supabase'
 
@@ -230,6 +231,8 @@ const campoRegs    = ref([])
 const loadingCampo = ref(false)
 const filtroMes    = ref('')
 const filtroDia    = ref('')
+// Ao recarregar, volta para o mês e o dia que o usuário estava vendo
+usarEstadoPersistido('dashboard', { filtroMes, filtroDia })
 
 // ── Opções de mês ──────────────────────────────────────────────
 const mesesOptions = computed(() => {
