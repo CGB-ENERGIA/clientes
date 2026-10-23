@@ -346,17 +346,29 @@
         <div v-if="!implProgramado.lista.length" class="prog-muted">Nenhuma obra programada neste período.</div>
         <template v-else>
           <div class="prog-muted q-mb-sm">
-            {{ implProgramado.obras }} {{ implProgramado.obras === 1 ? 'obra' : 'obras' }} e
-            {{ implProgramado.postes }} postes previstos neste período.
+            {{ implProgramado.obras }} {{ implProgramado.obras === 1 ? 'obra' : 'obras' }} ·
+            {{ implProgramado.postes }} postes previstos ·
+            {{ implProgramado.apontados }} apontados
           </div>
           <q-table
             flat dense bordered
             :rows="implProgramado.lista"
             :columns="colProgramado"
-            row-key="data"
-            :pagination="{ rowsPerPage: 31 }"
+            row-key="key"
+            :pagination="{ rowsPerPage: 50, sortBy: 'data', descending: true }"
             class="prog-tabela"
-          />
+          >
+            <template #body-cell-acao="props">
+              <q-td :props="props">
+                <q-btn
+                  v-if="!props.row.postes_campo"
+                  outline dense no-caps color="primary" icon="edit_note" label="Apontar"
+                  @click="abrirApontar(props.row)"
+                />
+                <span v-else class="prog-muted">No app de campo</span>
+              </q-td>
+            </template>
+          </q-table>
         </template>
       </div>
 
@@ -1061,28 +1073,28 @@ const colPostes = [
   { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center', sortable: true }
 ]
 
-// Previsão da programação (planilha) no período: não é produção registrada no app
+// Previsão da programação (planilha) no período, por obra: não é produção registrada no app
 const implProgramado = computed(() => {
-  const dias = new Map()
-  for (const l of linhas.value) {
-    if (l.status_programacao === 'CANCELAR' || !l.data_programada) continue
-    if (l.data_programada < implInicio.value || l.data_programada > implFim.value) continue
-    const d = dias.get(l.data_programada) ?? { data: l.data_programada, obras: 0, postes: 0 }
-    d.obras++
-    d.postes += Number(l.postes) || 0
-    dias.set(l.data_programada, d)
-  }
-  const lista = [...dias.values()].sort((a, b) => b.data.localeCompare(a.data))
+  const lista = linhas.value
+    .filter(l => l.status_programacao !== 'CANCELAR' && l.data_programada &&
+      l.data_programada >= implInicio.value && l.data_programada <= implFim.value)
+    .map(l => ({ ...l, key: l.sap }))
+    .sort((a, b) => b.data_programada.localeCompare(a.data_programada) || String(a.equipe).localeCompare(String(b.equipe)))
   return {
     lista,
-    obras: lista.reduce((s, d) => s + d.obras, 0),
-    postes: lista.reduce((s, d) => s + d.postes, 0)
+    obras: lista.length,
+    postes: lista.reduce((s, l) => s + (Number(l.postes) || 0), 0),
+    apontados: lista.reduce((s, l) => s + (Number(l.postes_apontados) || 0), 0)
   }
 })
 const colProgramado = [
-  { name: 'data', label: 'Data programada', field: 'data', align: 'center', format: formatarData },
-  { name: 'obras', label: 'Obras', field: 'obras', align: 'center' },
-  { name: 'postes', label: 'Postes previstos', field: 'postes', align: 'center' }
+  { name: 'data', label: 'Data', field: 'data_programada', align: 'center', format: formatarData },
+  { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center' },
+  { name: 'pep', label: 'PEP', field: 'pep', align: 'center' },
+  { name: 'sap', label: 'Projeto SAP', field: 'sap', align: 'center' },
+  { name: 'postes', label: 'Previstos', field: 'postes', align: 'center', format: v => v ?? 0 },
+  { name: 'apontados', label: 'Apontados', field: 'postes_apontados', align: 'center', format: v => v ?? '—' },
+  { name: 'acao', label: '', field: 'acao', align: 'center' }
 ]
 
 const colImplantacao = [
