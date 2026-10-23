@@ -319,7 +319,7 @@ export const useNotasStore = defineStore('notas', () => {
   async function buscarRegistrosCampo (nota) {
     const { data } = await supabase
       .from('campo_registros')
-      .select('id, pg_numero, equipe, created_at, foto_url, fotos_extras')
+      .select('id, nota, pg_numero, equipe, created_at, foto_url, fotos_extras')
       .eq('nota', nota)
       .order('created_at', { ascending: true })
     return data ?? []

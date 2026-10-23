@@ -537,6 +537,56 @@
 
     <MapaNotas v-model="mapaAberto" :grupos="notasFiltradas" :base-inicial="filtroBase" @abrir="abrirDoMapa" />
 
+    <!-- Dialog editar registro de campo (PG e fotos) -->
+    <q-dialog v-model="editRegDialog">
+      <q-card style="width: 520px; max-width: 95vw">
+        <q-bar style="background:#0a1628;color:#fff;min-height:42px">
+          <q-icon name="edit" size="16px" />
+          <span class="q-ml-sm text-weight-bold" style="font-size:13px">Editar registro do PG {{ editReg?.pg_numero }}</span>
+          <q-space />
+          <q-btn icon="close" flat dense round color="white" v-close-popup />
+        </q-bar>
+        <q-card-section class="q-gutter-sm">
+          <q-input
+            v-model="editRegPg"
+            outlined dense
+            label="Número do PG (8 dígitos)"
+            mask="########"
+            :rules="[() => editRegPgValido || 'Informe exatamente 8 dígitos']"
+          />
+          <div class="text-caption text-grey-8">Fotos deste poste (a primeira é a principal)</div>
+          <div class="row q-col-gutter-sm">
+            <div v-for="(url, i) in editRegFotos" :key="url + i" class="col-auto medidor-thumb-wrap">
+              <img :src="url" class="medidor-thumb" title="Ver foto ampliada" @click="verFoto(url)" />
+              <q-btn
+                icon="close" round dense unelevated size="6px"
+                color="negative" class="medidor-thumb-remove"
+                @click="editRegFotos.splice(i, 1)"
+              >
+                <q-tooltip>Remover foto</q-tooltip>
+              </q-btn>
+            </div>
+            <div v-if="!editRegFotos.length" class="col-12 text-grey-7">Sem fotos neste registro.</div>
+          </div>
+          <q-btn
+            flat dense no-caps color="primary" icon="add_a_photo" label="Adicionar foto"
+            :loading="editRegSalvando"
+            @click="editRegFotoInput.click()"
+          />
+          <input ref="editRegFotoInput" type="file" accept="image/*" hidden @change="onFotoEscolhida" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancelar" v-close-popup />
+          <q-btn
+            unelevated no-caps color="primary" label="Salvar"
+            :disable="!editRegPgValido || editRegSalvando"
+            :loading="editRegSalvando"
+            @click="salvarEdicaoRegistro"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <!-- Dialog preview foto medidor -->
     <q-dialog v-model="fotoDialog">
       <q-card style="max-width:95vw">
@@ -806,6 +856,16 @@
                       class="pg-item-ver-foto"
                       @click="verFotosPoste(r)"
                     />
+
+                    <q-btn
+                      flat round dense
+                      icon="edit"
+                      color="primary"
+                      size="sm"
+                      @click="abrirEditarRegistro(r)"
+                    >
+                      <q-tooltip>Editar PG e fotos</q-tooltip>
+                    </q-btn>
 
                     <q-btn
                       flat round dense
@@ -1262,6 +1322,76 @@ async function alterarStatus (novoStatus) {
   if (!error) {
     notaAtiva.value = { ...notaAtiva.value, status: novoStatus }
     $q.notify({ type: 'positive', message: `Status alterado para "${labelStatus(novoStatus)}"`, position: 'top', timeout: 2000 })
+  }
+}
+
+// ── Editar registro de campo: PG (8 dígitos) e fotos ──
+const editRegDialog = ref(false)
+const editReg = ref(null)
+const editRegPg = ref('')
+const editRegFotos = ref([])
+const editRegSalvando = ref(false)
+const editRegFotoInput = ref(null)
+const editRegPgValido = computed(() => /^[0-9]{8}$/.test(editRegPg.value || ''))
+
+function abrirEditarRegistro (r) {
+  editReg.value = r
+  editRegPg.value = r.pg_numero
+  editRegFotos.value = [r.foto_url, ...(r.fotos_extras || [])].filter(Boolean)
+  editRegDialog.value = true
+}
+
+async function enviarFotoRegistro (file) {
+  const nome = `registro/${editReg.value.nota}/${crypto.randomUUID()}.jpg`
+  const { error } = await supabase.storage.from('campo-fotos').upload(nome, file, {
+    contentType: file.type || 'image/jpeg', upsert: false
+  })
+  if (error) throw error
+  return supabase.storage.from('campo-fotos').getPublicUrl(nome).data.publicUrl
+}
+
+async function onFotoEscolhida (e) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  editRegSalvando.value = true
+  try {
+    editRegFotos.value.push(await enviarFotoRegistro(file))
+  } catch (err) {
+    $q.notify({ type: 'negative', message: 'Não foi possível enviar a foto: ' + err.message, position: 'top', timeout: 5000 })
+  } finally {
+    editRegSalvando.value = false
+  }
+}
+
+async function salvarEdicaoRegistro () {
+  const r = editReg.value
+  if (!r || !editRegPgValido.value) return
+  const novoPg = editRegPg.value
+  const fotos = editRegFotos.value
+  editRegSalvando.value = true
+  try {
+    // Troca do PG também atualiza o apontamento da nota (função de correção)
+    if (novoPg !== r.pg_numero) {
+      const { error } = await supabase.rpc('implantacao_corrigir_pg', {
+        p_nota: r.nota, p_pg_atual: r.pg_numero, p_pg_novo: novoPg
+      })
+      if (error) throw error
+    }
+    const { error: erroFotos } = await supabase.from('campo_registros').update({
+      foto_url: fotos[0] ?? null,
+      fotos_extras: fotos.slice(1)
+    }).eq('id', r.id)
+    if (erroFotos) throw erroFotos
+
+    Object.assign(r, { pg_numero: novoPg, foto_url: fotos[0] ?? null, fotos_extras: fotos.slice(1) })
+    editRegDialog.value = false
+    $q.notify({ type: 'positive', message: 'Registro atualizado', position: 'top', timeout: 2000 })
+  } catch (err) {
+    const msg = err.message?.includes('PG_JA_EXISTE') ? 'Este PG já existe nesta nota.' : 'Não foi possível salvar: ' + err.message
+    $q.notify({ type: 'negative', message: msg, position: 'top', timeout: 5000 })
+  } finally {
+    editRegSalvando.value = false
   }
 }
 
