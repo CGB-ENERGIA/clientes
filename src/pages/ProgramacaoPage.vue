@@ -336,6 +336,12 @@
         <q-btn outline no-caps color="primary" label="Últimos 7 dias" @click="periodoRapido('7dias')" />
         <q-input v-model="implInicio" dense outlined type="date" label="De" stack-label class="prog-filtro" />
         <q-input v-model="implFim" dense outlined type="date" label="Até" stack-label class="prog-filtro" />
+        <q-btn
+          unelevated no-caps color="positive" icon="share" label="Imagem para WhatsApp"
+          :disable="!implDados || imagemGerando"
+          :loading="imagemGerando"
+          @click="compartilharImagemImplantacao"
+        />
       </div>
 
       <div v-if="implProgramado.lista.length" class="prog-card q-mt-md">
@@ -589,6 +595,7 @@ import ProgInfo from 'components/ProgInfo.vue'
 import MapaNotas from 'components/MapaNotas.vue'
 import { useNotasStore } from 'stores/notas'
 import { lerProgramacao, hashArquivo, ROTULO_PROGRAMACAO } from 'src/utils/programacao'
+import { gerarImagemImplantacao } from 'src/utils/imagemImplantacao'
 
 const $q = useQuasar()
 const notasStore = useNotasStore()
@@ -1076,6 +1083,33 @@ const colPostes = [
   { name: 'pg', label: 'Poste (PG)', field: 'pg', align: 'center', sortable: true },
   { name: 'equipe', label: 'Equipe', field: 'equipe', align: 'center', sortable: true }
 ]
+
+// Imagem da implantação para compartilhar (WhatsApp): usa o botão de compartilhar do aparelho, ou baixa o arquivo
+const imagemGerando = ref(false)
+async function compartilharImagemImplantacao () {
+  imagemGerando.value = true
+  try {
+    const blob = await gerarImagemImplantacao(implDados.value, { inicio: implInicio.value, fim: implFim.value })
+    const nome = `implantacao_${implInicio.value}_${implFim.value}.png`
+    const arquivo = new File([blob], nome, { type: 'image/png' })
+    if (navigator.canShare?.({ files: [arquivo] })) {
+      await navigator.share({ files: [arquivo], title: 'Implantação de postes' })
+    } else {
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = nome
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      $q.notify({ type: 'negative', message: 'Não foi possível gerar a imagem: ' + e.message, position: 'top', timeout: 5000 })
+    }
+  } finally {
+    imagemGerando.value = false
+  }
+}
 
 // Previsão da programação (planilha) no período, por obra: não é produção registrada no app
 const implProgramado = computed(() => {
