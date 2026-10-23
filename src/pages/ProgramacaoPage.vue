@@ -1233,6 +1233,30 @@ onMounted(() => {
   carregar()
   notasStore.fetchNotas()
 })
+
+// Ao recarregar a página, volta para a última seção e os filtros que o usuário estava usando
+const ESTADO_KEY = 'programacao_estado'
+const ESTADO = {
+  secao, aba, buscaCompleta, equipeCompleta, statusCompleta,
+  dataInicioCompleta, dataFimCompleta, filtrosColunas, implInicio, implFim
+}
+try {
+  const salvo = JSON.parse(localStorage.getItem(ESTADO_KEY) || '{}')
+  for (const [chave, ref] of Object.entries(ESTADO)) {
+    if (salvo[chave] !== undefined) ref.value = salvo[chave]
+  }
+} catch {
+  // Sem acesso ao armazenamento local: a página abre no estado inicial
+}
+watch(
+  () => Object.fromEntries(Object.entries(ESTADO).map(([chave, ref]) => [chave, ref.value])),
+  estado => {
+    try { localStorage.setItem(ESTADO_KEY, JSON.stringify(estado)) } catch {
+      // Sem acesso ao armazenamento local: o estado só vale até recarregar
+    }
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>
