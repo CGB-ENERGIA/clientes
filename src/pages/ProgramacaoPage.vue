@@ -419,6 +419,17 @@
         </template>
       </div>
 
+      <div v-if="implPorEquipe.length" class="prog-card q-mt-md">
+        <div class="prog-sec-titulo"><q-icon name="groups" size="18px" /> Postes por equipe no período</div>
+        <div v-for="e in implPorEquipe" :key="e.equipe" class="impl-eq-linha">
+          <div class="impl-eq-topo">
+            <b>{{ e.equipe }}</b>
+            <span>{{ e.postes }} {{ e.postes === 1 ? 'poste' : 'postes' }}</span>
+          </div>
+          <div class="impl-eq-barra"><i :style="{ width: (e.postes / implPorEquipe[0].postes * 100) + '%' }" /></div>
+        </div>
+      </div>
+
       <q-table
         flat bordered
         :rows="implLinhas"
@@ -428,7 +439,16 @@
         :pagination="{ rowsPerPage: 31, sortBy: 'data', descending: true }"
         no-data-label="Nenhum poste ou cliente registrado neste período"
         class="prog-tabela q-mt-md"
-      />
+      >
+        <template #body-cell-equipes="props">
+          <q-td :props="props">
+            <div v-for="e in props.row.equipes" :key="e.equipe" class="impl-eq-celula">
+              <b>{{ e.postes }}</b> {{ e.equipe }}
+            </div>
+            <span v-if="!props.row.equipes?.length" class="prog-muted">—</span>
+          </q-td>
+        </template>
+      </q-table>
 
       <div class="prog-barra q-mt-lg">
         <div class="prog-sec-titulo"><q-icon name="electric_bolt" size="18px" /> Postes instalados no período</div>
@@ -982,10 +1002,18 @@ async function carregarImplantacao () {
   implDados.value = data
 }
 
-const implLinhas = computed(() => (implDados.value?.dias ?? []).map(d => ({
-  ...d,
-  equipesTexto: d.equipes.map(e => `${e.equipe}: ${e.postes}`).join(' · ') || '—'
-})))
+const implLinhas = computed(() => implDados.value?.dias ?? [])
+
+// Totais de postes por equipe no período inteiro
+const implPorEquipe = computed(() => {
+  const totais = new Map()
+  for (const d of implDados.value?.dias ?? []) {
+    for (const e of d.equipes ?? []) totais.set(e.equipe, (totais.get(e.equipe) ?? 0) + (Number(e.postes) || 0))
+  }
+  return [...totais.entries()]
+    .map(([equipe, postes]) => ({ equipe, postes }))
+    .sort((a, b) => b.postes - a.postes)
+})
 
 // Cada poste do período, com nota, PEP, número PG, equipe e hora
 const implPostes = computed(() => (implDados.value?.dias ?? []).flatMap(d =>
@@ -1142,7 +1170,7 @@ const colImplantacao = [
   { name: 'postes', label: 'Postes', field: 'postes', align: 'center', sortable: true },
   { name: 'apontados', label: 'Apontados', field: 'apontados', align: 'center', sortable: true },
   { name: 'clientes', label: 'Clientes', field: 'clientes', align: 'center', sortable: true },
-  { name: 'equipesTexto', label: 'Por equipe', field: 'equipesTexto', align: 'center' }
+  { name: 'equipes', label: 'Por equipe', field: 'equipes', align: 'left' }
 ]
 
 watch([secao, implInicio, implFim], ([s]) => { if (s === 'implantacao') carregarImplantacao() })
@@ -1329,6 +1357,13 @@ watch(
   .prog-tabela :deep(td) { white-space: normal; padding: 6px 8px; font-size: 13px; }
 }
 .prog-filtro-coluna :deep(input) { text-align: center; }
+.impl-eq-linha { margin-bottom: 12px; }
+.impl-eq-topo { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; color: #0f172a; }
+.impl-eq-topo span { color: #475569; font-weight: 600; white-space: nowrap; }
+.impl-eq-barra { height: 8px; border-radius: 4px; background: #e2e8f0; overflow: hidden; margin-top: 5px; }
+.impl-eq-barra i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #1d4ed8, #38bdf8); }
+.impl-eq-celula { white-space: nowrap; line-height: 1.5; }
+.impl-eq-celula b { color: #1d4ed8; }
 
 .prog-chip {
   display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 10px;
