@@ -275,7 +275,14 @@
       </div>
       <div class="prog-muted q-mt-sm">{{ linhasTabela.length }} de {{ linhas.length }} notas</div>
 
+      <div class="prog-rolagem-dica q-mt-sm">
+        <span><q-icon name="swipe" size="16px" /> Role para os lados para ver todas as colunas</span>
+        <q-space />
+        <q-btn flat dense round icon="chevron_left" aria-label="Rolar para a esquerda" @click="rolarTabelaCompleta(-400)" />
+        <q-btn flat dense round icon="chevron_right" aria-label="Rolar para a direita" @click="rolarTabelaCompleta(400)" />
+      </div>
       <q-table
+        ref="tabelaCompleta"
         flat bordered
         :rows="linhasTabela"
         :columns="colCompletas"
@@ -717,6 +724,13 @@ async function salvarApontar () {
 
 // Filtro digitado em cada coluna da programação completa
 const filtrosColunas = ref({})
+
+// Rolagem horizontal da tabela completa, pelos botões da faixa acima dela
+const tabelaCompleta = ref(null)
+function rolarTabelaCompleta (dx) {
+  const area = tabelaCompleta.value?.$el?.querySelector('.q-table__middle')
+  area?.scrollBy({ left: dx, behavior: 'smooth' })
+}
 const TEXTO_COLUNA = {
   data: l => formatarData(l.data_programada),
   pep: l => l.pep,
@@ -1357,6 +1371,9 @@ watch(
   .prog-tabela :deep(td) { white-space: normal; padding: 6px 8px; font-size: 13px; }
 }
 .prog-filtro-coluna :deep(input) { text-align: center; }
+.prog-rolagem-dica { display: flex; align-items: center; gap: 4px; font-size: 13px; color: #475569; }
+.prog-rolagem-dica span { display: inline-flex; align-items: center; gap: 6px; }
+.prog-tabela :deep(.q-table__middle) { overflow-x: auto; }
 .impl-eq-linha { margin-bottom: 12px; }
 .impl-eq-topo { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; color: #0f172a; }
 .impl-eq-topo span { color: #475569; font-weight: 600; white-space: nowrap; }
