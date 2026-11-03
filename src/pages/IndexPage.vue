@@ -79,8 +79,8 @@
         <q-input
           v-model="filtro"
           dense outlined
-          placeholder="Buscar nota, SAP, PEP, base ou cliente..."
-          style="min-width:200px;flex:1"
+          placeholder="Buscar nota, SAP, PEP ou cliente"
+          style="min-width:280px;flex:1"
           clearable
         >
           <template #prepend><q-icon name="search" size="16px" /></template>

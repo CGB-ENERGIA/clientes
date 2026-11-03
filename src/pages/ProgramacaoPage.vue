@@ -460,7 +460,7 @@
       <div class="prog-barra q-mt-lg">
         <div class="prog-sec-titulo"><q-icon name="electric_bolt" size="18px" /> Postes instalados no período</div>
         <q-space />
-        <q-input v-model="implBusca" dense outlined clearable placeholder="Buscar nota, PEP, poste ou equipe" class="prog-busca">
+        <q-input v-model="implBusca" dense outlined clearable placeholder="Buscar nota, PEP ou poste" class="prog-busca">
           <template #prepend><q-icon name="search" /></template>
         </q-input>
       </div>
@@ -1355,7 +1355,7 @@ watch(
 .prog-tile--ok { border-left-color: #1e88e5; }
 
 .prog-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.prog-busca { min-width: 300px; }
+.prog-busca { min-width: 340px; }
 .prog-filtro { min-width: 180px; }
 .prog-filtros-colunas td { padding: 6px 8px; }
 .prog-filtro-coluna { min-width: 110px; }
