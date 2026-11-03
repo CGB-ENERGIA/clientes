@@ -265,7 +265,7 @@
 
     <template v-if="secao === 'completa'">
       <div class="prog-barra q-mt-md">
-        <q-input v-model="buscaCompleta" dense outlined clearable placeholder="Buscar nota, município, equipe ou supervisor" class="prog-busca">
+        <q-input v-model="buscaCompleta" dense outlined clearable placeholder="Buscar nota, município ou equipe" class="prog-busca">
           <template #prepend><q-icon name="search" /></template>
         </q-input>
         <q-select v-model="equipeCompleta" dense outlined clearable emit-value map-options :options="equipesOpcoes" label="Equipe" class="prog-filtro" />
@@ -1355,7 +1355,7 @@ watch(
 .prog-tile--ok { border-left-color: #1e88e5; }
 
 .prog-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.prog-busca { min-width: 260px; }
+.prog-busca { min-width: 300px; }
 .prog-filtro { min-width: 180px; }
 .prog-filtros-colunas td { padding: 6px 8px; }
 .prog-filtro-coluna { min-width: 110px; }
