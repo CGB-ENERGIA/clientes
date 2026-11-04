@@ -2140,21 +2140,22 @@ notasStore.fetchNotas()
   display: grid;
   grid-template-columns: 130px 110px 220px 150px 1fr 90px 130px 110px;
   gap: 12px;
-  padding: 10px 16px 8px;
+  padding: 12px 16px;
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
   margin-bottom: 4px;
   text-align: center;
   /* Fica fixo logo abaixo da barra de navegação ao rolar a lista */
   position: sticky;
-  top: 58px;
+  top: 59px;
   z-index: 5;
-  background: var(--bg-page);
-  box-shadow: 0 6px 10px -8px rgba(15, 23, 42, 0.25);
+  box-shadow: var(--shadow-md);
 }
 .lista-header > div { text-align: center; }
 .lista-header-status { display: flex; align-items: center; justify-content: center; gap: 4px; }
