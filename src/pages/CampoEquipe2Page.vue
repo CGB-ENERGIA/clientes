@@ -74,17 +74,21 @@
             </button>
           </div>
           <textarea v-model="s.descricao" class="eq2-input eq2-textarea" rows="3" placeholder="Descreva o serviço executado" />
-          <div v-if="s.foto" class="eq2-fotos">
-            <div class="eq2-foto-item">
-              <img :src="s.foto" alt="Foto do serviço" />
-              <button class="eq2-foto-x" type="button" aria-label="Remover foto" :disabled="enviando" @click="s.foto = ''">
+          <div v-if="s.fotos.length" class="eq2-fotos">
+            <div v-for="(url, fi) in s.fotos" :key="url" class="eq2-foto-item">
+              <img :src="url" alt="Foto do serviço" />
+              <button class="eq2-foto-x" type="button" aria-label="Remover foto" :disabled="enviando" @click="removerFotoServico(s, fi)">
                 <q-icon name="close" size="14px" />
               </button>
             </div>
           </div>
           <label class="eq2-foto">
-            <span><q-icon name="photo_camera" size="24px" /> {{ s.foto ? 'Trocar foto' : 'Tirar foto do serviço' }}</span>
+            <span><q-icon name="photo_camera" size="24px" /> {{ s.fotos.length ? 'Adicionar outra foto' : 'Tirar foto do serviço' }}</span>
             <input type="file" accept="image/*" capture="environment" hidden :disabled="enviando" @change="fotoDoServico(s, $event)" />
+          </label>
+          <label class="eq2-foto eq2-foto--mini" title="Escolher várias fotos da galeria">
+            <span><q-icon name="photo_library" size="20px" /> Escolher da galeria</span>
+            <input type="file" accept="image/*" multiple hidden :disabled="enviando" @change="fotoDoServico(s, $event)" />
           </label>
         </div>
         <button class="eq2-btn eq2-btn--sec eq2-add" type="button" :disabled="enviando" @click="adicionarServico">
@@ -170,15 +174,21 @@ const notas = ref([])
 
 const notaAtiva = ref(null)
 // Serviços realizados: cada um com uma descrição e uma foto
-const novoServico = () => ({ chave: `srv-${crypto.randomUUID()}`, descricao: '', foto: '' })
+const novoServico = () => ({ chave: `srv-${crypto.randomUUID()}`, descricao: '', fotos: [] })
 const servicos = ref([novoServico()])
-const servicosProntos = computed(() => servicos.value.filter(s => s.descricao.trim() && s.foto).length)
+const servicosProntos = computed(() => servicos.value.filter(s => s.descricao.trim() && s.fotos.length).length)
+// Serviço guardado antes de aceitar várias fotos tinha só "foto"
+const normalizarServico = s => ({
+  chave: `srv-${crypto.randomUUID()}`,
+  descricao: s.descricao || '',
+  fotos: Array.isArray(s.fotos) ? s.fotos : (s.foto ? [s.foto] : [])
+})
 // Campos antigos do apontamento (lidos pelo desktop): descrição junta e todas as fotos
 const descricaoFinal = computed(() => {
   const itens = servicos.value.map(s => s.descricao.trim()).filter(Boolean)
   return itens.length > 1 ? itens.map((d, i) => `${i + 1}) ${d}`).join('\n') : (itens[0] || '')
 })
-const fotosFinal = computed(() => servicos.value.map(s => s.foto).filter(Boolean))
+const fotosFinal = computed(() => servicos.value.flatMap(s => s.fotos))
 function adicionarServico () { servicos.value.push(novoServico()) }
 function removerServico (i) { servicos.value = servicos.value.filter((_, k) => k !== i) }
 const clientes = ref([])
@@ -261,13 +271,21 @@ async function enviarFoto (file, bucket, caminho) {
   return supabase.storage.from(bucket).getPublicUrl(caminho).data.publicUrl
 }
 
+function removerFotoServico (s, i) {
+  s.fotos = s.fotos.filter((_, k) => k !== i)
+}
+
+// Várias fotos por serviço: tirar uma a uma pela câmera, ou escolher várias da galeria
 async function fotoDoServico (s, e) {
-  const file = e.target.files?.[0]
+  const arquivos = [...(e.target.files || [])]
   e.target.value = ''
-  if (!file) return
+  if (!arquivos.length) return
   enviando.value = true
   try {
-    s.foto = await enviarFoto(file, 'campo-fotos', `servico/${notaAtiva.value.nota}/${crypto.randomUUID()}.jpg`)
+    for (const file of arquivos) {
+      const url = await enviarFoto(file, 'campo-fotos', `servico/${notaAtiva.value.nota}/${crypto.randomUUID()}.jpg`)
+      s.fotos = [...s.fotos, url]
+    }
   } catch (err) {
     $q.notify({ type: 'negative', message: 'Não foi possível enviar a foto: ' + err.message, position: 'top' })
   } finally {
@@ -312,11 +330,10 @@ async function abrirNota (n) {
 
   const { data } = await supabase.rpc('equipe2_carregar', { p_nota: n.nota })
   if (Array.isArray(data?.servicos) && data.servicos.length) {
-    servicos.value = data.servicos.map(s => ({ chave: `srv-${crypto.randomUUID()}`, descricao: s.descricao || '', foto: s.foto || '' }))
+    servicos.value = data.servicos.map(normalizarServico)
   } else if (data?.descricao || data?.fotos_servico?.length) {
-    // Rascunho antigo, sem lista de serviços: a primeira foto fica com a descrição e as demais viram serviços sem descrição
-    const fotos = data.fotos_servico?.length ? data.fotos_servico : ['']
-    servicos.value = fotos.map((f, i) => ({ chave: `srv-${crypto.randomUUID()}`, descricao: i === 0 ? (data.descricao || '') : '', foto: f }))
+    // Rascunho antigo, sem lista de serviços: vira um serviço com a descrição e todas as fotos
+    servicos.value = [normalizarServico({ descricao: data.descricao, fotos: data.fotos_servico || [] })]
   }
   for (const salvo of data?.clientes || []) {
     const fotos = salvo.fotos_urls?.length ? salvo.fotos_urls : (salvo.foto_url ? [salvo.foto_url] : [])
@@ -365,7 +382,7 @@ async function salvar (concluir) {
     }
     let { error } = await supabase.rpc('equipe2_salvar', {
       ...base,
-      p_servicos: servicos.value.map(s => ({ descricao: s.descricao.trim(), foto: s.foto }))
+      p_servicos: servicos.value.map(s => ({ descricao: s.descricao.trim(), foto: s.fotos[0] || '', fotos: s.fotos }))
     })
     // Banco ainda sem a lista de serviços (SQL não rodado): salva no formato antigo
     if (error?.code === 'PGRST202') ({ error } = await supabase.rpc('equipe2_salvar', base))
@@ -411,7 +428,7 @@ async function restaurarAberta () {
   const n = notas.value.find(x => x.nota === salvo.nota)
   if (!n) { limparAberta(); return }
   await abrirNota(n)
-  if (Array.isArray(salvo.servicos) && salvo.servicos.length) servicos.value = salvo.servicos
+  if (Array.isArray(salvo.servicos) && salvo.servicos.length) servicos.value = salvo.servicos.map(normalizarServico)
   if (Array.isArray(salvo.clientes) && salvo.clientes.length) clientes.value = salvo.clientes
 }
 
