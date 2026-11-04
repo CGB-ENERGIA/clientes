@@ -276,7 +276,7 @@ const cols = [
 
 const notasFiltradas = computed(() => {
   if (!filtro.value?.trim()) return store.notas
-  const q = filtro.value.trim().toLowerCase()
+  const q = (filtro.value ?? '').trim().toLowerCase()
   return store.notas.filter(n =>
     n.nota?.toLowerCase().includes(q) ||
     n.base?.toLowerCase().includes(q) ||

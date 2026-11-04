@@ -685,7 +685,7 @@ const equipesOpcoes = computed(() => [...new Set(linhas.value.map(l => l.equipe)
 const statusOpcoes = Object.entries(ROTULO_PROGRAMACAO).map(([value, label]) => ({ label, value }))
 
 const linhasCompletas = computed(() => {
-  const q = buscaCompleta.value.trim().toLowerCase()
+  const q = (buscaCompleta.value ?? '').trim().toLowerCase()
   return linhas.value.filter(l =>
     (!equipeCompleta.value || l.equipe === equipeCompleta.value) &&
     (!statusCompleta.value || l.status_programacao === statusCompleta.value) &&
@@ -806,7 +806,7 @@ const GLOSSARIO_SIS = [
 ]
 
 const linhasAba = computed(() => {
-  const q = busca.value.trim().toLowerCase()
+  const q = (busca.value ?? '').trim().toLowerCase()
   return linhas.value.filter(l =>
     l.acao === aba.value &&
     (!q || [l.sap, l.municipio, l.equipe].some(v => String(v ?? '').toLowerCase().includes(q)))

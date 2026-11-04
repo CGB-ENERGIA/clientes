@@ -1,5 +1,10 @@
 import { watch } from 'vue'
 
+function mesmoTipo (padrao, salvo) {
+  if (padrao === null || padrao === undefined) return true
+  return Array.isArray(padrao) === Array.isArray(salvo) && typeof padrao === typeof salvo && salvo !== null
+}
+
 // Guarda no navegador os filtros e abas de uma tela e os restaura ao recarregar.
 // `chave` identifica a tela; `estado` é um objeto { nome: ref }.
 export function usarEstadoPersistido (chave, estado) {
@@ -7,7 +12,8 @@ export function usarEstadoPersistido (chave, estado) {
   try {
     const salvo = JSON.parse(localStorage.getItem(chaveStorage) || '{}')
     for (const [nome, ref] of Object.entries(estado)) {
-      if (salvo[nome] !== undefined) ref.value = salvo[nome]
+      // Só restaura se for do mesmo tipo do valor padrão (evita nulo no lugar de texto ou lista)
+      if (salvo[nome] !== undefined && mesmoTipo(ref.value, salvo[nome])) ref.value = salvo[nome]
     }
   } catch {
     // Sem acesso ao armazenamento local: a tela abre no estado inicial

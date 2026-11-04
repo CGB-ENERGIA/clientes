@@ -105,7 +105,7 @@ const fotosServico = ref([])
 const clientes = ref([])
 
 const notasFiltradas = computed(() => {
-  const q = busca.value.trim().toLowerCase()
+  const q = (busca.value ?? '').trim().toLowerCase()
   return notas.value.filter(n =>
     !q || [n.nota, n.projeto_info_sap, n.municipio, n.base].some(v => String(v ?? '').toLowerCase().includes(q))
   )
