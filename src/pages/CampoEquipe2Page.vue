@@ -68,7 +68,7 @@
         <div class="eq2-titulo">Serviço realizado</div>
         <label class="eq2-label">Descrição do serviço</label>
         <textarea v-model="descricao" class="eq2-input eq2-textarea" rows="3" placeholder="Descreva o serviço executado" />
-        <label class="eq2-label q-mt-md">Fotos do serviço</label>
+        <label class="eq2-label q-mt-md">Foto do serviço</label>
         <div v-if="fotosServico.length" class="eq2-fotos">
           <div v-for="(url, i) in fotosServico" :key="url" class="eq2-foto-item">
             <img :src="url" alt="Foto do serviço" />
@@ -78,7 +78,7 @@
           </div>
         </div>
         <label class="eq2-foto">
-          <span><q-icon name="photo_camera" size="24px" /> {{ fotosServico.length ? 'Adicionar outra foto' : 'Tirar foto do serviço' }}</span>
+          <span><q-icon name="photo_camera" size="24px" /> {{ fotosServico.length ? 'Trocar foto' : 'Tirar foto do serviço' }}</span>
           <input type="file" accept="image/*" capture="environment" hidden :disabled="enviando" @change="fotoDoServico" />
         </label>
       </div>
@@ -251,7 +251,8 @@ async function fotoDoServico (e) {
   enviando.value = true
   try {
     const url = await enviarFoto(file, 'campo-fotos', `servico/${notaAtiva.value.nota}/${crypto.randomUUID()}.jpg`)
-    fotosServico.value = [...fotosServico.value, url]
+    // O serviço tem uma foto e uma descrição: a nova foto substitui a anterior
+    fotosServico.value = [url]
   } catch (err) {
     $q.notify({ type: 'negative', message: 'Não foi possível enviar a foto: ' + err.message, position: 'top' })
   } finally {
