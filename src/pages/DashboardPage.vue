@@ -139,8 +139,8 @@
           </div>
           <div class="kpi-sep" />
           <div>
-            <div class="kpi-prev">{{ executado.postes }}</div>
-            <div class="kpi-prev-lbl">registros</div>
+            <div class="kpi-prev">{{ executado.postesCampo }}</div>
+            <div class="kpi-prev-lbl">postes no campo</div>
           </div>
         </div>
         <div class="kpi-progress-track" />
@@ -287,13 +287,24 @@ onMounted(async () => {
 // ── Métricas executado ─────────────────────────────────────────
 const executado = computed(() => {
   const notasConcluidasPlanilha = notasStore.notas.filter(n => n.status === 'concluido')
-  const postesPlanilha = notasConcluidasPlanilha.reduce((s, n) => s + (Number(n.postes) || 0), 0)
   const notasPlanilhaSet = new Set(notasConcluidasPlanilha.map(n => n.nota))
 
-  const postesCampo = campoRegs.value.length
-  const notasCampoSet = new Set(campoRegs.value.map(r => r.nota).filter(Boolean))
+  // Postes do campo: cada número PG distinto por nota (fotos com rótulo não contam)
+  const pgPorNota = new Map()
+  for (const r of campoRegs.value) {
+    if (!/^[0-9]+$/.test(String(r.pg_numero))) continue
+    if (!pgPorNota.has(r.nota)) pgPorNota.set(r.nota, new Set())
+    pgPorNota.get(r.nota).add(r.pg_numero)
+  }
+  const postesCampo = [...pgPorNota.values()].reduce((s, set) => s + set.size, 0)
+
+  // Nota concluída pela planilha que já tem postes no campo entra só pelo campo (não conta duas vezes)
+  const postesPlanilha = notasConcluidasPlanilha
+    .filter(n => !pgPorNota.has(n.nota))
+    .reduce((s, n) => s + (Number(n.postes) || 0), 0)
 
   // União das notas (campo OU concluído planilha)
+  const notasCampoSet = new Set(campoRegs.value.map(r => r.nota).filter(Boolean))
   const notasExecSet = new Set([...notasCampoSet, ...notasPlanilhaSet])
 
   return {
