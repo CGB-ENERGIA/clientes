@@ -87,18 +87,50 @@
       <div class="eq2-cartao">
         <div class="eq2-titulo">Clientes e medidores <small>{{ clientesProntos }} de {{ clientes.length }}</small></div>
         <div v-if="!clientes.length" class="eq2-vazio">Esta nota não tem clientes na planilha.</div>
-        <div v-for="c in clientes" :key="c.chave" class="eq2-cliente" :class="{ 'eq2-cliente--ok': c.medidor && c.foto }">
-          <div class="eq2-cliente-nome">{{ c.nome }}</div>
+        <div v-for="c in clientes" :key="c.chave" class="eq2-cliente" :class="{ 'eq2-cliente--ok': c.medidor.trim() && c.fotos.length }">
+          <div class="eq2-cliente-nome">
+            {{ c.nome }}
+            <span v-if="c.adicional" class="eq2-tag eq2-tag--prog">Adicional</span>
+          </div>
           <div class="eq2-cliente-sub">{{ [c.conta, c.endereco].filter(Boolean).join(' · ') }}</div>
           <div class="eq2-cliente-linha">
             <input v-model="c.medidor" class="eq2-input" placeholder="Nº do medidor" :disabled="enviando" />
-            <label class="eq2-foto eq2-foto--mini" :class="{ 'eq2-foto--ok': c.foto }">
-              <img v-if="c.foto" :src="c.foto" alt="Foto do medidor" />
-              <q-icon v-else name="photo_camera" size="20px" />
-              <input type="file" accept="image/*" capture="environment" hidden :disabled="enviando" @change="fotoDoMedidor(c, $event)" />
+            <label class="eq2-foto eq2-foto--mini" :class="{ 'eq2-foto--ok': c.fotos.length }" title="Tirar foto">
+              <q-icon name="photo_camera" size="20px" />
+              <input type="file" accept="image/*" capture="environment" hidden :disabled="enviando" @change="fotosDoMedidor(c, $event)" />
+            </label>
+            <label class="eq2-foto eq2-foto--mini" title="Escolher várias fotos da galeria">
+              <q-icon name="photo_library" size="20px" />
+              <input type="file" accept="image/*" multiple hidden :disabled="enviando" @change="fotosDoMedidor(c, $event)" />
             </label>
           </div>
+          <div v-if="c.fotos.length" class="eq2-fotos">
+            <div v-for="(url, fi) in c.fotos" :key="url" class="eq2-foto-item">
+              <img :src="url" alt="Foto do medidor" />
+              <button class="eq2-foto-x" type="button" aria-label="Remover foto" :disabled="enviando" @click="removerFotoMedidor(c, fi)">
+                <q-icon name="close" size="14px" />
+              </button>
+            </div>
+          </div>
+          <button v-if="c.adicional" class="eq2-remover" type="button" :disabled="enviando" @click="removerCliente(c)">
+            Remover este cliente adicional
+          </button>
         </div>
+
+        <!-- Cliente adicional: que não está na planilha -->
+        <div v-if="novoCliente" class="eq2-cliente eq2-novo">
+          <div class="eq2-cliente-nome">Novo cliente adicional</div>
+          <input v-model="novoCliente.nome" class="eq2-input" placeholder="Nome do cliente *" style="text-transform:uppercase" />
+          <input v-model="novoCliente.conta" class="eq2-input" placeholder="Conta contrato (opcional)" inputmode="numeric" />
+          <input v-model="novoCliente.endereco" class="eq2-input" placeholder="Endereço (opcional)" />
+          <div class="eq2-acoes">
+            <button class="eq2-btn eq2-btn--sec" type="button" @click="novoCliente = null">Cancelar</button>
+            <button class="eq2-btn eq2-btn--ok" type="button" :disabled="!novoCliente.nome.trim()" @click="adicionarCliente">Adicionar</button>
+          </div>
+        </div>
+        <button v-else class="eq2-btn eq2-btn--sec eq2-add" type="button" :disabled="enviando" @click="novoCliente = { nome: '', conta: '', endereco: '' }">
+          <q-icon name="person_add" size="18px" /> Adicionar cliente adicional
+        </button>
       </div>
 
       <div class="eq2-acoes">
@@ -155,7 +187,27 @@ const notasFiltradas = computed(() => {
 })
 
 const postesCampo = computed(() => notaAtiva.value?.postes ?? 0)
-const clientesProntos = computed(() => clientes.value.filter(c => c.medidor.trim() && c.foto).length)
+const clientesProntos = computed(() => clientes.value.filter(c => c.medidor.trim() && c.fotos.length).length)
+
+// Cliente adicional: que não está na planilha da nota (formulário aberto quando preenchido)
+const novoCliente = ref(null)
+function adicionarCliente () {
+  const nome = novoCliente.value.nome.trim().toUpperCase()
+  if (!nome) return
+  clientes.value.push({
+    chave: `extra-${crypto.randomUUID()}`,
+    nome,
+    conta: novoCliente.value.conta.trim(),
+    endereco: novoCliente.value.endereco.trim(),
+    medidor: '',
+    fotos: [],
+    adicional: true
+  })
+  novoCliente.value = null
+}
+function removerCliente (c) {
+  clientes.value = clientes.value.filter(x => x.chave !== c.chave)
+}
 const prontoParaEnviar = computed(() =>
   !!descricao.value.trim() && fotosServico.value.length > 0 && clientes.value.length > 0 && clientesProntos.value === clientes.value.length
 )
@@ -207,18 +259,26 @@ async function fotoDoServico (e) {
   }
 }
 
-async function fotoDoMedidor (c, e) {
-  const file = e.target.files?.[0]
+// Várias fotos por cliente: tirar uma a uma pela câmera, ou escolher várias da galeria
+async function fotosDoMedidor (c, e) {
+  const arquivos = [...(e.target.files || [])]
   e.target.value = ''
-  if (!file) return
+  if (!arquivos.length) return
   enviando.value = true
   try {
-    c.foto = await enviarFoto(file, 'medidores', `${notaAtiva.value.nota}/${crypto.randomUUID()}.jpg`)
+    for (const file of arquivos) {
+      const url = await enviarFoto(file, 'medidores', `${notaAtiva.value.nota}/${crypto.randomUUID()}.jpg`)
+      c.fotos = [...c.fotos, url]
+    }
   } catch (err) {
     $q.notify({ type: 'negative', message: 'Não foi possível enviar a foto: ' + err.message, position: 'top' })
   } finally {
     enviando.value = false
   }
+}
+
+function removerFotoMedidor (c, i) {
+  c.fotos = c.fotos.filter((_, k) => k !== i)
 }
 
 async function abrirNota (n) {
@@ -231,15 +291,29 @@ async function abrirNota (n) {
     conta: c.conta_contrato || '',
     endereco: [c.endereco, c.bairro].filter(Boolean).join(', '),
     medidor: '',
-    foto: ''
+    fotos: []
   }))
+  novoCliente.value = null
 
   const { data } = await supabase.rpc('equipe2_carregar', { p_nota: n.nota })
   if (data?.descricao) descricao.value = data.descricao
   if (data?.fotos_servico?.length) fotosServico.value = data.fotos_servico
   for (const salvo of data?.clientes || []) {
+    const fotos = salvo.fotos_urls?.length ? salvo.fotos_urls : (salvo.foto_url ? [salvo.foto_url] : [])
+    if (salvo.adicional) {
+      clientes.value.push({
+        chave: `extra-${crypto.randomUUID()}`,
+        nome: salvo.nome,
+        conta: salvo.conta_contrato || '',
+        endereco: salvo.endereco || '',
+        medidor: salvo.num_medidor || '',
+        fotos,
+        adicional: true
+      })
+      continue
+    }
     const c = clientes.value.find(x => x.conta && x.conta === salvo.conta_contrato)
-    if (c) { c.medidor = salvo.num_medidor || ''; c.foto = salvo.foto_url || '' }
+    if (c) { c.medidor = salvo.num_medidor || ''; c.fotos = fotos }
   }
 }
 
@@ -254,7 +328,10 @@ async function salvar (concluir) {
     padrao: '',
     conta_contrato: c.conta || null,
     num_medidor: c.medidor.trim() || null,
-    foto_url: c.foto || null
+    foto_url: c.fotos[0] || null,
+    fotos_urls: c.fotos,
+    endereco: c.endereco || null,
+    adicional: !!c.adicional
   }))
   enviando.value = true
   try {
@@ -299,6 +376,9 @@ onMounted(carregarNotas)
 .eq2-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 16px; }
 .eq2-chip { font-size: 12px; font-weight: 700; background: rgba(255,202,40,0.15); color: #ffca28; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
 .eq2-card-sub { font-size: 12.5px; color: rgba(255,255,255,0.55); margin-top: 4px; }
+.eq2-add { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 8px; }
+.eq2-novo { display: flex; flex-direction: column; gap: 8px; border-style: dashed; }
+.eq2-remover { background: none; border: 0; color: #ef9a9a; font: inherit; font-size: 12.5px; text-align: left; padding: 6px 0 0; cursor: pointer; }
 .eq2-filtros { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
 .eq2-filtro { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.75); border-radius: 18px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
 .eq2-filtro b { margin-left: 4px; color: #ffca28; }
