@@ -14,8 +14,8 @@ html, body {
   --bg-card-alt:   #f8fafc;
   --border:        rgba(0,0,0,0.07);
   --text-primary:  #0f172a;
-  --text-secondary:#64748b;
-  --text-muted:    #94a3b8;
+  --text-secondary:#475569;
+  --text-muted:    #5f6f84;
   --accent:        #1565c0;
   --accent-light:  #e8f0fe;
   --shadow-sm:     0 1px 4px rgba(0,0,0,0.07);
@@ -24,6 +24,11 @@ html, body {
   --radius:        12px;
   --radius-sm:     8px;
   --page-pad:      20px;
+  // Cores de marca do Quasar com contraste suficiente para texto branco em cima (WCAG AA)
+  --q-primary:     #1565c0;
+  --q-positive:    #15803d;
+  --q-warning:     #b45309;
+  --q-negative:    #c62828;
 }
 
 body.body--dark {
@@ -32,14 +37,25 @@ body.body--dark {
   --bg-card-alt:   #1c2128;
   --border:        rgba(255,255,255,0.07);
   --text-primary:  #e6edf3;
-  --text-secondary:#8b949e;
-  --text-muted:    #6e7681;
+  --text-secondary:#a9b4c0;
+  --text-muted:    #8b949e;
   --accent:        #58a6ff;
   --accent-light:  rgba(88,166,255,0.1);
   --shadow-sm:     0 1px 4px rgba(0,0,0,0.35);
   --shadow-md:     0 4px 16px rgba(0,0,0,0.45);
   --shadow-lg:     0 8px 32px rgba(0,0,0,0.55);
+  // No escuro a cor de marca precisa ser clara para texto/contorno; botões cheios trocam para texto escuro
+  --q-primary:     #58a6ff;
+  --q-positive:    #3fb950;
+  --q-warning:     #e3b341;
+  --q-negative:    #f85149;
 }
+body.body--dark .q-btn.bg-primary, body.body--dark .q-btn.bg-positive,
+body.body--dark .q-btn.bg-warning, body.body--dark .q-btn.bg-negative { color: #0d1117 !important; }
+
+// Texto de apoio que acompanha o tema
+.txt-suave { color: var(--text-secondary); }
+body.body--dark .text-grey-5, body.body--dark .text-grey-6, body.body--dark .text-grey-7, body.body--dark .text-grey-8 { color: var(--text-secondary) !important; }
 
 // ── Page base ─────────────────────────────────────────────────────
 .q-page {

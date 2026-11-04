@@ -388,13 +388,13 @@ function pct (exec, prev) {
 
 // ── Status distribution ────────────────────────────────────────
 const STATUS_CONFIG = [
-  { val: 'pendente',       label: 'Não Iniciado',   cor: '#64748b' },
-  { val: 'em_andamento',   label: 'Em Andamento',   cor: '#ea580c' },
-  { val: 'aguardando_etapa2', label: 'Aguardando Etapa 2', cor: '#8e24aa' },
+  { val: 'pendente',       label: 'Não Iniciado',   cor: '#475569' },
+  { val: 'em_andamento',   label: 'Em Andamento',   cor: '#c2410c' },
+  { val: 'aguardando_etapa2', label: 'Aguardando Etapa 2', cor: '#7b1fa2' },
   { val: 'baixar_medidor', label: 'Auditar', cor: '#1d4ed8' },
-  { val: 'concluido',      label: 'Concluído',      cor: '#16a34a' },
-  { val: 'expurgo',        label: 'Expurgo',        cor: '#dc2626' },
-  { val: 'sem_acesso',     label: 'Sem Acesso',     cor: '#7c3aed' },
+  { val: 'concluido',      label: 'Concluído',      cor: '#15803d' },
+  { val: 'expurgo',        label: 'Expurgo',        cor: '#c62828' },
+  { val: 'sem_acesso',     label: 'Sem Acesso',     cor: '#6d28d9' },
 ]
 
 const distStatus = computed(() => {
@@ -602,6 +602,7 @@ const rankPep = computed(() => {
 .status-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 .status-lbl  { flex:1; font-size:12px; font-weight:600; color:var(--text-primary); }
 .status-count{ font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; min-width:30px; text-align:right; }
+.body--dark .status-count { filter: brightness(2.2); }
 .status-pct  { font-size:10px; color:var(--text-muted); min-width:28px; text-align:right; }
 
 /* Rank list */

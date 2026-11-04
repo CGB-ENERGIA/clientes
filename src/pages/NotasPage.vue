@@ -31,7 +31,7 @@
               @click="store.fetchNotas()"
             />
             <q-space />
-            <div class="text-caption text-grey-6 self-center">
+            <div class="text-caption txt-suave self-center">
               {{ store.notas.length }} nota{{ store.notas.length !== 1 ? 's' : '' }} carregada{{ store.notas.length !== 1 ? 's' : '' }}
             </div>
           </div>
@@ -39,7 +39,7 @@
           <!-- Banner Dropbox -->
           <q-banner rounded class="banner-dropbox q-mb-md">
             <template #avatar>
-              <q-icon name="cloud_sync" :color="dropboxUrl ? 'blue-7' : 'blue-4'" size="22px" />
+              <q-icon name="cloud_sync" :color="'blue-9'" size="22px" />
             </template>
 
             <div v-if="dropboxUrl" class="row items-center q-gutter-sm flex-wrap">
@@ -56,7 +56,7 @@
                 label="Sincronizar agora"
                 icon="sync"
                 flat dense
-                :color="dropboxUrl ? 'blue-8' : 'blue-4'"
+                :color="'blue-9'"
                 :loading="syncingDropbox"
                 :disable="syncingDropbox"
                 @click="dropboxUrl ? executarSync() : abrirConfigDialog()"
@@ -64,7 +64,7 @@
               <q-btn
                 :label="dropboxUrl ? 'Reconfigurar' : 'Configurar'"
                 :icon="dropboxUrl ? 'edit' : 'settings'"
-                flat dense color="blue-7"
+                flat dense color="blue-9"
                 @click="abrirConfigDialog"
               />
             </template>

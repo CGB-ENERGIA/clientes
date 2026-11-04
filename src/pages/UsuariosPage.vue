@@ -180,5 +180,5 @@ onMounted(() => {
 <style scoped>
 .usr-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .usr-titulo { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
-.usr-sub { font-size: 13px; color: #64748b; margin-top: 2px; }
+.usr-sub { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
 </style>

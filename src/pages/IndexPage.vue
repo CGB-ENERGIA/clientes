@@ -197,12 +197,12 @@
       </div>
 
       <!-- ── Loading inicial ───────────────────────────────────────── -->
-      <div v-if="notasStore.loading && !notasStore.notas.length" class="text-center q-py-xl text-grey-5">
+      <div v-if="notasStore.loading && !notasStore.notas.length" class="text-center q-py-xl txt-suave">
         <q-spinner size="40px" color="primary" /><div class="q-mt-sm">Carregando...</div>
       </div>
 
       <!-- ── Empty state ───────────────────────────────────────────── -->
-      <div v-else-if="!notasFiltradas.length" class="card-modern q-pa-xl text-center text-grey-5">
+      <div v-else-if="!notasFiltradas.length" class="card-modern q-pa-xl text-center txt-suave">
         <q-icon name="table_chart" size="48px" class="q-mb-sm" />
         <div class="text-subtitle1">
           {{ filtro ? 'Nenhuma nota encontrada para "' + filtro + '"' : semNotasMsg }}
@@ -264,7 +264,7 @@
               <span class="lista-cliente-nome">{{ n.clientes_planilha[0].nome }}</span>
               <span v-if="n.clientes_planilha.length > 1" class="lista-cliente-mais">+{{ n.clientes_planilha.length - 1 }}</span>
             </template>
-            <span v-else class="text-grey-5">—</span>
+            <span v-else class="txt-suave">—</span>
           </div>
           <div class="lista-info">
             <span :class="n.postes > 1 ? 'info-destaque info-destaque--poste' : ''">
@@ -563,7 +563,7 @@
                 <q-tooltip>Remover foto</q-tooltip>
               </q-btn>
             </div>
-            <div v-if="!editRegFotos.length" class="col-12 text-grey-7">Sem fotos neste registro.</div>
+            <div v-if="!editRegFotos.length" class="col-12 txt-suave">Sem fotos neste registro.</div>
           </div>
           <q-btn
             flat dense no-caps color="primary" icon="add_a_photo" label="Adicionar foto"
@@ -1946,7 +1946,7 @@ notasStore.fetchNotas()
 .body--dark .nc-status--aguardando_etapa2, .body--dark .nc-status--sem_acesso { color: #c4b5fd; }
 .body--dark .nc-status--concluido { color: #86efac; }
 .body--dark .nc-status--expurgo { color: #fca5a5; }
-.nc-status--pendente       { background: #f5f5f5;  color: #757575; }
+.nc-status--pendente       { background: #f5f5f5;  color: #616161; }
 .nc-status--em_andamento   { background: #fff3e0;  color: #e65100; }
 .nc-status--baixar_medidor { background: #e3f2fd;  color: #1565c0; }
 .nc-status--aguardando_etapa2 { background: #f3e5f5; color: #6a1b9a; }
@@ -1965,7 +1965,7 @@ notasStore.fetchNotas()
   display: flex; align-items: center; gap: 5px;
   padding: 6px 10px; border-radius: 8px;
 }
-.nc-msg--pendente       { background: #f5f5f5;  color: #9e9e9e; }
+.nc-msg--pendente       { background: #f5f5f5;  color: #616161; }
 .nc-msg--em_andamento   { background: #fff8e1;  color: #e65100; }
 .nc-msg--baixar_medidor { background: #e3f2fd;  color: #1565c0; }
 .nc-msg--concluido      { background: #e8f5e9;  color: #2e7d32; }
@@ -2069,10 +2069,10 @@ notasStore.fetchNotas()
 .lista-header-status { display: flex; align-items: center; justify-content: center; gap: 4px; }
 
 .status-legenda { padding: 12px 14px; max-width: 340px; display: flex; flex-direction: column; gap: 10px; }
-.status-legenda-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #78909c; }
+.status-legenda-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #546e7a; }
 .status-legenda-item { display: flex; align-items: flex-start; gap: 10px; }
 .status-legenda-label { font-size: 13px; font-weight: 700; }
-.status-legenda-desc { font-size: 12px; color: #78909c; line-height: 1.35; }
+.status-legenda-desc { font-size: 12px; color: #546e7a; line-height: 1.35; }
 .lista-row {
   --st: #94a3b8;
   display: grid;
@@ -2122,7 +2122,7 @@ notasStore.fetchNotas()
 .lista-equipe { display: inline-flex; align-items: center; gap: 3px; width: 100%; justify-content: center; font-size: 11px; font-weight: 700; color: #5d4037; background: #fff8e1; border-radius: 8px; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .body--dark .lista-equipe { background: rgba(255,202,40,0.12); color: #ffe082; }
 .lista-acao { display: flex; justify-content: center; align-items: center; gap: 4px; }
-.lista-acao :deep(.q-btn:not(.q-btn--round)) { border-radius: 999px; padding: 3px 12px; font-weight: 700; letter-spacing: 0.04em; }
+.lista-acao :deep(.q-btn:not(.q-btn--round)) { border-radius: 999px; padding: 3px 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
 
 @media (max-width: 700px) {
   .lista-row {
@@ -2157,12 +2157,12 @@ notasStore.fetchNotas()
   padding: 14px 24px; background: var(--bg-card); border-bottom: 1px solid var(--border);
 }
 .meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.meta-lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.meta-lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); }
 .meta-val { font-size: 14px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
 .meta-val--destaque { color: var(--accent); }
 .meta-val--mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; }
-.meta-ico--ambar { color: #d97706; }
-.meta-ico--verde { color: #16a34a; }
+.meta-ico--ambar { color: #b45309; }
+.meta-ico--verde { color: #15803d; }
 
 /* Corpo: coluna principal (Etapa 2) + lateral (Etapa 1) */
 .dlg-corpo { flex: 1; overflow-y: auto; padding: 22px 24px 28px; }
@@ -2201,8 +2201,8 @@ notasStore.fetchNotas()
 .bloco--lateral .bloco-cab { flex-shrink: 0; }
 .bloco--lateral .cmp { overflow-y: auto; }
 
-.vazio-bloco { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 34px 16px; color: var(--text-muted); text-align: center; }
-.vazio-bloco-titulo { font-size: 14px; font-weight: 700; color: var(--text-secondary); margin-top: 6px; }
+.vazio-bloco { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 34px 16px; color: var(--text-secondary); text-align: center; }
+.vazio-bloco-titulo { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-top: 6px; }
 .vazio-bloco-sub { font-size: 12.5px; }
 
 /* Campos do diálogo */
@@ -2243,7 +2243,7 @@ notasStore.fetchNotas()
   flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
   font-size: 12px; font-weight: 800; color: var(--accent); background: var(--accent-light); font-variant-numeric: tabular-nums;
 }
-.cli-origem { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--text-muted); }
+.cli-origem { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--text-secondary); }
 .cli-origem-lbl { font-weight: 700; color: var(--accent); }
 .cli-end { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -2254,7 +2254,7 @@ notasStore.fetchNotas()
 }
 .seg-op:hover { color: var(--text-primary); }
 .seg-op:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.seg-op--ok.seg-op--on { background: #16a34a; color: #fff; }
+.seg-op--ok.seg-op--on { background: #15803d; color: #fff; }
 .seg-op--nao.seg-op--on { background: #dc2626; color: #fff; }
 
 .cli-campos { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; padding: 14px; align-items: start; }
@@ -2275,7 +2275,7 @@ notasStore.fetchNotas()
 .cmp-stat-val { font-size: 18px; font-weight: 800; line-height: 1.1; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .cmp-stat-val small { font-size: 12px; font-weight: 700; color: var(--text-muted); }
 .cmp-stat-val--sm { font-size: 12.5px; font-weight: 700; line-height: 1.35; }
-.cmp-stat-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmp-stat-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cmp-equipe-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .cmp-equipe-nome { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }
 .cmp-pgs { display: flex; flex-direction: column; gap: 6px; }
@@ -2291,7 +2291,7 @@ notasStore.fetchNotas()
 .cmp-pg-mais { position: absolute; right: 2px; bottom: 2px; padding: 0 5px; border-radius: 8px; background: rgba(0,0,0,0.68); color: #fff; font-size: 10px; font-weight: 800; }
 .cmp-pg-info { flex: 1; min-width: 0; }
 .cmp-pg-num { font-size: 13.5px; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cmp-pg-hora { font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.cmp-pg-hora { font-size: 11.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 
 /* Rodapé */
 .dlg-rodape {
@@ -2300,10 +2300,13 @@ notasStore.fetchNotas()
 }
 .dlg-rodape-info { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 18px; margin-right: auto; min-width: 0; }
 .resumo { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
-.resumo--ok { color: #16a34a; }
+.resumo--ok { color: #15803d; }
 .resumo--nao { color: #dc2626; }
-.resumo--rascunho { font-weight: 600; color: #d97706; }
+.resumo--rascunho { font-weight: 600; color: #b45309; }
+.body--dark .resumo--ok { color: #86efac; }
+.body--dark .resumo--rascunho { color: #fbbf24; }
 .btn-concluir { min-width: 170px; }
+.btn-concluir.disabled, .btn-concluir[disabled] { opacity: 1 !important; background: var(--bg-card-alt) !important; color: var(--text-secondary) !important; border: 1px solid var(--border); }
 @media (max-width: 700px) {
   .dlg-topo, .dlg-meta, .dlg-corpo, .dlg-rodape { padding-left: 14px; padding-right: 14px; }
   .dlg-rodape-info { flex-basis: 100%; }
@@ -2325,9 +2328,10 @@ notasStore.fetchNotas()
 }
 /* ── Coluna PROJETO na lista ── */
 .lista-projeto {
-  font-size: 12px; color: #7e57c2; font-weight: 600;
+  font-size: 12px; color: #6d3fb8; font-weight: 600;
   text-align: center;
 }
+.body--dark .lista-projeto { color: #c4b0f0; }
 /* ── Badge count de notas no grupo ── */
 .lista-num-badge {
   display: inline-block;
@@ -2367,7 +2371,7 @@ notasStore.fetchNotas()
 .grupo-item-nota { font-size: 16px; font-weight: 800; color: #0d1b2a; }
 .grupo-item-info {
   display: flex; gap: 8px; margin-top: 2px;
-  font-size: 11px; color: #78909c;
+  font-size: 11px; color: #546e7a;
 }
 .grupo-item-info span { display: flex; align-items: center; gap: 3px; }
 
