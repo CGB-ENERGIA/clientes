@@ -19,8 +19,7 @@
 
         <!-- Nav desktop -->
         <nav class="header-nav row items-center gt-sm">
-          <template v-for="(item, i) in navVisiveis" :key="item.to">
-            <div v-if="i > 0" class="nav-divider" />
+          <template v-for="item in navVisiveis" :key="item.to">
             <router-link :to="item.to" custom v-slot="{ isExactActive, navigate }">
               <button class="nav-btn" :class="{ 'nav-btn--active': isExactActive }" @click="navigate">
                 <span class="nav-btn-inner">
@@ -45,7 +44,7 @@
         </div>
 
         <!-- Logout -->
-        <q-btn flat round dense icon="logout" color="white" class="q-ml-sm" size="sm" @click="logout">
+        <q-btn flat round dense icon="logout" color="white" class="q-ml-sm btn-sair" size="sm" @click="logout">
           <q-tooltip>Sair</q-tooltip>
         </q-btn>
 
@@ -171,26 +170,30 @@ const navVisiveis = computed(() => navItems.filter(i => !i.admin || auth.isAdmin
 }
 
 /* ── Nav desktop ── */
-.header-nav { gap: 0; }
-.nav-divider { width: 1px; height: 18px; background: rgba(255,255,255,0.1); margin: 0 2px; }
+.header-nav { gap: 4px; }
 .nav-btn {
   position: relative;
   display: inline-flex; flex-direction: column; align-items: center;
-  padding: 8px 14px;
-  border: none; background: transparent;
-  color: rgba(255,255,255,0.45);
-  font-family: inherit; font-size: 12px; font-weight: 500;
-  cursor: pointer; transition: color 0.2s; outline: none; letter-spacing: 0.2px;
+  padding: 9px 14px;
+  border: none; border-radius: 10px; background: transparent;
+  color: rgba(255,255,255,0.64);
+  font-family: inherit; font-size: 12.5px; font-weight: 500;
+  cursor: pointer; transition: color 0.2s, background 0.2s; outline: none; letter-spacing: 0.2px;
 }
-.nav-btn-inner { display: flex; align-items: center; gap: 5px; }
-.nav-btn:hover { color: rgba(255,255,255,0.85); }
-.nav-btn--active { color: #fff; font-weight: 700; }
+.nav-btn-inner { display: flex; align-items: center; gap: 6px; }
+.nav-btn:hover { color: #fff; background: rgba(255,255,255,0.07); }
+.nav-btn:focus-visible { box-shadow: 0 0 0 2px rgba(255,202,40,0.7); }
+.nav-btn--active { color: #fff; font-weight: 700; background: rgba(255,255,255,0.06); }
 .nav-indicator {
-  position: absolute; bottom: -1px; left: 18%; width: 64%; height: 3px;
+  position: absolute; bottom: -8px; left: 22%; width: 56%; height: 3px;
   border-radius: 3px 3px 0 0;
   background: linear-gradient(90deg, #ffca28, #ff8f00);
   box-shadow: 0 0 8px rgba(255,160,0,0.55);
 }
+
+/* ── Sair ── */
+.btn-sair { opacity: 0.7; transition: opacity 0.2s; }
+.btn-sair:hover, .btn-sair:focus-visible { opacity: 1; }
 
 /* ── Toggle ── */
 .theme-toggle { cursor: pointer; user-select: none; }
@@ -228,7 +231,7 @@ const navVisiveis = computed(() => navItems.filter(i => !i.admin || auth.isAdmin
 .user-role  { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; line-height: 1; }
 .role--super  { color: #ffca28; }
 .role--admin  { color: #80cbc4; }
-.role--viewer { color: rgba(255,255,255,0.35); }
+.role--viewer { color: rgba(255,255,255,0.6); }
 
 /* ── Drawer mobile ── */
 .drawer-modern { background: var(--bg-card) !important; }

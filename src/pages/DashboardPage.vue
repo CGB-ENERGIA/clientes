@@ -1,6 +1,13 @@
 <template>
   <q-page class="dash-page">
 
+    <div class="page-head q-mb-md">
+      <div>
+        <div class="page-titulo">Dashboard</div>
+        <div class="page-sub">Postes, notas e equipes no período</div>
+      </div>
+    </div>
+
     <!-- ── Filtros ────────────────────────────────────────────── -->
     <div class="filtros-dash">
       <q-select
@@ -563,10 +570,11 @@ const rankPep = computed(() => {
 .dash-col { display:flex; flex-direction:column; gap:12px; }
 
 .dash-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
 }
 .dash-card-title {
   display: flex;
@@ -576,7 +584,7 @@ const rankPep = computed(() => {
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-bottom: 14px;
 }
 
@@ -592,22 +600,22 @@ const rankPep = computed(() => {
 .status-list { display:flex; flex-direction:column; gap:9px; }
 .status-row  { display:flex; align-items:center; gap:8px; }
 .status-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-.status-lbl  { flex:1; font-size:12px; font-weight:600; color:#334155; }
+.status-lbl  { flex:1; font-size:12px; font-weight:600; color:var(--text-primary); }
 .status-count{ font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; min-width:30px; text-align:right; }
-.status-pct  { font-size:10px; color:#94a3b8; min-width:28px; text-align:right; }
+.status-pct  { font-size:10px; color:var(--text-muted); min-width:28px; text-align:right; }
 
 /* Rank list */
 .rank-list { display:flex; flex-direction:column; gap:7px; }
 .rank-row  { display:grid; grid-template-columns:20px 1fr 70px 26px; align-items:center; gap:8px; }
-.rank-pos  { font-size:10px; font-weight:700; color:#cbd5e1; font-variant-numeric:tabular-nums; }
-.rank-name { font-size:12px; font-weight:600; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.rank-name--mono { font-size:11px; font-family:'Courier New',monospace; color:#475569; }
-.rank-track { height:4px; background:#f1f5f9; border-radius:99px; overflow:hidden; }
+.rank-pos  { font-size:10px; font-weight:700; color:var(--text-muted); font-variant-numeric:tabular-nums; }
+.rank-name { font-size:12px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rank-name--mono { font-size:11px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; color:var(--text-secondary); }
+.rank-track { height:4px; background:rgba(100,116,139,0.16); border-radius:99px; overflow:hidden; }
 .rank-fill  { height:100%; background:#3b82f6; border-radius:99px; transition:width .5s ease; }
 .rank-fill--purple { background:#7c3aed; }
-.rank-val   { font-size:11px; font-weight:700; color:#64748b; text-align:right; font-variant-numeric:tabular-nums; }
+.rank-val   { font-size:11px; font-weight:700; color:var(--text-secondary); text-align:right; font-variant-numeric:tabular-nums; }
 
 /* Empty */
-.empty-state { display:flex; flex-direction:column; align-items:center; padding:24px 0; gap:8px; color:#94a3b8; font-size:12px; }
-.empty-sm    { text-align:center; padding:16px; font-size:12px; color:#94a3b8; }
+.empty-state { display:flex; flex-direction:column; align-items:center; padding:24px 0; gap:8px; color:var(--text-muted); font-size:12px; }
+.empty-sm    { text-align:center; padding:16px; font-size:12px; color:var(--text-muted); }
 </style>

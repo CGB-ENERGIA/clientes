@@ -3,9 +3,11 @@
     <div class="q-gutter-y-md">
 
       <div>
-        <div class="section-title">
-          <q-icon name="table_chart" size="15px" />
-          Gestão de Notas de Serviço
+        <div class="page-head q-mb-md">
+          <div>
+            <div class="page-titulo">Gestão de notas de serviço</div>
+            <div class="page-sub">{{ store.notas.length }} notas carregadas</div>
+          </div>
         </div>
 
         <div class="card-modern q-pa-md">

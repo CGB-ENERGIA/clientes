@@ -1,6 +1,13 @@
 <template>
   <q-page>
 
+    <div class="page-head q-mb-md">
+      <div>
+        <div class="page-titulo">Histórico</div>
+        <div class="page-sub">Registros de apontamento enviados</div>
+      </div>
+    </div>
+
     <!-- KPIs compactos -->
     <div class="row q-col-gutter-sm q-mb-md">
       <div class="col-6 col-sm-3">

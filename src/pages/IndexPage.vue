@@ -3,9 +3,10 @@
     <div class="q-gutter-y-md">
 
       <!-- ── Barra de busca + atualizar ───────────────────────────── -->
-      <div class="row items-center q-gutter-sm">
-        <div class="section-title col-auto q-mb-none">
-          <q-icon name="assignment" size="15px" /> Notas de Serviço
+      <div class="row items-end q-gutter-sm">
+        <div class="col-auto">
+          <div class="page-titulo">Notas de serviço</div>
+          <div class="page-sub">{{ notasStore.notas.length }} notas carregadas</div>
         </div>
         <q-space />
         <!-- Toggle grade / lista -->
@@ -332,8 +333,8 @@
               <q-btn
                 v-else
                 label="Abrir"
-                flat dense size="xs"
-                color="grey-5"
+                outline dense size="xs"
+                color="blue-grey-5"
                 @click.stop="abrirDialog(n)"
               />
             </template>
@@ -2205,7 +2206,8 @@ notasStore.fetchNotas()
 .lista-status .badge-apagada { margin-left: 0; }
 .lista-equipe { display: inline-flex; align-items: center; gap: 3px; width: 100%; justify-content: center; font-size: 11px; font-weight: 700; color: #5d4037; background: #fff8e1; border-radius: 8px; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .body--dark .lista-equipe { background: rgba(255,202,40,0.12); color: #ffe082; }
-.lista-acao { display: flex; justify-content: center; align-items: center; gap: 2px; }
+.lista-acao { display: flex; justify-content: center; align-items: center; gap: 4px; }
+.lista-acao :deep(.q-btn:not(.q-btn--round)) { border-radius: 999px; padding: 3px 12px; font-weight: 700; letter-spacing: 0.04em; }
 
 @media (max-width: 700px) {
   .lista-row {
