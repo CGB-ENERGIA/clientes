@@ -8,37 +8,29 @@
       </div>
     </div>
 
-    <!-- KPIs compactos -->
-    <div class="row q-col-gutter-sm q-mb-md">
-      <div class="col-6 col-sm-3">
-        <div class="mini-kpi bg-blue-9">
-          <q-icon name="assignment" size="18px" /><span>{{ listagem.length }}</span>
-          <div class="mini-kpi-label">Registros</div>
-        </div>
+    <!-- Indicadores -->
+    <div class="stat-strip q-mb-md">
+      <div class="stat stat--azul">
+        <span class="stat-ico"><q-icon name="assignment" size="22px" /></span>
+        <div class="stat-corpo"><div class="stat-val">{{ listagem.length }}</div><div class="stat-lbl">Registros</div></div>
       </div>
-      <div class="col-6 col-sm-3">
-        <div class="mini-kpi bg-teal-7">
-          <q-icon name="electrical_services" size="18px" /><span>{{ totais.postes }}</span>
-          <div class="mini-kpi-label">Postes</div>
-        </div>
+      <div class="stat stat--verde">
+        <span class="stat-ico"><q-icon name="electrical_services" size="22px" /></span>
+        <div class="stat-corpo"><div class="stat-val">{{ totais.postes }}</div><div class="stat-lbl">Postes</div></div>
       </div>
-      <div class="col-6 col-sm-3">
-        <div class="mini-kpi bg-purple-7">
-          <q-icon name="people" size="18px" /><span>{{ totais.clientes }}</span>
-          <div class="mini-kpi-label">Clientes</div>
-        </div>
+      <div class="stat stat--roxo">
+        <span class="stat-ico"><q-icon name="people" size="22px" /></span>
+        <div class="stat-corpo"><div class="stat-val">{{ totais.clientes }}</div><div class="stat-lbl">Clientes</div></div>
       </div>
-      <div class="col-6 col-sm-3">
-        <div class="mini-kpi" :class="corAdeClass(totais.aderencia)">
-          <q-icon name="track_changes" size="18px" /><span>{{ totais.aderencia }}%</span>
-          <div class="mini-kpi-label">Aderência</div>
-        </div>
+      <div class="stat" :class="classeAderencia(totais.aderencia)">
+        <span class="stat-ico"><q-icon name="track_changes" size="22px" /></span>
+        <div class="stat-corpo"><div class="stat-val">{{ totais.aderencia }}%</div><div class="stat-lbl">Aderência</div></div>
       </div>
     </div>
 
     <!-- Filtros -->
-    <div class="card-modern q-pa-sm q-mb-md">
-      <div class="row q-col-gutter-sm items-end">
+    <div class="filtros-card q-mb-md">
+      <div class="row q-col-gutter-sm items-center">
         <div class="col-12 col-sm-6 col-md-2">
           <q-select v-model="filtros.base" :options="['', ...bases]" label="Base" outlined dense clearable emit-value map-options>
             <template #prepend><q-icon name="location_on" size="16px" /></template>
@@ -60,34 +52,43 @@
         <div class="col-6 col-sm-3 col-md-2">
           <q-input v-model="filtros.dataFim" label="Até" type="date" outlined dense clearable />
         </div>
-        <div class="col-12 col-sm-6 col-md-2 row items-center justify-end q-gutter-sm">
-          <q-btn flat dense no-caps icon="clear_all" color="grey-6" label="Limpar" size="sm" @click="limparFiltros" />
-          <q-btn flat dense no-caps icon="download" color="positive" label="Excel" size="sm" @click="exportarExcel" />
+        <div class="col-12 col-sm-6 col-md-2 row items-center justify-end no-wrap q-gutter-sm">
+          <q-btn v-if="temFiltro" flat round dense icon="filter_alt_off" color="grey-7" aria-label="Limpar filtros" @click="limparFiltros">
+            <q-tooltip>Limpar filtros</q-tooltip>
+          </q-btn>
+          <q-btn outline no-caps dense color="positive" icon="download" label="Excel" class="btn-pill" @click="exportarExcel" />
         </div>
       </div>
     </div>
 
     <!-- Tabela -->
-    <div class="card-modern overflow-hidden">
+    <div class="tabela-card">
       <q-table
         :rows="listagem"
         :columns="columns"
         row-key="id"
         :loading="store.loading"
-        flat dense
+        flat
         :pagination="{ rowsPerPage: 50 }"
-        no-data-label="Nenhum apontamento encontrado"
         class="modern-table"
       >
+        <template #no-data>
+          <div class="vazio">
+            <q-icon name="inbox" size="40px" />
+            <div class="vazio-titulo">Nenhum apontamento encontrado</div>
+            <div class="vazio-sub">{{ temFiltro ? 'Tente ajustar ou limpar os filtros.' : 'Os registros enviados aparecem aqui.' }}</div>
+          </div>
+        </template>
+
         <template #body-cell-base="props">
           <q-td :props="props">
-            <q-badge color="blue-8" :label="props.row.base || '—'" />
+            <span class="pill pill--azul">{{ props.row.base || '—' }}</span>
           </q-td>
         </template>
 
         <template #body-cell-pg="props">
           <q-td :props="props">
-            <div v-for="(pg, i) in (props.row.pg_numeros || [])" :key="i" style="font-family:monospace;font-size:11px">{{ pg }}</div>
+            <div v-for="(pg, i) in (props.row.pg_numeros || [])" :key="i" class="mono">{{ pg }}</div>
             <span v-if="!props.row.pg_numeros?.length" style="color:var(--text-muted)">—</span>
           </q-td>
         </template>
@@ -96,7 +97,7 @@
           <q-td :props="props">
             <div v-for="c in (props.row.clientes || [])" :key="c.id" class="cliente-row">
               <span style="font-weight:500">{{ c.nome }}</span>
-              <q-badge v-if="c.padrao" outline :color="corPadraoQ(c.padrao)" :label="c.padrao" class="q-ml-xs" />
+              <span v-if="c.padrao" class="pill" :class="classePadrao(c.padrao)">{{ c.padrao }}</span>
             </div>
             <span v-if="!props.row.clientes?.length" style="color:var(--text-muted)">—</span>
           </q-td>
@@ -104,7 +105,7 @@
 
         <template #body-cell-aderencia="props">
           <q-td :props="props" class="text-center">
-            <q-badge :color="corAdeQ(calcAde(props.row))">{{ calcAde(props.row) }}%</q-badge>
+            <span class="pill" :class="'pill--' + corAde(calcAde(props.row))">{{ calcAde(props.row) }}%</span>
           </q-td>
         </template>
 
@@ -228,9 +229,10 @@ function calcAde (row) {
 }
 
 function fmt (d) { return d ? new Date(d).toLocaleDateString('pt-BR') : '' }
-function corAdeClass (p) { return p >= 90 ? 'bg-positive' : p >= 60 ? 'bg-warning' : 'bg-negative' }
-function corAdeQ (p) { return p >= 90 ? 'positive' : p >= 60 ? 'warning' : 'negative' }
-function corPadraoQ (p) { return p === 'PP' ? 'deep-orange' : p === '5 M' ? 'blue' : p === '7 M' ? 'purple' : 'grey' }
+function corAde (p) { return p >= 90 ? 'verde' : p >= 60 ? 'ambar' : 'vermelho' }
+function classeAderencia (p) { return 'stat--' + corAde(p) }
+function classePadrao (p) { return p === 'PP' ? 'pill--ambar' : p === '5 M' ? 'pill--azul' : p === '7 M' ? 'pill--roxo' : '' }
+const temFiltro = computed(() => Object.values(filtros.value).some(v => v))
 function limparFiltros () { filtros.value = { base: '', pep: '', nota: '', dataInicio: '', dataFim: '' } }
 
 function ajustarPg (n) {
@@ -297,21 +299,34 @@ onMounted(() => store.fetchApontamentos())
 </script>
 
 <style scoped>
-.mini-kpi {
-  border-radius: 10px; padding: 12px 14px;
-  color: #fff; display: flex; flex-direction: column;
-  box-shadow: 0 3px 12px rgba(0,0,0,0.18);
+.tabela-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow-sm);
 }
-.mini-kpi > span { font-size: 22px; font-weight: 800; margin-top: 4px; }
-.mini-kpi-label { font-size: 10px; opacity: 0.75; margin-top: 2px; text-transform: uppercase; letter-spacing: .08em; }
-
+/* Sem rolagem interna: o cabeçalho pode ficar fixo abaixo da barra de navegação */
+.modern-table { background: transparent; }
+.modern-table :deep(.q-table__middle) { overflow: visible; max-height: none; }
 .modern-table :deep(thead th) {
-  font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
-  color: var(--text-secondary); background: var(--bg-card-alt); border-bottom: 1px solid var(--border);
+  position: sticky; top: 59px; z-index: 3;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-secondary); background: var(--bg-card);
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  box-shadow: 0 6px 10px -8px rgba(15, 23, 42, 0.25);
 }
-.modern-table :deep(tbody td) { font-size: 12px; color: var(--text-primary); border-bottom: 1px solid var(--border); }
+.modern-table :deep(thead tr:first-child th:first-child) { border-top-left-radius: 15px; }
+.modern-table :deep(thead tr:first-child th:last-child) { border-top-right-radius: 15px; }
+.modern-table :deep(tbody td) {
+  font-size: 12.5px; color: var(--text-primary); padding: 12px 16px;
+  border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums;
+}
+.modern-table :deep(tbody tr:last-child td) { border-bottom: none; }
 .modern-table :deep(tbody tr:hover td) { background: var(--accent-light); }
+.modern-table :deep(.q-table__bottom) { border-top: 1px solid var(--border); color: var(--text-secondary); }
 
-.cliente-row { font-size: 12px; margin-bottom: 3px; display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
+.cliente-row { font-size: 12.5px; margin-bottom: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .cliente-row:last-child { margin-bottom: 0; }
+.mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11.5px; }
+
+.vazio { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 36px 12px; color: var(--text-muted); }
+.vazio-titulo { font-size: 14px; font-weight: 700; color: var(--text-secondary); margin-top: 6px; }
+.vazio-sub { font-size: 12.5px; }
 </style>
