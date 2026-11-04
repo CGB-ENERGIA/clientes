@@ -289,7 +289,7 @@ const mesesOptions = computed(() => {
 async function fetchCampo () {
   loadingCampo.value = true
   const buildQuery = () => {
-    let q = supabase.from('campo_registros').select('id, nota, equipe, created_at').order('id')
+    let q = supabase.from('campo_registros').select('id, nota, pg_numero, equipe, created_at').order('id')
 
     if (filtroDia.value) {
       q = q.gte('created_at', filtroDia.value + 'T00:00:00')
