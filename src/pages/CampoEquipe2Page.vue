@@ -86,7 +86,7 @@
             <span><q-icon name="photo_camera" size="24px" /> {{ s.fotos.length ? 'Adicionar outra foto' : 'Tirar foto do serviço' }}</span>
             <input type="file" accept="image/*" capture="environment" hidden :disabled="enviando" @change="fotoDoServico(s, $event)" />
           </label>
-          <label class="eq2-foto eq2-foto--mini" title="Escolher várias fotos da galeria">
+          <label class="eq2-foto eq2-foto--galeria" title="Escolher várias fotos da galeria">
             <span><q-icon name="photo_library" size="20px" /> Escolher da galeria</span>
             <input type="file" accept="image/*" multiple hidden :disabled="enviando" @change="fotoDoServico(s, $event)" />
           </label>
@@ -479,6 +479,7 @@ onMounted(restaurarAberta)
 .eq2-foto-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .eq2-foto-x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .eq2-foto--mini { min-height: 46px; width: 56px; flex-shrink: 0; border-radius: 12px; }
+.eq2-foto--galeria { min-height: 56px; border-radius: 12px; }
 .eq2-foto--mini img { height: 46px; }
 .eq2-cliente { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .eq2-cliente--ok .eq2-cliente-nome::after { content: ' ✓'; color: #66bb6a; }
