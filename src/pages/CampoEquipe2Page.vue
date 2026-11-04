@@ -63,24 +63,33 @@
         <div v-if="!postesCampo" class="eq2-nota-sub">Etapa 1 ainda não registrada pela equipe de campo.</div>
       </div>
 
-      <!-- Serviço: descrição + foto (no lugar de Registrar Poste) -->
+      <!-- Serviços realizados: cada um com uma descrição e uma foto -->
       <div class="eq2-cartao">
-        <div class="eq2-titulo">Serviço realizado</div>
-        <label class="eq2-label">Descrição do serviço</label>
-        <textarea v-model="descricao" class="eq2-input eq2-textarea" rows="3" placeholder="Descreva o serviço executado" />
-        <label class="eq2-label q-mt-md">Foto do serviço</label>
-        <div v-if="fotosServico.length" class="eq2-fotos">
-          <div v-for="(url, i) in fotosServico" :key="url" class="eq2-foto-item">
-            <img :src="url" alt="Foto do serviço" />
-            <button class="eq2-foto-x" type="button" aria-label="Remover foto" :disabled="enviando" @click="removerFotoServico(i)">
-              <q-icon name="close" size="14px" />
+        <div class="eq2-titulo">Serviços realizados <small>{{ servicosProntos }} de {{ servicos.length }}</small></div>
+        <div v-for="(s, i) in servicos" :key="s.chave" class="eq2-servico">
+          <div class="eq2-servico-topo">
+            <span class="eq2-label">Serviço {{ i + 1 }}</span>
+            <button v-if="servicos.length > 1" class="eq2-remover" type="button" :disabled="enviando" @click="removerServico(i)">
+              Remover serviço
             </button>
           </div>
+          <textarea v-model="s.descricao" class="eq2-input eq2-textarea" rows="3" placeholder="Descreva o serviço executado" />
+          <div v-if="s.foto" class="eq2-fotos">
+            <div class="eq2-foto-item">
+              <img :src="s.foto" alt="Foto do serviço" />
+              <button class="eq2-foto-x" type="button" aria-label="Remover foto" :disabled="enviando" @click="s.foto = ''">
+                <q-icon name="close" size="14px" />
+              </button>
+            </div>
+          </div>
+          <label class="eq2-foto">
+            <span><q-icon name="photo_camera" size="24px" /> {{ s.foto ? 'Trocar foto' : 'Tirar foto do serviço' }}</span>
+            <input type="file" accept="image/*" capture="environment" hidden :disabled="enviando" @change="fotoDoServico(s, $event)" />
+          </label>
         </div>
-        <label class="eq2-foto">
-          <span><q-icon name="photo_camera" size="24px" /> {{ fotosServico.length ? 'Trocar foto' : 'Tirar foto do serviço' }}</span>
-          <input type="file" accept="image/*" capture="environment" hidden :disabled="enviando" @change="fotoDoServico" />
-        </label>
+        <button class="eq2-btn eq2-btn--sec eq2-add" type="button" :disabled="enviando" @click="adicionarServico">
+          <q-icon name="add" size="18px" /> Adicionar serviço
+        </button>
       </div>
 
       <!-- Clientes e medidores -->
@@ -139,7 +148,7 @@
           <q-spinner v-if="enviando" size="18px" /> Enviar para auditoria
         </button>
       </div>
-      <div v-if="!prontoParaEnviar" class="eq2-dica">Para enviar: descreva e fotografe o serviço e informe medidor e foto de cada cliente.</div>
+      <div v-if="!prontoParaEnviar" class="eq2-dica">Para enviar: cada serviço precisa de descrição e foto, e cada cliente de medidor e foto.</div>
     </section>
   </div>
 </template>
@@ -160,8 +169,18 @@ const enviando = ref(false)
 const notas = ref([])
 
 const notaAtiva = ref(null)
-const descricao = ref('')
-const fotosServico = ref([])
+// Serviços realizados: cada um com uma descrição e uma foto
+const novoServico = () => ({ chave: `srv-${crypto.randomUUID()}`, descricao: '', foto: '' })
+const servicos = ref([novoServico()])
+const servicosProntos = computed(() => servicos.value.filter(s => s.descricao.trim() && s.foto).length)
+// Campos antigos do apontamento (lidos pelo desktop): descrição junta e todas as fotos
+const descricaoFinal = computed(() => {
+  const itens = servicos.value.map(s => s.descricao.trim()).filter(Boolean)
+  return itens.length > 1 ? itens.map((d, i) => `${i + 1}) ${d}`).join('\n') : (itens[0] || '')
+})
+const fotosFinal = computed(() => servicos.value.map(s => s.foto).filter(Boolean))
+function adicionarServico () { servicos.value.push(novoServico()) }
+function removerServico (i) { servicos.value = servicos.value.filter((_, k) => k !== i) }
 const clientes = ref([])
 
 // Escolha das obras: todas, só as programadas na planilha, ou só as que já têm Etapa 1
@@ -210,7 +229,8 @@ function removerCliente (c) {
   clientes.value = clientes.value.filter(x => x.chave !== c.chave)
 }
 const prontoParaEnviar = computed(() =>
-  !!descricao.value.trim() && fotosServico.value.length > 0 && clientes.value.length > 0 && clientesProntos.value === clientes.value.length
+  servicos.value.length > 0 && servicosProntos.value === servicos.value.length &&
+  clientes.value.length > 0 && clientesProntos.value === clientes.value.length
 )
 
 const MENSAGENS = {
@@ -241,19 +261,13 @@ async function enviarFoto (file, bucket, caminho) {
   return supabase.storage.from(bucket).getPublicUrl(caminho).data.publicUrl
 }
 
-function removerFotoServico (i) {
-  fotosServico.value = fotosServico.value.filter((_, k) => k !== i)
-}
-
-async function fotoDoServico (e) {
+async function fotoDoServico (s, e) {
   const file = e.target.files?.[0]
   e.target.value = ''
   if (!file) return
   enviando.value = true
   try {
-    const url = await enviarFoto(file, 'campo-fotos', `servico/${notaAtiva.value.nota}/${crypto.randomUUID()}.jpg`)
-    // O serviço tem uma foto e uma descrição: a nova foto substitui a anterior
-    fotosServico.value = [url]
+    s.foto = await enviarFoto(file, 'campo-fotos', `servico/${notaAtiva.value.nota}/${crypto.randomUUID()}.jpg`)
   } catch (err) {
     $q.notify({ type: 'negative', message: 'Não foi possível enviar a foto: ' + err.message, position: 'top' })
   } finally {
@@ -285,8 +299,7 @@ function removerFotoMedidor (c, i) {
 
 async function abrirNota (n) {
   notaAtiva.value = n
-  descricao.value = ''
-  fotosServico.value = []
+  servicos.value = [novoServico()]
   clientes.value = (n.clientes_planilha || []).map((c, i) => ({
     chave: c.conta_contrato || `${i}`,
     nome: c.nome,
@@ -298,8 +311,13 @@ async function abrirNota (n) {
   novoCliente.value = null
 
   const { data } = await supabase.rpc('equipe2_carregar', { p_nota: n.nota })
-  if (data?.descricao) descricao.value = data.descricao
-  if (data?.fotos_servico?.length) fotosServico.value = data.fotos_servico
+  if (Array.isArray(data?.servicos) && data.servicos.length) {
+    servicos.value = data.servicos.map(s => ({ chave: `srv-${crypto.randomUUID()}`, descricao: s.descricao || '', foto: s.foto || '' }))
+  } else if (data?.descricao || data?.fotos_servico?.length) {
+    // Rascunho antigo, sem lista de serviços: a primeira foto fica com a descrição e as demais viram serviços sem descrição
+    const fotos = data.fotos_servico?.length ? data.fotos_servico : ['']
+    servicos.value = fotos.map((f, i) => ({ chave: `srv-${crypto.randomUUID()}`, descricao: i === 0 ? (data.descricao || '') : '', foto: f }))
+  }
   for (const salvo of data?.clientes || []) {
     const fotos = salvo.fotos_urls?.length ? salvo.fotos_urls : (salvo.foto_url ? [salvo.foto_url] : [])
     if (salvo.adicional) {
@@ -338,13 +356,19 @@ async function salvar (concluir) {
   }))
   enviando.value = true
   try {
-    const { error } = await supabase.rpc('equipe2_salvar', {
+    const base = {
       p_nota: notaAtiva.value.nota,
-      p_descricao: descricao.value.trim(),
-      p_fotos_servico: fotosServico.value,
+      p_descricao: descricaoFinal.value,
+      p_fotos_servico: fotosFinal.value,
       p_clientes: payload,
       p_concluir: concluir
+    }
+    let { error } = await supabase.rpc('equipe2_salvar', {
+      ...base,
+      p_servicos: servicos.value.map(s => ({ descricao: s.descricao.trim(), foto: s.foto }))
     })
+    // Banco ainda sem a lista de serviços (SQL não rodado): salva no formato antigo
+    if (error?.code === 'PGRST202') ({ error } = await supabase.rpc('equipe2_salvar', base))
     if (error) throw error
     $q.notify({
       type: 'positive', position: 'top',
@@ -369,13 +393,12 @@ function lerAberta () {
 function limparAberta () {
   try { localStorage.removeItem(ABERTA_KEY) } catch { /* sem armazenamento local */ }
 }
-watch([notaAtiva, descricao, fotosServico, clientes], () => {
+watch([notaAtiva, servicos, clientes], () => {
   if (!notaAtiva.value) return
   try {
     localStorage.setItem(ABERTA_KEY, JSON.stringify({
       nota: notaAtiva.value.nota,
-      descricao: descricao.value,
-      fotosServico: fotosServico.value,
+      servicos: servicos.value,
       clientes: clientes.value
     }))
   } catch { /* sem armazenamento local */ }
@@ -388,8 +411,7 @@ async function restaurarAberta () {
   const n = notas.value.find(x => x.nota === salvo.nota)
   if (!n) { limparAberta(); return }
   await abrirNota(n)
-  if (typeof salvo.descricao === 'string') descricao.value = salvo.descricao
-  if (Array.isArray(salvo.fotosServico)) fotosServico.value = salvo.fotosServico
+  if (Array.isArray(salvo.servicos) && salvo.servicos.length) servicos.value = salvo.servicos
   if (Array.isArray(salvo.clientes) && salvo.clientes.length) clientes.value = salvo.clientes
 }
 
@@ -413,6 +435,8 @@ onMounted(restaurarAberta)
 .eq2-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 16px; }
 .eq2-chip { font-size: 12px; font-weight: 700; background: rgba(255,202,40,0.15); color: #ffca28; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
 .eq2-card-sub { font-size: 12.5px; color: rgba(255,255,255,0.55); margin-top: 4px; }
+.eq2-servico { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.eq2-servico-topo { display: flex; justify-content: space-between; align-items: center; }
 .eq2-add { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 8px; }
 .eq2-novo { display: flex; flex-direction: column; gap: 8px; border-style: dashed; }
 .eq2-remover { background: none; border: 0; color: #ef9a9a; font: inherit; font-size: 12.5px; text-align: left; padding: 6px 0 0; cursor: pointer; }

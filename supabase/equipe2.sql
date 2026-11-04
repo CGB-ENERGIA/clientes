@@ -3,7 +3,10 @@
 
 ALTER TABLE public.apontamentos ADD COLUMN IF NOT EXISTS descricao_servico TEXT;
 ALTER TABLE public.apontamentos ADD COLUMN IF NOT EXISTS fotos_servico      JSONB DEFAULT '[]';
+-- Lista de serviços da Etapa 2: cada item tem uma descrição e uma foto ([{ "descricao": "...", "foto": "url" }])
+ALTER TABLE public.apontamentos ADD COLUMN IF NOT EXISTS servicos           JSONB DEFAULT '[]';
 
+DROP FUNCTION IF EXISTS public.equipe2_salvar(text, text, jsonb, jsonb, boolean);
 DROP FUNCTION IF EXISTS public.equipe2_carregar(text);
 DROP FUNCTION IF EXISTS public.equipe2_salvar(text, jsonb, boolean);
 DROP FUNCTION IF EXISTS public.equipe2_salvar(text, text, text, jsonb, boolean);
@@ -48,6 +51,7 @@ RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
     (SELECT jsonb_build_object(
         'descricao', a.descricao_servico,
         'fotos_servico', coalesce(a.fotos_servico, '[]'::jsonb),
+        'servicos', coalesce(a.servicos, '[]'::jsonb),
         'clientes', a.clientes)
      FROM public.apontamentos a
      WHERE a.nota = p_nota AND a.rascunho
@@ -59,7 +63,8 @@ $$;
 -- Salva o rascunho ou conclui a Etapa 2. Concluir leva a nota direto para Auditar (baixar_medidor),
 -- com ou sem a Etapa 1 concluída pela equipe 1.
 CREATE OR REPLACE FUNCTION public.equipe2_salvar(
-  p_nota text, p_descricao text, p_fotos_servico jsonb, p_clientes jsonb, p_concluir boolean)
+  p_nota text, p_descricao text, p_fotos_servico jsonb, p_clientes jsonb, p_concluir boolean,
+  p_servicos jsonb DEFAULT '[]'::jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   n record;
@@ -80,11 +85,19 @@ BEGIN
 
   IF jsonb_typeof(p_clientes) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'CLIENTES_INVALIDOS'; END IF;
   IF jsonb_typeof(p_fotos_servico) IS DISTINCT FROM 'array' THEN p_fotos_servico := '[]'::jsonb; END IF;
+  IF jsonb_typeof(p_servicos) IS DISTINCT FROM 'array' THEN p_servicos := '[]'::jsonb; END IF;
   v_atendidos := jsonb_array_length(p_clientes);
   v_esperados := greatest(jsonb_array_length(coalesce(n.clientes_planilha, '[]'::jsonb)), 1);
 
   IF p_concluir THEN
     IF coalesce(trim(p_descricao), '') = '' OR jsonb_array_length(p_fotos_servico) = 0 THEN
+      RAISE EXCEPTION 'SERVICO_INCOMPLETO';
+    END IF;
+    -- Cada serviço da lista precisa ter descrição e foto
+    IF EXISTS (
+      SELECT 1 FROM jsonb_array_elements(p_servicos) s
+      WHERE coalesce(trim(s->>'descricao'), '') = '' OR coalesce(s->>'foto', '') = ''
+    ) THEN
       RAISE EXCEPTION 'SERVICO_INCOMPLETO';
     END IF;
     IF v_atendidos < v_esperados THEN RAISE EXCEPTION 'CLIENTES_INCOMPLETOS'; END IF;
@@ -102,11 +115,11 @@ BEGIN
   IF v_apid IS NULL THEN
     INSERT INTO public.apontamentos
       (pep, nota, base, postes, pg_numeros, clientes, todos_atendidos, nao_atendidos, qtd_clientes_nota,
-       rascunho, descricao_servico, fotos_servico)
+       rascunho, descricao_servico, fotos_servico, servicos)
     VALUES
       (coalesce(n.pep, ''), p_nota, n.base, v_postes, v_pgs, p_clientes,
        v_atendidos >= v_esperados, '[]'::jsonb, v_atendidos,
-       NOT p_concluir, nullif(trim(p_descricao), ''), p_fotos_servico)
+       NOT p_concluir, nullif(trim(p_descricao), ''), p_fotos_servico, p_servicos)
     RETURNING id INTO v_apid;
   ELSE
     UPDATE public.apontamentos SET
@@ -121,6 +134,7 @@ BEGIN
       rascunho = NOT p_concluir,
       descricao_servico = nullif(trim(p_descricao), ''),
       fotos_servico = p_fotos_servico,
+      servicos = p_servicos,
       atualizado_em = now()
     WHERE id = v_apid;
   END IF;
@@ -139,4 +153,4 @@ END $$;
 
 GRANT EXECUTE ON FUNCTION public.equipe2_listar() TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.equipe2_carregar(text) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.equipe2_salvar(text, text, jsonb, jsonb, boolean) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.equipe2_salvar(text, text, jsonb, jsonb, boolean, jsonb) TO anon, authenticated;
