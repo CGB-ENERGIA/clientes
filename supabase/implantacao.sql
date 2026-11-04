@@ -66,6 +66,25 @@ RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
       AND (COALESCE(a.atualizado_em, a.created_at) AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN p_inicio AND p_fim
     GROUP BY 1
   ),
+  -- Clientes por equipe: a equipe da nota vem do registro de campo ou da programação
+  clientes_eq AS (
+    SELECT x.dia, x.equipe, sum(x.qtd) AS qtd
+    FROM (
+      SELECT (COALESCE(a.atualizado_em, a.created_at) AT TIME ZONE 'America/Sao_Paulo')::date AS dia,
+             COALESCE(
+               NULLIF(trim((SELECT min(c.equipe) FROM public.campo_registros c WHERE c.nota = a.nota)), ''),
+               NULLIF(trim((SELECT min(pn.equipe)
+                            FROM public.programacao_notas pn
+                            JOIN public.notas_servico n ON n.projeto_info_sap = pn.nota
+                            WHERE n.nota = a.nota)), ''),
+               '—') AS equipe,
+             COALESCE(a.qtd_clientes_nota, 0) AS qtd
+      FROM public.apontamentos a
+      WHERE NOT a.rascunho
+        AND (COALESCE(a.atualizado_em, a.created_at) AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN p_inicio AND p_fim
+    ) x
+    GROUP BY 1, 2
+  ),
   dias AS (
     SELECT dia FROM postes
     UNION
@@ -91,8 +110,17 @@ RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
         'clientes', COALESCE((SELECT sum(c.qtd) FROM clientes c WHERE c.dia = d.dia), 0),
         'apontados', COALESCE((SELECT sum(a.qtd) FROM apontados a WHERE a.dia = d.dia), 0),
         'equipes', COALESCE((
-          SELECT jsonb_agg(jsonb_build_object('equipe', p.equipe, 'postes', p.qtd) ORDER BY p.equipe)
-          FROM postes p WHERE p.dia = d.dia), '[]'::jsonb),
+          SELECT jsonb_agg(jsonb_build_object(
+            'equipe', e.equipe,
+            'postes', COALESCE(pp.qtd, 0),
+            'clientes', COALESCE(cc.qtd, 0)) ORDER BY e.equipe)
+          FROM (
+            SELECT equipe FROM postes WHERE dia = d.dia
+            UNION
+            SELECT equipe FROM clientes_eq WHERE dia = d.dia
+          ) e
+          LEFT JOIN postes pp ON pp.dia = d.dia AND pp.equipe = e.equipe
+          LEFT JOIN clientes_eq cc ON cc.dia = d.dia AND cc.equipe = e.equipe), '[]'::jsonb),
         'postes_lista', COALESCE((
           SELECT jsonb_agg(jsonb_build_object(
             'nota', p.nota,

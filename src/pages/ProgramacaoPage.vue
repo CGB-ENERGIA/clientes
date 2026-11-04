@@ -431,9 +431,12 @@
         <div v-for="e in implPorEquipe" :key="e.equipe" class="impl-eq-linha">
           <div class="impl-eq-topo">
             <b>{{ e.equipe }}</b>
-            <span>{{ e.postes }} {{ e.postes === 1 ? 'poste' : 'postes' }}</span>
+            <span>
+              {{ e.postes }} {{ e.postes === 1 ? 'poste' : 'postes' }}
+              <template v-if="e.clientes">· {{ e.clientes }} {{ e.clientes === 1 ? 'cliente' : 'clientes' }}</template>
+            </span>
           </div>
-          <div class="impl-eq-barra"><i :style="{ width: (e.postes / implPorEquipe[0].postes * 100) + '%' }" /></div>
+          <div class="impl-eq-barra"><i :style="{ width: (e.postes / Math.max(1, implPorEquipe[0]?.postes || 0) * 100) + '%' }" /></div>
         </div>
       </div>
 
@@ -450,7 +453,9 @@
         <template #body-cell-equipes="props">
           <q-td :props="props">
             <div v-for="e in props.row.equipes" :key="e.equipe" class="impl-eq-celula">
-              <b>{{ e.postes }}</b> {{ e.equipe }}
+              {{ e.equipe }}:
+              <b>{{ e.postes }}</b> {{ e.postes === 1 ? 'poste' : 'postes' }}
+              <template v-if="e.clientes">· <b>{{ e.clientes }}</b> {{ e.clientes === 1 ? 'cliente' : 'clientes' }}</template>
             </div>
             <span v-if="!props.row.equipes?.length" class="prog-muted">—</span>
           </q-td>
@@ -1018,15 +1023,18 @@ async function carregarImplantacao () {
 
 const implLinhas = computed(() => implDados.value?.dias ?? [])
 
-// Totais de postes por equipe no período inteiro
+// Totais de postes e clientes por equipe no período inteiro
 const implPorEquipe = computed(() => {
   const totais = new Map()
   for (const d of implDados.value?.dias ?? []) {
-    for (const e of d.equipes ?? []) totais.set(e.equipe, (totais.get(e.equipe) ?? 0) + (Number(e.postes) || 0))
+    for (const e of d.equipes ?? []) {
+      const t = totais.get(e.equipe) ?? { equipe: e.equipe, postes: 0, clientes: 0 }
+      t.postes += Number(e.postes) || 0
+      t.clientes += Number(e.clientes) || 0
+      totais.set(e.equipe, t)
+    }
   }
-  return [...totais.entries()]
-    .map(([equipe, postes]) => ({ equipe, postes }))
-    .sort((a, b) => b.postes - a.postes)
+  return [...totais.values()].sort((a, b) => b.postes - a.postes || b.clientes - a.clientes)
 })
 
 // Cada poste do período, com nota, PEP, número PG, equipe e hora
