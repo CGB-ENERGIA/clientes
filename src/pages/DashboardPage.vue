@@ -37,6 +37,15 @@
         <q-tooltip>Limpar filtros</q-tooltip>
       </q-btn>
 
+      <q-toggle
+        v-model="planilhaNoPeriodo"
+        dense
+        color="primary"
+        label="Postes da planilha só no período"
+      >
+        <q-tooltip>Liga: conta só as notas concluídas cujo apontamento final está no período escolhido. Desliga: todas as concluídas da planilha.</q-tooltip>
+      </q-toggle>
+
       <span v-if="filtroMes || filtroDia" class="filtro-label">
         <q-icon name="info_outline" size="13px" />
         Executado filtrado · Previsto = total geral
@@ -232,7 +241,36 @@ const loadingCampo = ref(false)
 const filtroMes    = ref('')
 const filtroDia    = ref('')
 // Ao recarregar, volta para o mês e o dia que o usuário estava vendo
-usarEstadoPersistido('dashboard', { filtroMes, filtroDia })
+// Escolha do usuário: postes da planilha filtrados ou não pelo período (fica guardada ao recarregar)
+const planilhaNoPeriodo = ref(false)
+usarEstadoPersistido('dashboard', { filtroMes, filtroDia, planilhaNoPeriodo })
+
+// Data de conclusão de cada nota = data do apontamento final (a planilha não guarda essa data)
+const apontDatas = ref(new Map())
+function dataLocalIso (d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+async function fetchApontDatas () {
+  const { data } = await fetchAll(() => supabase
+    .from('apontamentos')
+    .select('nota, created_at, atualizado_em')
+    .eq('rascunho', false)
+    .order('created_at'))
+  const mapa = new Map()
+  for (const a of data ?? []) {
+    const quando = a.atualizado_em || a.created_at
+    if (!a.nota || !quando) continue
+    const iso = dataLocalIso(new Date(quando))
+    if (!mapa.has(a.nota) || iso > mapa.get(a.nota)) mapa.set(a.nota, iso)
+  }
+  apontDatas.value = mapa
+}
+function noPeriodo (iso) {
+  if (!iso) return false
+  if (filtroDia.value) return iso === filtroDia.value
+  if (filtroMes.value) return iso.startsWith(filtroMes.value)
+  return true
+}
 
 // ── Opções de mês ──────────────────────────────────────────────
 const mesesOptions = computed(() => {
@@ -280,13 +318,17 @@ function limparFiltros () {
 onMounted(async () => {
   await Promise.all([
     notasStore.notas.length ? null : notasStore.fetchNotas(),
-    fetchCampo()
+    fetchCampo(),
+    fetchApontDatas()
   ])
 })
 
 // ── Métricas executado ─────────────────────────────────────────
 const executado = computed(() => {
-  const notasConcluidasPlanilha = notasStore.notas.filter(n => n.status === 'concluido')
+  const temPeriodo = !!(filtroMes.value || filtroDia.value)
+  const notasConcluidasPlanilha = notasStore.notas
+    .filter(n => n.status === 'concluido')
+    .filter(n => !(planilhaNoPeriodo.value && temPeriodo) || noPeriodo(apontDatas.value.get(n.nota)))
   const notasPlanilhaSet = new Set(notasConcluidasPlanilha.map(n => n.nota))
 
   // Postes do campo: cada número PG distinto por nota (fotos com rótulo não contam)
