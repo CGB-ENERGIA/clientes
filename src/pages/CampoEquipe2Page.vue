@@ -100,14 +100,32 @@
       <div class="eq2-cartao">
         <div class="eq2-titulo">Clientes e medidores <small>{{ clientesProntos }} de {{ clientes.length }}</small></div>
         <div v-if="!clientes.length" class="eq2-vazio">Esta nota não tem clientes na planilha.</div>
-        <div v-for="c in clientes" :key="c.chave" class="eq2-cliente" :class="{ 'eq2-cliente--ok': c.medidor.trim() && c.fotos.length }">
+        <div v-for="c in clientes" :key="c.chave" class="eq2-cliente" :class="{ 'eq2-cliente--ok': clientePronto(c), 'eq2-cliente--nao': !c.atendido }">
           <div class="eq2-cliente-nome">
             {{ c.nome }}
             <span v-if="c.adicional" class="eq2-tag eq2-tag--prog">Adicional</span>
+            <span v-if="!c.atendido" class="eq2-tag eq2-tag--pend">Não ligado</span>
           </div>
           <div class="eq2-cliente-sub">{{ [c.conta, c.endereco].filter(Boolean).join(' · ') }}</div>
+          <button class="eq2-nao" type="button" :class="{ 'eq2-nao--on': !c.atendido }" :disabled="enviando" @click="c.atendido = !c.atendido">
+            <q-icon :name="c.atendido ? 'phone_disabled' : 'undo'" size="16px" />
+            {{ c.atendido ? 'Não consegui ligar este cliente' : 'Desfazer: voltar a ligar este cliente' }}
+          </button>
+
+          <!-- Justificativa: cliente que a operação não conseguiu ligar -->
+          <div v-if="!c.atendido" class="eq2-motivo">
+            <select v-model="c.motivo" class="eq2-input">
+              <option value="">Escolha o motivo *</option>
+              <option v-for="m in MOTIVOS" :key="m" :value="m">{{ m }}</option>
+            </select>
+            <textarea
+              v-model="c.obs" class="eq2-input eq2-textarea" rows="2"
+              :placeholder="c.motivo === 'Outro' ? 'Descreva o motivo *' : 'Detalhe do motivo (opcional)'"
+            />
+          </div>
+
           <div class="eq2-cliente-linha">
-            <input v-model="c.medidor" class="eq2-input" placeholder="Nº do medidor" :disabled="enviando" />
+            <input v-if="c.atendido" v-model="c.medidor" class="eq2-input" placeholder="Nº do medidor" :disabled="enviando" />
             <label class="eq2-foto eq2-foto--mini" :class="{ 'eq2-foto--ok': c.fotos.length }" title="Tirar foto">
               <q-icon name="photo_camera" size="20px" />
               <input type="file" accept="image/*" capture="environment" hidden :disabled="enviando" @change="fotosDoMedidor(c, $event)" />
@@ -152,7 +170,7 @@
           <q-spinner v-if="enviando" size="18px" /> Enviar para auditoria
         </button>
       </div>
-      <div v-if="!prontoParaEnviar" class="eq2-dica">Para enviar: cada serviço precisa de descrição e foto, e cada cliente de medidor e foto.</div>
+      <div v-if="!prontoParaEnviar" class="eq2-dica">Para enviar: cada serviço precisa de descrição e foto, e cada cliente de medidor e foto, ou de um motivo se não foi ligado.</div>
     </section>
   </div>
 </template>
@@ -217,7 +235,23 @@ const notasFiltradas = computed(() => {
 })
 
 const postesCampo = computed(() => notaAtiva.value?.postes ?? 0)
-const clientesProntos = computed(() => clientes.value.filter(c => c.medidor.trim() && c.fotos.length).length)
+// Motivos para o cliente que a operação não conseguiu ligar
+const MOTIVOS = [
+  'Cliente ausente',
+  'Imóvel fechado',
+  'Cliente recusou a ligação',
+  'Endereço não localizado',
+  'Sem acesso ao local',
+  'Instalação do cliente irregular',
+  'Falta de material',
+  'Problema na rede',
+  'Outro'
+]
+// Cliente pronto: ligado, com medidor e foto; ou não ligado, com o motivo (e o detalhe, se for "Outro")
+const clientePronto = c => c.atendido
+  ? !!(c.medidor.trim() && c.fotos.length)
+  : !!(c.motivo && (c.motivo !== 'Outro' || c.obs.trim()))
+const clientesProntos = computed(() => clientes.value.filter(clientePronto).length)
 
 // Cliente adicional: que não está na planilha da nota (formulário aberto quando preenchido)
 const novoCliente = ref(null)
@@ -231,6 +265,9 @@ function adicionarCliente () {
     endereco: novoCliente.value.endereco.trim(),
     medidor: '',
     fotos: [],
+    atendido: true,
+    motivo: '',
+    obs: '',
     adicional: true
   })
   novoCliente.value = null
@@ -248,7 +285,8 @@ const MENSAGENS = {
   SEM_POSTES_REGISTRADOS: 'Esta nota ainda não tem postes registrados pela equipe de campo.',
   SERVICO_INCOMPLETO: 'Informe a descrição e a foto do serviço.',
   CLIENTES_INCOMPLETOS: 'Ainda faltam clientes desta nota.',
-  MEDIDOR_OU_FOTO_FALTANDO: 'Informe o medidor e a foto de todos os clientes.'
+  MEDIDOR_OU_FOTO_FALTANDO: 'Informe o medidor e a foto de todos os clientes ligados.',
+  MOTIVO_FALTANDO: 'Informe o motivo de cada cliente que não foi ligado.'
 }
 
 function guardarEquipe () {
@@ -324,7 +362,10 @@ async function abrirNota (n) {
     conta: c.conta_contrato || '',
     endereco: [c.endereco, c.bairro].filter(Boolean).join(', '),
     medidor: '',
-    fotos: []
+    fotos: [],
+    atendido: true,
+    motivo: '',
+    obs: ''
   }))
   novoCliente.value = null
 
@@ -345,12 +386,21 @@ async function abrirNota (n) {
         endereco: salvo.endereco || '',
         medidor: salvo.num_medidor || '',
         fotos,
+        atendido: salvo.atendido !== false,
+        motivo: salvo.motivo_tipo || '',
+        obs: salvo.motivo_obs || '',
         adicional: true
       })
       continue
     }
     const c = clientes.value.find(x => x.conta && x.conta === salvo.conta_contrato)
-    if (c) { c.medidor = salvo.num_medidor || ''; c.fotos = fotos }
+    if (c) {
+      c.medidor = salvo.num_medidor || ''
+      c.fotos = fotos
+      c.atendido = salvo.atendido !== false
+      c.motivo = salvo.motivo_tipo || ''
+      c.obs = salvo.motivo_obs || ''
+    }
   }
 }
 
@@ -365,11 +415,16 @@ async function salvar (concluir) {
     nome: c.nome,
     padrao: '',
     conta_contrato: c.conta || null,
-    num_medidor: c.medidor.trim() || null,
+    num_medidor: c.atendido ? (c.medidor.trim() || null) : null,
     foto_url: c.fotos[0] || null,
     fotos_urls: c.fotos,
     endereco: c.endereco || null,
-    adicional: !!c.adicional
+    adicional: !!c.adicional,
+    // Cliente que a operação não conseguiu ligar: motivo escolhido + detalhe, também junto no texto lido pelo desktop
+    atendido: c.atendido,
+    motivo_tipo: c.atendido ? null : (c.motivo || null),
+    motivo_obs: c.atendido ? null : (c.obs.trim() || null),
+    motivo: c.atendido ? null : [c.motivo, c.obs.trim()].filter(Boolean).join(' — ')
   }))
   enviando.value = true
   try {
@@ -429,7 +484,10 @@ async function restaurarAberta () {
   if (!n) { limparAberta(); return }
   await abrirNota(n)
   if (Array.isArray(salvo.servicos) && salvo.servicos.length) servicos.value = salvo.servicos.map(normalizarServico)
-  if (Array.isArray(salvo.clientes) && salvo.clientes.length) clientes.value = salvo.clientes
+  if (Array.isArray(salvo.clientes) && salvo.clientes.length) {
+    // Estado guardado antes do motivo de não ligado: assume cliente ligado
+    clientes.value = salvo.clientes.map(c => ({ atendido: true, motivo: '', obs: '', fotos: [], ...c }))
+  }
 }
 
 onMounted(restaurarAberta)
@@ -454,6 +512,10 @@ onMounted(restaurarAberta)
 .eq2-card-sub { font-size: 12.5px; color: rgba(255,255,255,0.55); margin-top: 4px; }
 .eq2-servico { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
 .eq2-servico-topo { display: flex; justify-content: space-between; align-items: center; }
+.eq2-nao { display: flex; align-items: center; gap: 8px; width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); color: rgba(255,255,255,0.8); border-radius: 12px; padding: 9px 12px; font: inherit; font-size: 13.5px; cursor: pointer; text-align: left; }
+.eq2-nao--on { background: rgba(255,202,40,0.14); border-color: rgba(255,202,40,0.5); color: #ffca28; }
+.eq2-motivo { display: flex; flex-direction: column; gap: 8px; }
+.eq2-cliente--nao { border-color: rgba(255,202,40,0.4); }
 .eq2-add { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 8px; }
 .eq2-novo { display: flex; flex-direction: column; gap: 8px; border-style: dashed; }
 .eq2-remover { background: none; border: 0; color: #ef9a9a; font: inherit; font-size: 12.5px; text-align: left; padding: 6px 0 0; cursor: pointer; }

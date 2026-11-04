@@ -73,6 +73,7 @@ DECLARE
   v_apid uuid;
   v_esperados int;
   v_atendidos int;
+  v_nao jsonb;
 BEGIN
   SELECT * INTO n FROM public.notas_servico WHERE nota = p_nota AND ativo;
   IF NOT FOUND THEN RAISE EXCEPTION 'NOTA_NAO_ENCONTRADA'; END IF;
@@ -89,6 +90,12 @@ BEGIN
   v_atendidos := jsonb_array_length(p_clientes);
   v_esperados := greatest(jsonb_array_length(coalesce(n.clientes_planilha, '[]'::jsonb)), 1);
 
+  -- Clientes que a operação não conseguiu ligar, com o motivo (mesmo formato do desktop)
+  SELECT coalesce(jsonb_agg(jsonb_build_object('cliente', c->>'nome', 'motivo', c->>'motivo')), '[]'::jsonb)
+    INTO v_nao
+  FROM jsonb_array_elements(p_clientes) c
+  WHERE c->>'atendido' = 'false';
+
   IF p_concluir THEN
     IF coalesce(trim(p_descricao), '') = '' OR jsonb_array_length(p_fotos_servico) = 0 THEN
       RAISE EXCEPTION 'SERVICO_INCOMPLETO';
@@ -101,11 +108,20 @@ BEGIN
       RAISE EXCEPTION 'SERVICO_INCOMPLETO';
     END IF;
     IF v_atendidos < v_esperados THEN RAISE EXCEPTION 'CLIENTES_INCOMPLETOS'; END IF;
+    -- Medidor e foto só são exigidos de quem foi ligado
     IF EXISTS (
       SELECT 1 FROM jsonb_array_elements(p_clientes) c
-      WHERE coalesce(trim(c->>'num_medidor'), '') = '' OR coalesce(c->>'foto_url', '') = ''
+      WHERE coalesce(c->>'atendido', 'true') <> 'false'
+        AND (coalesce(trim(c->>'num_medidor'), '') = '' OR coalesce(c->>'foto_url', '') = '')
     ) THEN
       RAISE EXCEPTION 'MEDIDOR_OU_FOTO_FALTANDO';
+    END IF;
+    -- Quem não foi ligado precisa de motivo
+    IF EXISTS (
+      SELECT 1 FROM jsonb_array_elements(p_clientes) c
+      WHERE c->>'atendido' = 'false' AND coalesce(trim(c->>'motivo'), '') = ''
+    ) THEN
+      RAISE EXCEPTION 'MOTIVO_FALTANDO';
     END IF;
   END IF;
 
@@ -118,7 +134,7 @@ BEGIN
        rascunho, descricao_servico, fotos_servico, servicos)
     VALUES
       (coalesce(n.pep, ''), p_nota, n.base, v_postes, v_pgs, p_clientes,
-       v_atendidos >= v_esperados, '[]'::jsonb, v_atendidos,
+       v_atendidos >= v_esperados AND jsonb_array_length(v_nao) = 0, v_nao, v_atendidos,
        NOT p_concluir, nullif(trim(p_descricao), ''), p_fotos_servico, p_servicos)
     RETURNING id INTO v_apid;
   ELSE
@@ -128,8 +144,8 @@ BEGIN
       postes = v_postes,
       pg_numeros = v_pgs,
       clientes = p_clientes,
-      todos_atendidos = v_atendidos >= v_esperados,
-      nao_atendidos = '[]'::jsonb,
+      todos_atendidos = v_atendidos >= v_esperados AND jsonb_array_length(v_nao) = 0,
+      nao_atendidos = v_nao,
       qtd_clientes_nota = v_atendidos,
       rascunho = NOT p_concluir,
       descricao_servico = nullif(trim(p_descricao), ''),

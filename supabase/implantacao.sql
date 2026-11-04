@@ -60,7 +60,8 @@ RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
   clientes AS (
     -- Clientes atendidos nas etapas salvas (dia em que a etapa foi atualizada)
     SELECT (COALESCE(a.atualizado_em, a.created_at) AT TIME ZONE 'America/Sao_Paulo')::date AS dia,
-           sum(COALESCE(a.qtd_clientes_nota, 0)) AS qtd
+           sum(GREATEST(COALESCE(a.qtd_clientes_nota, 0)
+                        - jsonb_array_length(COALESCE(a.nao_atendidos::jsonb, '[]'::jsonb)), 0)) AS qtd
     FROM public.apontamentos a
     WHERE NOT a.rascunho
       AND (COALESCE(a.atualizado_em, a.created_at) AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN p_inicio AND p_fim
@@ -78,7 +79,8 @@ RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
                             JOIN public.notas_servico n ON n.projeto_info_sap = pn.nota
                             WHERE n.nota = a.nota)), ''),
                '—') AS equipe,
-             COALESCE(a.qtd_clientes_nota, 0) AS qtd
+             GREATEST(COALESCE(a.qtd_clientes_nota, 0)
+                      - jsonb_array_length(COALESCE(a.nao_atendidos::jsonb, '[]'::jsonb)), 0) AS qtd
       FROM public.apontamentos a
       WHERE NOT a.rascunho
         AND (COALESCE(a.atualizado_em, a.created_at) AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN p_inicio AND p_fim
