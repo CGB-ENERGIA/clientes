@@ -145,9 +145,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { supabase } from 'boot/supabase'
+import { usarEstadoPersistido } from 'src/utils/estadoPersistido'
 
 const $q = useQuasar()
 
@@ -320,6 +321,7 @@ async function abrirNota (n) {
 
 function voltarLista () {
   notaAtiva.value = null
+  limparAberta()
   carregarNotas()
 }
 
@@ -357,7 +359,41 @@ async function salvar (concluir) {
   }
 }
 
-onMounted(carregarNotas)
+// Ao recarregar, volta para a busca e o filtro da lista e para a nota que estava aberta, com o que já foi preenchido
+usarEstadoPersistido('equipe2', { busca, filtroLista })
+
+const ABERTA_KEY = 'cgb_equipe2_aberta'
+function lerAberta () {
+  try { return JSON.parse(localStorage.getItem(ABERTA_KEY) || 'null') } catch { return null }
+}
+function limparAberta () {
+  try { localStorage.removeItem(ABERTA_KEY) } catch { /* sem armazenamento local */ }
+}
+watch([notaAtiva, descricao, fotosServico, clientes], () => {
+  if (!notaAtiva.value) return
+  try {
+    localStorage.setItem(ABERTA_KEY, JSON.stringify({
+      nota: notaAtiva.value.nota,
+      descricao: descricao.value,
+      fotosServico: fotosServico.value,
+      clientes: clientes.value
+    }))
+  } catch { /* sem armazenamento local */ }
+}, { deep: true })
+
+async function restaurarAberta () {
+  const salvo = lerAberta()
+  await carregarNotas()
+  if (!salvo?.nota) return
+  const n = notas.value.find(x => x.nota === salvo.nota)
+  if (!n) { limparAberta(); return }
+  await abrirNota(n)
+  if (typeof salvo.descricao === 'string') descricao.value = salvo.descricao
+  if (Array.isArray(salvo.fotosServico)) fotosServico.value = salvo.fotosServico
+  if (Array.isArray(salvo.clientes) && salvo.clientes.length) clientes.value = salvo.clientes
+}
+
+onMounted(restaurarAberta)
 </script>
 
 <style scoped>
