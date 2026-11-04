@@ -12,11 +12,20 @@
       <label class="eq2-label">Nome da equipe</label>
       <input v-model="equipe" class="eq2-input" placeholder="Ex: EQUIPE BETA" style="text-transform:uppercase" @input="equipe = equipe.toUpperCase()" @change="guardarEquipe" />
 
-      <label class="eq2-label q-mt-md">Aguardando medidor</label>
+      <label class="eq2-label q-mt-md">Obras para a equipe 2</label>
       <input v-model="busca" class="eq2-input" placeholder="Buscar nota, SAP ou município" />
+      <div class="eq2-filtros">
+        <button
+          v-for="f in FILTROS" :key="f.val" type="button" class="eq2-filtro"
+          :class="{ 'eq2-filtro--on': filtroLista === f.val }"
+          @click="filtroLista = f.val"
+        >
+          {{ f.label }} <b>{{ contagemFiltro(f.val) }}</b>
+        </button>
+      </div>
 
-      <div v-if="carregando" class="eq2-vazio">Carregando notas…</div>
-      <div v-else-if="!notasFiltradas.length" class="eq2-vazio">Nenhuma nota aguardando medidor.</div>
+      <div v-if="carregando" class="eq2-vazio">Carregando obras…</div>
+      <div v-else-if="!notasFiltradas.length" class="eq2-vazio">Nenhuma obra encontrada.</div>
       <button v-for="n in notasFiltradas" :key="n.nota" class="eq2-card" type="button" @click="abrirNota(n)">
         <div class="eq2-card-top">
           <b>{{ n.projeto_info_sap || n.nota }}</b>
@@ -26,6 +35,14 @@
           {{ n.municipio || n.base }} · {{ n.clientes_planilha?.length || 0 }} clientes
           <span v-if="n.rascunho"> · rascunho salvo</span>
         </div>
+        <div class="eq2-tags">
+          <span v-if="n.prog_data" class="eq2-tag eq2-tag--prog">
+            Programada {{ dataCurta(n.prog_data) }}<template v-if="n.prog_equipe"> · {{ n.prog_equipe }}</template>
+          </span>
+          <span class="eq2-tag" :class="n.postes ? 'eq2-tag--ok' : 'eq2-tag--pend'">
+            {{ n.postes ? 'Etapa 1 feita' : 'Etapa 1 pendente' }}
+          </span>
+        </div>
       </button>
     </section>
 
@@ -33,7 +50,17 @@
     <section v-else class="eq2-bloco">
       <div class="eq2-nota">
         <div class="eq2-nota-sap">SAP {{ notaAtiva.projeto_info_sap || notaAtiva.nota }}</div>
-        <div class="eq2-nota-sub">{{ notaAtiva.municipio || notaAtiva.base }} · {{ postesCampo }} postes registrados pela equipe</div>
+        <div class="eq2-nota-sub">
+          {{ notaAtiva.municipio || notaAtiva.base }} · Etapa 1: {{ postesCampo }} {{ postesCampo === 1 ? 'poste' : 'postes' }}
+        </div>
+        <div v-if="notaAtiva.pgs?.length" class="eq2-tags">
+          <span v-for="pg in notaAtiva.pgs" :key="pg" class="eq2-tag">PG {{ pg }}</span>
+        </div>
+        <div v-if="notaAtiva.prog_data" class="eq2-nota-sub">
+          Programada para {{ dataCurta(notaAtiva.prog_data) }}<template v-if="notaAtiva.prog_equipe"> · {{ notaAtiva.prog_equipe }}</template>
+          <template v-if="notaAtiva.prog_postes != null"> · {{ notaAtiva.prog_postes }} postes previstos</template>
+        </div>
+        <div v-if="!postesCampo" class="eq2-nota-sub">Etapa 1 ainda não registrada pela equipe de campo.</div>
       </div>
 
       <!-- Serviço: descrição + foto (no lugar de Registrar Poste) -->
@@ -104,10 +131,26 @@ const descricao = ref('')
 const fotosServico = ref([])
 const clientes = ref([])
 
+// Escolha das obras: todas, só as programadas na planilha, ou só as que já têm Etapa 1
+const FILTROS = [
+  { val: 'todas', label: 'Todas' },
+  { val: 'programadas', label: 'Programadas' },
+  { val: 'etapa1', label: 'Etapa 1 feita' }
+]
+const filtroLista = ref('todas')
+const passaFiltro = (n, f) => f === 'programadas' ? !!n.prog_data : f === 'etapa1' ? n.postes > 0 : true
+const contagemFiltro = f => notas.value.filter(n => passaFiltro(n, f)).length
+const dataCurta = iso => {
+  if (!iso) return ''
+  const [, m, d] = iso.split('-')
+  return `${d}/${m}`
+}
+
 const notasFiltradas = computed(() => {
   const q = (busca.value ?? '').trim().toLowerCase()
   return notas.value.filter(n =>
-    !q || [n.nota, n.projeto_info_sap, n.municipio, n.base].some(v => String(v ?? '').toLowerCase().includes(q))
+    passaFiltro(n, filtroLista.value) &&
+    (!q || [n.nota, n.projeto_info_sap, n.municipio, n.base].some(v => String(v ?? '').toLowerCase().includes(q)))
   )
 })
 
@@ -256,6 +299,15 @@ onMounted(carregarNotas)
 .eq2-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 16px; }
 .eq2-chip { font-size: 12px; font-weight: 700; background: rgba(255,202,40,0.15); color: #ffca28; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
 .eq2-card-sub { font-size: 12.5px; color: rgba(255,255,255,0.55); margin-top: 4px; }
+.eq2-filtros { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
+.eq2-filtro { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.75); border-radius: 18px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.eq2-filtro b { margin-left: 4px; color: #ffca28; }
+.eq2-filtro--on { background: rgba(100,181,246,0.2); border-color: rgba(100,181,246,0.6); color: #fff; }
+.eq2-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.eq2-tag { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 10px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.8); }
+.eq2-tag--prog { background: rgba(100,181,246,0.18); color: #90caf9; }
+.eq2-tag--ok { background: rgba(102,187,106,0.18); color: #a5d6a7; }
+.eq2-tag--pend { background: rgba(255,202,40,0.15); color: #ffca28; }
 .eq2-nota { background: rgba(10,22,40,0.7); border: 1px solid rgba(100,181,246,0.35); border-radius: 14px; padding: 12px 14px; }
 .eq2-nota-sap { font-size: 18px; font-weight: 800; }
 .eq2-nota-sub { font-size: 12.5px; color: rgba(255,255,255,0.55); margin-top: 2px; }

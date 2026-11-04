@@ -8,10 +8,11 @@ DROP FUNCTION IF EXISTS public.equipe2_carregar(text);
 DROP FUNCTION IF EXISTS public.equipe2_salvar(text, jsonb, boolean);
 DROP FUNCTION IF EXISTS public.equipe2_salvar(text, text, text, jsonb, boolean);
 
--- Notas aguardando Etapa 2 (finalizadas pela equipe 1 ou marcadas pela planilha) cuja Etapa 2 ainda não foi concluída
+-- Obras para a equipe 2 escolher: todas as notas ainda sem Etapa 2 concluída (Apontamento), com a programação
+-- da obra (planilha) e os postes registrados na Etapa 1 (número PG distinto). Programadas vêm primeiro, por data.
 CREATE OR REPLACE FUNCTION public.equipe2_listar()
 RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
-  SELECT coalesce(jsonb_agg(s.x ORDER BY s.x->>'projeto_info_sap', s.x->>'nota'), '[]'::jsonb)
+  SELECT coalesce(jsonb_agg(s.x ORDER BY s.prog_data NULLS LAST, s.x->>'projeto_info_sap', s.x->>'nota'), '[]'::jsonb)
   FROM (
     SELECT jsonb_build_object(
       'nota', n.nota,
@@ -19,11 +20,21 @@ RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
       'base', n.base,
       'municipio', n.municipio,
       'pep', n.pep,
+      'status', n.status,
       'clientes_planilha', coalesce(n.clientes_planilha, '[]'::jsonb),
-      'postes', (SELECT count(*) FROM public.campo_registros c WHERE c.nota = n.nota),
+      'postes', (SELECT count(DISTINCT c.pg_numero) FROM public.campo_registros c
+                 WHERE c.nota = n.nota AND c.pg_numero ~ '^[0-9]+$'),
+      'pgs', (SELECT coalesce(jsonb_agg(DISTINCT c.pg_numero), '[]'::jsonb) FROM public.campo_registros c
+              WHERE c.nota = n.nota AND c.pg_numero ~ '^[0-9]+$'),
+      'prog_data', p.data_programada,
+      'prog_equipe', p.equipe,
+      'prog_status', p.status,
+      'prog_postes', p.postes,
       'rascunho', EXISTS (SELECT 1 FROM public.apontamentos a WHERE a.nota = n.nota AND a.rascunho)
-    ) AS x
+    ) AS x,
+    p.data_programada AS prog_data
     FROM public.notas_servico n
+    LEFT JOIN public.programacao_notas p ON p.nota = n.projeto_info_sap
     WHERE n.ativo
       AND n.status IN ('pendente', 'em_andamento', 'aguardando_etapa2')
       AND NOT EXISTS (SELECT 1 FROM public.apontamentos a WHERE a.nota = n.nota AND NOT a.rascunho)
@@ -62,9 +73,10 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'NOTA_NAO_ENCONTRADA'; END IF;
   IF n.status NOT IN ('pendente', 'em_andamento', 'aguardando_etapa2') THEN RAISE EXCEPTION 'NOTA_NAO_AGUARDANDO_ETAPA2'; END IF;
 
-  SELECT count(*)::int, coalesce(array_agg(c.pg_numero ORDER BY c.created_at), '{}'::text[])
+  -- Postes da Etapa 1: um por número PG distinto (fotos com rótulo não contam)
+  SELECT count(DISTINCT c.pg_numero)::int, coalesce(array_agg(DISTINCT c.pg_numero), '{}'::text[])
     INTO v_postes, v_pgs
-  FROM public.campo_registros c WHERE c.nota = p_nota;
+  FROM public.campo_registros c WHERE c.nota = p_nota AND c.pg_numero ~ '^[0-9]+$';
 
   IF jsonb_typeof(p_clientes) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'CLIENTES_INVALIDOS'; END IF;
   IF jsonb_typeof(p_fotos_servico) IS DISTINCT FROM 'array' THEN p_fotos_servico := '[]'::jsonb; END IF;
