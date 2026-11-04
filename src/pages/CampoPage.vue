@@ -46,6 +46,7 @@
           <label class="cp-pg-label">Número do PG</label>
           <input
             v-model="pg"
+            v-maiuscula
             class="cp-pg-input"
             placeholder="Ex: PG-0001"
             type="text"
@@ -259,6 +260,7 @@ import { useNotasStore } from 'stores/notas'
 import ImprevistoDialog from 'components/ImprevistoDialog.vue'
 import MapaNotas from 'components/MapaNotas.vue'
 import { temCoordenada } from 'src/utils/rota'
+import { vMaiuscula } from 'src/utils/maiuscula'
 
 const router      = useRouter()
 const $q          = useQuasar()
@@ -526,7 +528,7 @@ async function gravar () {
   salvando.value = true
   try {
     const total = fotosPosteAtual.value.length
-    await store.salvarRegistro({ pg: pg.value.trim(), fotoB64: fotoPrincipal.value, extrasB64: [...extras.value] })
+    await store.salvarRegistro({ pg: pg.value.trim().toUpperCase(), fotoB64: fotoPrincipal.value, extrasB64: [...extras.value] })
     $q.notify({
       type: 'positive',
       message: `PG ${pg.value.trim()} salvo com ${total} ${total === 1 ? 'foto' : 'fotos'}. Registre o próximo poste.`,

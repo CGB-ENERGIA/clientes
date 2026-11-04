@@ -76,7 +76,7 @@
               Remover serviço
             </button>
           </div>
-          <textarea v-model="s.descricao" class="eq2-input eq2-textarea" rows="3" placeholder="Descreva o serviço executado" />
+          <textarea v-model="s.descricao" v-maiuscula class="eq2-input eq2-textarea" rows="3" placeholder="Descreva o serviço executado" />
           <div v-if="s.fotos.length" class="eq2-fotos">
             <div v-for="(url, fi) in s.fotos" :key="url" class="eq2-foto-item">
               <img :src="url" alt="Foto do serviço" />
@@ -122,13 +122,13 @@
               <option v-for="m in MOTIVOS" :key="m" :value="m">{{ m }}</option>
             </select>
             <textarea
-              v-model="c.obs" class="eq2-input eq2-textarea" rows="2"
+              v-model="c.obs" v-maiuscula class="eq2-input eq2-textarea" rows="2"
               :placeholder="c.motivo === 'Outro' ? 'Descreva o motivo *' : 'Detalhe do motivo (opcional)'"
             />
           </div>
 
           <div class="eq2-cliente-linha">
-            <input v-if="c.atendido" v-model="c.medidor" class="eq2-input" placeholder="Nº do medidor" :disabled="enviando" />
+            <input v-if="c.atendido" v-model="c.medidor" v-maiuscula class="eq2-input" placeholder="Nº do medidor" :disabled="enviando" />
             <label class="eq2-foto eq2-foto--mini" :class="{ 'eq2-foto--ok': c.fotos.length }" title="Tirar foto">
               <q-icon name="photo_camera" size="20px" />
               <input type="file" accept="image/*" capture="environment" hidden :disabled="enviando" @change="fotosDoMedidor(c, $event)" />
@@ -154,9 +154,9 @@
         <!-- Cliente adicional: que não está na planilha -->
         <div v-if="novoCliente" class="eq2-cliente eq2-novo">
           <div class="eq2-cliente-nome">Novo cliente adicional</div>
-          <input v-model="novoCliente.nome" class="eq2-input" placeholder="Nome do cliente *" style="text-transform:uppercase" />
+          <input v-model="novoCliente.nome" v-maiuscula class="eq2-input" placeholder="Nome do cliente *" style="text-transform:uppercase" />
           <input v-model="novoCliente.conta" class="eq2-input" placeholder="Conta contrato (opcional)" inputmode="numeric" />
-          <input v-model="novoCliente.endereco" class="eq2-input" placeholder="Endereço (opcional)" />
+          <input v-model="novoCliente.endereco" v-maiuscula class="eq2-input" placeholder="Endereço (opcional)" />
           <div class="eq2-acoes">
             <button class="eq2-btn eq2-btn--sec" type="button" @click="novoCliente = null">Cancelar</button>
             <button class="eq2-btn eq2-btn--ok" type="button" :disabled="!novoCliente.nome.trim()" @click="adicionarCliente">Adicionar</button>
@@ -184,6 +184,7 @@ import { useQuasar } from 'quasar'
 import { supabase } from 'boot/supabase'
 import { usarEstadoPersistido } from 'src/utils/estadoPersistido'
 import { normalizarEquipe, opcoesEquipe } from 'src/utils/equipes'
+import { vMaiuscula, maiusculo } from 'src/utils/maiuscula'
 
 const $q = useQuasar()
 
@@ -208,7 +209,7 @@ const normalizarServico = s => ({
 // Campos antigos do apontamento (lidos pelo desktop): descrição junta e todas as fotos
 const descricaoFinal = computed(() => {
   const itens = servicos.value.map(s => s.descricao.trim()).filter(Boolean)
-  return itens.length > 1 ? itens.map((d, i) => `${i + 1}) ${d}`).join('\n') : (itens[0] || '')
+  return maiusculo(itens.length > 1 ? itens.map((d, i) => `${i + 1}) ${d}`).join('\n') : (itens[0] || ''))
 })
 const fotosFinal = computed(() => servicos.value.flatMap(s => s.fotos))
 function adicionarServico () { servicos.value.push(novoServico()) }
@@ -416,19 +417,19 @@ function voltarLista () {
 
 async function salvar (concluir) {
   const payload = clientes.value.map(c => ({
-    nome: c.nome,
+    nome: maiusculo(c.nome).trim(),
     padrao: '',
     conta_contrato: c.conta || null,
-    num_medidor: c.atendido ? (c.medidor.trim() || null) : null,
+    num_medidor: c.atendido ? (maiusculo(c.medidor).trim() || null) : null,
     foto_url: c.fotos[0] || null,
     fotos_urls: c.fotos,
-    endereco: c.endereco || null,
+    endereco: maiusculo(c.endereco).trim() || null,
     adicional: !!c.adicional,
     // Cliente que a operação não conseguiu ligar: motivo escolhido + detalhe, também junto no texto lido pelo desktop
     atendido: c.atendido,
     motivo_tipo: c.atendido ? null : (c.motivo || null),
-    motivo_obs: c.atendido ? null : (c.obs.trim() || null),
-    motivo: c.atendido ? null : [c.motivo, c.obs.trim()].filter(Boolean).join(' — ')
+    motivo_obs: c.atendido ? null : (maiusculo(c.obs).trim() || null),
+    motivo: c.atendido ? null : maiusculo([c.motivo, c.obs.trim()].filter(Boolean).join(' — '))
   }))
   enviando.value = true
   try {
@@ -441,7 +442,7 @@ async function salvar (concluir) {
     }
     let { error } = await supabase.rpc('equipe2_salvar', {
       ...base,
-      p_servicos: servicos.value.map(s => ({ descricao: s.descricao.trim(), foto: s.fotos[0] || '', fotos: s.fotos }))
+      p_servicos: servicos.value.map(s => ({ descricao: maiusculo(s.descricao).trim(), foto: s.fotos[0] || '', fotos: s.fotos }))
     })
     // Banco ainda sem a lista de serviços (SQL não rodado): salva no formato antigo
     if (error?.code === 'PGRST202') ({ error } = await supabase.rpc('equipe2_salvar', base))

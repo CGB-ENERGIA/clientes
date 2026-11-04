@@ -31,6 +31,7 @@
       </div>
       <textarea
         v-model="observacao"
+        v-maiuscula
         class="imp-textarea"
         rows="3"
         maxlength="500"
@@ -54,6 +55,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useCampoStore, MOTIVOS_IMPREVISTO } from 'stores/campo'
+import { vMaiuscula } from 'src/utils/maiuscula'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -82,7 +84,7 @@ async function enviar () {
     pep: props.nota.pep,
     equipe: props.equipe,
     motivo: motivo.value,
-    observacao: observacao.value.trim()
+    observacao: observacao.value.trim().toUpperCase()
   })
   enviando.value = false
   emit('update:modelValue', false)
