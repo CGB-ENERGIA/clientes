@@ -9,8 +9,11 @@
 
     <!-- Lista: só notas em andamento -->
     <section v-if="!notaAtiva" class="eq2-bloco">
-      <label class="eq2-label">Nome da equipe</label>
-      <input v-model="equipe" class="eq2-input" placeholder="Ex: EQUIPE BETA" style="text-transform:uppercase" @input="equipe = equipe.toUpperCase()" @change="guardarEquipe" />
+      <label class="eq2-label">Equipe</label>
+      <select v-model="equipe" class="eq2-input" @change="guardarEquipe">
+        <option value="">Escolha a equipe</option>
+        <option v-for="e in opcoesEquipe(equipe)" :key="e" :value="e">{{ e }}</option>
+      </select>
 
       <label class="eq2-label q-mt-md">Obras para a equipe 2</label>
       <input v-model="busca" class="eq2-input" placeholder="Buscar nota, SAP ou município" />
@@ -180,11 +183,12 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { supabase } from 'boot/supabase'
 import { usarEstadoPersistido } from 'src/utils/estadoPersistido'
+import { normalizarEquipe, opcoesEquipe } from 'src/utils/equipes'
 
 const $q = useQuasar()
 
 const EQUIPE_KEY = 'cgb_equipe2_nome'
-const equipe = ref(localStorage.getItem(EQUIPE_KEY) || '')
+const equipe = ref(normalizarEquipe(localStorage.getItem(EQUIPE_KEY)))
 const busca = ref('')
 const carregando = ref(false)
 const enviando = ref(false)

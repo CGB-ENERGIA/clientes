@@ -14,15 +14,13 @@
       <!-- EQUIPE -->
       <div class="cl-field">
         <label class="cl-label">Nome da equipe <span class="cl-req">*</span></label>
-        <div class="cl-input-wrap" :class="{ 'cl-input-wrap--err': erros.equipe }">
+        <div class="cl-select-wrap" :class="{ 'cl-select-wrap--err': erros.equipe }">
           <q-icon name="groups" size="20px" class="cl-icon" />
-          <input
-            v-model="form.equipe"
-            class="cl-input"
-            placeholder="EX: EQUIPE ALPHA"
-            style="text-transform:uppercase"
-            @input="form.equipe = form.equipe.toUpperCase()"
-          />
+          <select v-model="form.equipe" class="cl-select">
+            <option value="">Escolha a equipe</option>
+            <option v-for="e in opcoesEquipe(form.equipe)" :key="e" :value="e">{{ e }}</option>
+          </select>
+          <q-icon name="expand_more" size="20px" class="cl-chevron" />
         </div>
         <span v-if="erros.equipe" class="cl-err">{{ erros.equipe }}</span>
       </div>
@@ -325,6 +323,7 @@ import ImprevistoDialog from 'components/ImprevistoDialog.vue'
 import MapaNotas from 'components/MapaNotas.vue'
 import { temCoordenada, iniciarDeslocamento, distanciaKm, formatarDistancia } from 'src/utils/rota'
 import { ordenarRoteiro } from 'src/utils/roteiro'
+import { normalizarEquipe, opcoesEquipe } from 'src/utils/equipes'
 
 const $q         = useQuasar()
 const router     = useRouter()
@@ -333,7 +332,7 @@ const notasStore = useNotasStore()
 const ano        = new Date().getFullYear()
 const carregando = ref(false)
 
-const form  = reactive({ equipe: store.ultimaEquipe || '', nota: '', cliente: null })
+const form  = reactive({ equipe: normalizarEquipe(store.ultimaEquipe), nota: '', cliente: null })
 const erros = reactive({ equipe: '', nota: '', cliente: '' })
 
 const notas        = computed(() => notasStore.notas)
