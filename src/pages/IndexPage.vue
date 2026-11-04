@@ -2149,6 +2149,12 @@ notasStore.fetchNotas()
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
   text-align: center;
+  /* Fica fixo logo abaixo da barra de navegação ao rolar a lista */
+  position: sticky;
+  top: 58px;
+  z-index: 5;
+  background: var(--bg-page);
+  box-shadow: 0 6px 10px -8px rgba(15, 23, 42, 0.25);
 }
 .lista-header > div { text-align: center; }
 .lista-header-status { display: flex; align-items: center; justify-content: center; gap: 4px; }
