@@ -7,11 +7,15 @@
 
         <!-- Logo -->
         <div class="header-brand row items-center no-wrap">
-          <img src="/logo.ico" class="brand-logo q-mr-sm" alt="CGB" />
-          <div class="brand-sep q-mr-sm gt-xs" />
-          <div class="column no-wrap gt-xs">
-            <span class="brand-title">CONTROLE DE CLIENTES</span>
-            <span class="brand-sub">CGB Energia</span>
+          <span class="brand-logo-wrap q-mr-md">
+            <img src="/logo.ico" class="brand-logo" alt="CGB Energia" />
+          </span>
+          <div class="brand-word gt-xs" role="img" aria-label="CGB Energia">
+            <div class="brand-letras" aria-hidden="true">
+              <span class="brand-cgb"><span v-for="(c, i) in 'CGB'" :key="'c' + i" :style="{ '--i': i }">{{ c }}</span></span>
+              <span class="brand-energia"><span v-for="(c, i) in 'ENERGIA'" :key="'e' + i" :style="{ '--i': i + 3 }">{{ c }}</span></span>
+            </div>
+            <span class="brand-line" aria-hidden="true"><i class="brand-spark" /></span>
           </div>
         </div>
 
@@ -157,16 +161,60 @@ const navVisiveis = computed(() => navItems.filter(i => !i.admin || auth.isAdmin
   display: block; flex-shrink: 0;
   height: 36px; width: auto; object-fit: contain;
 }
-.brand-sep {
-  width: 1px; height: 28px;
-  background: rgba(255,255,255,0.12); flex-shrink: 0;
+/* Halo que acende uma vez na entrada, como um disjuntor sendo ligado */
+.brand-logo-wrap { position: relative; display: flex; flex-shrink: 0; }
+.brand-logo-wrap::after {
+  content: ''; position: absolute; inset: -6px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255,202,40,0.38) 0%, rgba(255,202,40,0) 68%);
+  opacity: 0; animation: brand-halo 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s 1 both;
 }
-.brand-title {
-  font-size: 13px; font-weight: 800; color: #fff; letter-spacing: 1px; line-height: 1.3;
+
+.brand-word { display: flex; flex-direction: column; gap: 6px; }
+.brand-letras {
+  display: flex; align-items: baseline; gap: 0.55em;
+  font-family: 'Unbounded', 'Segoe UI', system-ui, sans-serif;
+  font-size: 19px; line-height: 1; white-space: nowrap;
 }
-.brand-sub {
-  font-size: 9px; font-weight: 600; color: #ffca28;
-  letter-spacing: 2px; text-transform: uppercase; opacity: 0.85;
+.brand-cgb { font-weight: 800; color: #fff; letter-spacing: 0.04em; }
+.brand-energia { font-weight: 300; color: #ffca28; letter-spacing: 0.2em; }
+.brand-letras span > span {
+  display: inline-block;
+  animation: brand-letra 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i) * 60ms + 120ms);
+}
+
+/* Fio de energia: uma faísca atravessa a linha de tempos em tempos */
+.brand-line {
+  position: relative; display: block; height: 2px; border-radius: 2px; overflow: hidden;
+  background: rgba(255,202,40,0.16);
+}
+.brand-spark {
+  position: absolute; top: 0; left: 0; width: 34%; height: 100%;
+  background: linear-gradient(90deg, rgba(255,202,40,0), #ffca28 60%, #fff4c7);
+  box-shadow: 0 0 10px 1px rgba(255,202,40,0.75);
+  transform: translateX(-110%);
+  animation: brand-faisca 4.2s cubic-bezier(0.65, 0, 0.35, 1) 1.2s infinite;
+}
+.header-brand:hover .brand-spark { animation-duration: 1.6s; }
+
+@keyframes brand-letra {
+  from { opacity: 0; transform: translateY(45%); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes brand-faisca {
+  0%   { transform: translateX(-110%); }
+  45%  { transform: translateX(300%); }
+  100% { transform: translateX(300%); }
+}
+@keyframes brand-halo {
+  0%   { opacity: 0; transform: scale(0.6); }
+  35%  { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 0.0; transform: scale(1.4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-letras span > span { animation: none; }
+  .brand-spark { animation: none; transform: translateX(0); width: 100%; opacity: 0.55; }
+  .brand-logo-wrap::after { animation: none; }
 }
 
 /* ── Nav desktop ── */
