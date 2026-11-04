@@ -14,14 +14,10 @@
       <!-- EQUIPE -->
       <div class="cl-field">
         <label class="cl-label">Nome da equipe <span class="cl-req">*</span></label>
-        <div class="cl-select-wrap" :class="{ 'cl-select-wrap--err': erros.equipe }">
-          <q-icon name="groups" size="20px" class="cl-icon" />
-          <select v-model="form.equipe" class="cl-select" @change="erros.equipe = ''">
-            <option value="">Escolha a equipe</option>
-            <option v-for="e in opcoesEquipe(form.equipe)" :key="e" :value="e">{{ e }}</option>
-          </select>
-          <q-icon name="expand_more" size="20px" class="cl-chevron" />
-        </div>
+        <SeletorLista
+          v-model="form.equipe" :opcoes="opcoesEquipe(form.equipe)" placeholder="Escolha a equipe"
+          icone="groups" :erro="!!erros.equipe" @change="erros.equipe = ''"
+        />
         <span v-if="erros.equipe" class="cl-err">{{ erros.equipe }}</span>
       </div>
 
@@ -319,6 +315,7 @@ import { useRouter } from 'vue-router'
 import { useCampoStore } from 'stores/campo'
 import { useNotasStore } from 'stores/notas'
 import { useQuasar } from 'quasar'
+import SeletorLista from 'components/SeletorLista.vue'
 import ImprevistoDialog from 'components/ImprevistoDialog.vue'
 import MapaNotas from 'components/MapaNotas.vue'
 import { temCoordenada, iniciarDeslocamento, distanciaKm, formatarDistancia } from 'src/utils/rota'

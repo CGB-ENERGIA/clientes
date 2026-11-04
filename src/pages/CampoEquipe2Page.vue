@@ -10,10 +10,7 @@
     <!-- Lista: só notas em andamento -->
     <section v-if="!notaAtiva" class="eq2-bloco">
       <label class="eq2-label">Equipe</label>
-      <select v-model="equipe" class="eq2-input" @change="guardarEquipe">
-        <option value="">Escolha a equipe</option>
-        <option v-for="e in opcoesEquipe(equipe)" :key="e" :value="e">{{ e }}</option>
-      </select>
+      <SeletorLista v-model="equipe" :opcoes="opcoesEquipe(equipe)" placeholder="Escolha a equipe" icone="groups" @change="guardarEquipe" />
 
       <label class="eq2-label q-mt-md">Obras para a equipe 2</label>
       <input v-model="busca" class="eq2-input" placeholder="Buscar nota, SAP ou município" />
@@ -117,10 +114,7 @@
 
           <!-- Justificativa: cliente que a operação não conseguiu ligar -->
           <div v-if="!c.atendido" class="eq2-motivo">
-            <select v-model="c.motivo" class="eq2-input">
-              <option value="">Escolha o motivo *</option>
-              <option v-for="m in MOTIVOS" :key="m" :value="m">{{ m }}</option>
-            </select>
+            <SeletorLista v-model="c.motivo" :opcoes="MOTIVOS" placeholder="Escolha o motivo *" icone="help_outline" :disabled="enviando" />
             <textarea
               v-model="c.obs" v-maiuscula class="eq2-input eq2-textarea" rows="2"
               :placeholder="c.motivo === 'Outro' ? 'Descreva o motivo *' : 'Detalhe do motivo (opcional)'"
@@ -182,6 +176,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { supabase } from 'boot/supabase'
+import SeletorLista from 'components/SeletorLista.vue'
 import { usarEstadoPersistido } from 'src/utils/estadoPersistido'
 import { normalizarEquipe, opcoesEquipe } from 'src/utils/equipes'
 import { vMaiuscula, maiusculo } from 'src/utils/maiuscula'
