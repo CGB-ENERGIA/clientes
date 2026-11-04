@@ -6,7 +6,7 @@
       <div class="row items-end q-gutter-sm">
         <div class="col-auto">
           <div class="page-titulo">Notas de serviço</div>
-          <div class="page-sub">{{ notasStore.notas.length }} notas carregadas</div>
+          <div class="page-sub">{{ subtituloAtualizacao }}</div>
         </div>
         <q-space />
         <!-- Toggle grade / lista -->
@@ -189,8 +189,8 @@
           <q-tooltip>Exibir apenas notas com imprevisto reportado pelo campo</q-tooltip>
         </button>
 
-        <div class="filtros-count self-center q-ml-auto">
-          <strong>{{ notasFiltradas.length }}</strong> de {{ notasStore.notas.length }}
+        <div class="filtros-count self-center">
+          <strong>{{ notasFiltradas.length }}</strong> de {{ notasStore.notas.length }} notas
           <ProgInfo titulo="Contagem da lista" texto="Cada linha é um projeto SAP. Notas que dividem o mesmo PROJETO SAP aparecem juntas em uma linha. O número depois de de é o total de notas carregadas." />
         </div>
         </div>
@@ -1057,6 +1057,11 @@ import ProgInfo from 'components/ProgInfo.vue'
 
 const $q         = useQuasar()
 const notasStore = useNotasStore()
+const subtituloAtualizacao = computed(() => {
+  const d = notasStore.atualizadoEm
+  if (!d) return notasStore.loading ? 'Carregando notas…' : 'Notas do último acesso'
+  return 'Atualizado às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+})
 const apStore    = useApontamentoStore()
 
 // ── Filtros, tabs e vista ─────────────────────────────────────────
@@ -2108,6 +2113,7 @@ notasStore.fetchNotas()
   font-variant-numeric: tabular-nums; color: var(--text-muted);
 }
 .filtros-count strong { color: var(--text-primary); font-weight: 700; }
+.filtros-count { margin-left: 6px; padding-left: 16px; border-left: 1px solid var(--border); line-height: 22px; }
 
 .chip-toggle {
   --c: #64748b;

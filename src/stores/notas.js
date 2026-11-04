@@ -10,6 +10,7 @@ const PROGRAMACOES_ACEITAS = new Set(['', 'EQUIPE STC/GERE'])
 export const useNotasStore = defineStore('notas', () => {
   const notas      = ref([])
   const loading    = ref(false)
+  const atualizadoEm = ref(null)   // horário da última carga bem-sucedida das notas
   const importando = ref(false)
 
   // Inicializa do cache (garante offline no campo)
@@ -95,6 +96,7 @@ export const useNotasStore = defineStore('notas', () => {
         invalidos.forEach(n => { n.status = 'pendente' })
       }
       notas.value = data
+      atualizadoEm.value = new Date()
       localStorage.setItem(CACHE_KEY, JSON.stringify(data))
     }
     loading.value = false
@@ -325,5 +327,5 @@ export const useNotasStore = defineStore('notas', () => {
     return data ?? []
   }
 
-  return { notas, notasViaPwa, campoInicio, notasComRascunho, imprevistosAbertos, resolverImprevistos, loading, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo, apagarNotas, removerMarcaApagada }
+  return { notas, notasViaPwa, campoInicio, notasComRascunho, imprevistosAbertos, resolverImprevistos, loading, atualizadoEm, importando, fetchNotas, importarXlsx, notasOptions, getNota, atualizarStatus, buscarRegistrosCampo, apagarNotas, removerMarcaApagada }
 })
