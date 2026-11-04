@@ -12,18 +12,23 @@
         <!-- Toggle grade / lista -->
         <q-btn-toggle
           v-model="vista"
-          dense flat
+          class="vista-toggle"
+          unelevated dense no-caps
           :options="[
-            { value: 'grid', icon: 'grid_view' },
-            { value: 'list', icon: 'view_list' }
+            { value: 'grid', icon: 'grid_view', attrs: { 'aria-label': 'Ver em cards' } },
+            { value: 'list', icon: 'view_list', attrs: { 'aria-label': 'Ver em lista' } }
           ]"
-          color="grey-6"
+          color="transparent"
+          text-color="grey-7"
           toggle-color="primary"
         />
-        <q-btn icon="map" flat round dense color="primary" @click="mapaAberto = true">
+        <q-btn
+          label="Mapa" icon="map" no-caps dense outline color="primary"
+          class="btn-mapa" @click="mapaAberto = true"
+        >
           <q-tooltip>Abrir mapa das notas ({{ notasFiltradas.length }} no filtro atual)</q-tooltip>
         </q-btn>
-        <q-btn icon="refresh" flat round dense color="grey-6" :loading="notasStore.loading" @click="notasStore.fetchNotas()">
+        <q-btn icon="refresh" flat round dense color="grey-7" aria-label="Atualizar notas" :loading="notasStore.loading" @click="notasStore.fetchNotas()">
           <q-tooltip>Atualizar notas</q-tooltip>
         </q-btn>
       </div>
@@ -1869,6 +1874,14 @@ notasStore.fetchNotas()
 .body--dark .stab--concluido         { --c-ink: #86efac; }
 .body--dark .stab--active .stab-count { color: #0d1117; }
 @media (prefers-reduced-motion: reduce) { .stab, .stab-count { transition: none; } .stab:hover { transform: none; } }
+
+/* ── Barra superior: troca de vista, mapa, atualizar ── */
+.vista-toggle {
+  padding: 3px; border-radius: 12px;
+  background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+}
+.vista-toggle :deep(.q-btn) { border-radius: 9px; min-width: 36px; }
+.btn-mapa { border-radius: 12px; padding: 0 14px; min-height: 38px; font-weight: 700; letter-spacing: 0.02em; }
 
 /* ── Imprevistos reportados pelo campo ── */
 .badge-imprevisto {
