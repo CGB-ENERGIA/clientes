@@ -515,6 +515,9 @@ onMounted(restaurarAberta)
 .eq2-nao { display: flex; align-items: center; gap: 8px; width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); color: rgba(255,255,255,0.8); border-radius: 12px; padding: 9px 12px; font: inherit; font-size: 13.5px; cursor: pointer; text-align: left; }
 .eq2-nao--on { background: rgba(255,202,40,0.14); border-color: rgba(255,202,40,0.5); color: #ffca28; }
 .eq2-motivo { display: flex; flex-direction: column; gap: 8px; }
+/* A lista nativa do select abre com fundo claro: sem isto o texto branco some */
+select.eq2-input { color-scheme: dark; }
+select.eq2-input option { background: #111c2e; color: #fff; }
 .eq2-cliente--nao { border-color: rgba(255,202,40,0.4); }
 .eq2-add { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 8px; }
 .eq2-novo { display: flex; flex-direction: column; gap: 8px; border-style: dashed; }
