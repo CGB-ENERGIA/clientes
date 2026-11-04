@@ -2153,10 +2153,10 @@ notasStore.fetchNotas()
 
 /* Dados da nota */
 .dlg-meta {
-  display: flex; flex-wrap: wrap; gap: 8px 36px; flex-shrink: 0;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 56px; flex-shrink: 0;
   padding: 14px 24px; background: var(--bg-card); border-bottom: 1px solid var(--border);
 }
-.meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.meta { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 3px; min-width: 0; }
 .meta-lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); }
 .meta-val { font-size: 14px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
 .meta-val--destaque { color: var(--accent); }
