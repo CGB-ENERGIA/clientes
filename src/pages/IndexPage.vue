@@ -610,39 +610,20 @@
          DIALOG — Etapa 2: Registro de clientes (escritório)
     ══════════════════════════════════════════════════════════════ -->
     <q-dialog v-model="dialog" maximized transition-show="slide-up" transition-hide="slide-down">
-      <q-card class="dialog-card">
+      <q-card class="dlg">
 
-        <!-- Header -->
-        <q-bar class="dialog-bar">
-          <q-icon name="people" color="white" size="18px" />
-          <span class="dialog-bar-title q-ml-sm">Etapa 2 — Registro de Clientes</span>
-          <q-space />
-          <q-btn icon="close" flat round dense color="white" @click="dialog = false" />
-        </q-bar>
-
-        <!-- Chips da nota -->
-        <div class="dialog-nota-header">
-          <q-chip dense color="primary" text-color="white" icon="folder_special">SAP {{ notaAtiva?.projeto_info_sap || notaAtiva?.nota }}</q-chip>
-          <template v-if="notaAtiva?.notas_lista?.length">
-            <q-chip v-for="nt in notaAtiva.notas_lista" :key="nt" dense color="grey-3" text-color="grey-8" icon="description" size="sm">{{ nt }}</q-chip>
-          </template>
-          <q-chip dense color="blue-1" text-color="blue-8">{{ notaAtiva?.base }}</q-chip>
-          <q-chip dense color="grey-2" text-color="grey-8">PEP {{ notaAtiva?.pep }}</q-chip>
-          <q-chip dense color="orange-1" text-color="orange-9" icon="electrical_services">{{ notaAtiva?.postes }} postes</q-chip>
-          <q-chip dense color="teal-1" text-color="teal-9" icon="people">{{ notaAtiva?.qtd_clientes }} clientes previstos</q-chip>
-          <q-chip v-if="notaAtiva?.status === 'em_andamento'" dense color="amber-2" text-color="amber-9" icon="construction">
-            Campo em andamento — veja os postes registrados abaixo
-          </q-chip>
-          <q-chip v-if="notaAtiva?.status === 'baixar_medidor'" dense color="blue-1" text-color="blue-9" icon="speed">
-            Preencha Nº medidor + foto de cada cliente para concluir
-          </q-chip>
-          <!-- Alterar status manualmente -->
+        <!-- Topo: identidade da nota -->
+        <header class="dlg-topo">
+          <div class="dlg-topo-txt">
+            <div class="dlg-passo">Etapa 2</div>
+            <div class="dlg-titulo">Registro de clientes</div>
+          </div>
           <q-space />
           <q-btn-dropdown
-            flat dense size="sm"
+            flat no-caps dense
+            class="dlg-status"
             :label="'Status: ' + labelStatus(notaAtiva?.status)"
             icon="tune"
-            color="grey-7"
           >
             <q-list dense>
               <q-item
@@ -658,365 +639,302 @@
               </q-item>
             </q-list>
           </q-btn-dropdown>
-        </div>
+          <q-btn icon="close" flat round dense class="dlg-fechar" aria-label="Fechar" @click="dialog = false" />
+        </header>
 
-        <q-separator />
+        <!-- Dados da nota -->
+        <div class="dlg-meta">
+          <div class="meta">
+            <span class="meta-lbl">Projeto SAP</span>
+            <span class="meta-val meta-val--destaque">{{ notaAtiva?.projeto_info_sap || notaAtiva?.nota }}</span>
+          </div>
+          <div v-if="notaAtiva?.notas_lista?.length" class="meta">
+            <span class="meta-lbl">Notas</span>
+            <span class="meta-val">{{ notaAtiva.notas_lista.join(' · ') }}</span>
+          </div>
+          <div class="meta">
+            <span class="meta-lbl">Base</span>
+            <span class="meta-val">{{ notaAtiva?.base || '—' }}</span>
+          </div>
+          <div class="meta">
+            <span class="meta-lbl">PEP</span>
+            <span class="meta-val meta-val--mono">{{ notaAtiva?.pep || '—' }}</span>
+          </div>
+          <div class="meta">
+            <span class="meta-lbl">Postes</span>
+            <span class="meta-val"><q-icon name="electrical_services" size="15px" class="meta-ico meta-ico--ambar" /> {{ notaAtiva?.postes }}</span>
+          </div>
+          <div class="meta">
+            <span class="meta-lbl">Clientes previstos</span>
+            <span class="meta-val"><q-icon name="people" size="15px" class="meta-ico meta-ico--verde" /> {{ notaAtiva?.qtd_clientes }}</span>
+          </div>
+        </div>
 
         <!-- Input de foto (oculto) -->
         <input ref="fotoInput" type="file" accept="image/*" multiple hidden @change="onFotoSelecionada" />
 
-        <!-- Conteúdo scrollável -->
-        <q-card-section class="dialog-scroll">
+        <!-- Conteúdo com rolagem -->
+        <div class="dlg-corpo">
+          <div class="dlg-grade">
 
-          <div v-for="imp in imprevistosNotaAtiva" :key="imp.id" class="imprevisto-banner">
-            <q-icon name="report_problem" size="22px" color="deep-orange" />
-            <div class="imprevisto-banner-txt">
-              <div class="imprevisto-banner-title">Imprevisto reportado pelo campo: {{ imp.motivo }}</div>
-              <div v-if="imp.observacao" class="imprevisto-banner-obs">{{ imp.observacao }}</div>
-              <div class="imprevisto-banner-meta">{{ imp.equipe }} · {{ formatarDataCompleta(imp.created_at) }}</div>
-            </div>
-            <q-btn
-              label="Resolvido"
-              icon="check"
-              color="deep-orange"
-              outline dense size="sm"
-              @click="resolverImprevisto(imp)"
-            >
-              <q-tooltip>Marcar imprevisto como resolvido (remove o selo)</q-tooltip>
-            </q-btn>
-          </div>
+            <!-- ── Coluna principal: Etapa 2 ── -->
+            <main class="dlg-principal">
 
-          <div v-if="notaAtiva && !podeConcluir" class="fluxo-banner">
-            <q-icon name="info" size="20px" color="orange-9" />
-            <div class="fluxo-banner-txt">
-              <template v-if="notaAtiva.status === 'em_andamento'">
-                Nota em <b>Andamento</b>: aguardando a equipe tocar em <b>"Finalizar nota"</b> no app de campo.
-              </template>
-              <template v-else>
-                Nota em <b>{{ labelStatus(notaAtiva.status) }}</b>.
-              </template>
-              Você pode preencher e salvar como rascunho; a conclusão é liberada quando a nota estiver em <b>Aguardando Etapa 2</b> ou <b>Auditar</b>.
-            </div>
-            <q-btn
-              v-if="['pendente', 'em_andamento'].includes(notaAtiva.status)"
-              label="Enviar para Etapa 2"
-              icon="speed"
-              color="blue-7"
-              outline dense size="sm"
-              @click="alterarStatus('aguardando_etapa2')"
-            >
-              <q-tooltip>Use quando a equipe concluiu o campo mas não finalizou pelo app</q-tooltip>
-            </q-btn>
-          </div>
-
-          <div v-if="temServicoEquipe2" class="etapa-section">
-            <div class="etapa-label">
-              <q-icon name="build" size="16px" />
-              Serviço registrado pela Equipe 2
-            </div>
-            <div class="q-pa-sm column q-gutter-sm">
-              <q-input
-                v-model="servicoEquipe2.descricao"
-                type="textarea" autogrow outlined dense
-                label="Descrição do serviço"
-              />
-              <div class="row q-gutter-sm">
-                <div v-for="(url, i) in servicoEquipe2.fotos" :key="url" style="position: relative">
-                  <img :src="url" alt="Foto do serviço" style="width: 110px; height: 110px; object-fit: cover; border-radius: 10px" />
-                  <q-btn round dense size="xs" icon="close" color="negative" style="position: absolute; top: 4px; right: 4px" @click="removerFotoServico(i)" />
+              <div v-for="imp in imprevistosNotaAtiva" :key="imp.id" class="aviso aviso--alerta">
+                <q-icon name="report_problem" size="22px" class="aviso-ico" />
+                <div class="aviso-txt">
+                  <div class="aviso-titulo">Imprevisto reportado pelo campo: {{ imp.motivo }}</div>
+                  <div v-if="imp.observacao" class="aviso-corpo">{{ imp.observacao }}</div>
+                  <div class="aviso-meta">{{ imp.equipe }} · {{ formatarDataCompleta(imp.created_at) }}</div>
                 </div>
-                <q-btn outline color="primary" icon="add_a_photo" label="Adicionar foto" :loading="servicoSalvando" no-caps style="height: 110px; width: 130px" @click="fotoServicoInput?.click()" />
-                <input ref="fotoServicoInput" type="file" accept="image/*" hidden @change="e => { adicionarFotoServico(e.target.files?.[0]); e.target.value = '' }" />
-              </div>
-              <div>
-                <q-btn unelevated color="primary" label="Salvar serviço" icon="save" no-caps :loading="servicoSalvando" @click="salvarServico" />
-              </div>
-            </div>
-          </div>
-
-          <!-- ── Seção Campo (Etapa 1) ── -->
-          <div class="etapa-section etapa-section--campo">
-            <div class="etapa-label">
-              <q-icon name="construction" size="16px" />
-              Etapa 1 — Registro de Campo
-              <q-space />
-              <q-btn
-                v-if="registrosCampo.length"
-                label="Apagar tudo"
-                icon="delete_sweep"
-                color="negative"
-                flat dense size="xs"
-                @click="apagarRegistrosCampo"
-              />
-            </div>
-
-            <div v-if="carregandoCampo" class="text-center q-pa-md text-grey-5">
-              <q-spinner size="24px" color="amber" /> Buscando registros do campo...
-            </div>
-
-            <div v-else-if="!registrosCampo.length" class="campo-vazio">
-              <q-icon name="warning_amber" size="20px" />
-              Nenhum registro do campo ainda. A equipe ainda não enviou os postes.
-            </div>
-
-            <div v-else>
-              <div class="campo-stats-grid">
-                <div class="campo-stat-card">
-                  <div class="campo-stat-icon campo-stat-icon--total">
-                    <q-icon name="electrical_services" size="20px" />
-                  </div>
-                  <div class="campo-stat-body">
-                    <span class="campo-stat-val">{{ campoStats.total }}</span>
-                    <span class="campo-stat-label">Postes registrados</span>
-                  </div>
-                </div>
-                <div class="campo-stat-card">
-                  <div class="campo-stat-icon campo-stat-icon--equipe">
-                    <q-icon name="groups" size="20px" />
-                  </div>
-                  <div class="campo-stat-body">
-                    <span class="campo-stat-val">{{ campoStats.equipes }}</span>
-                    <span class="campo-stat-label">{{ campoStats.equipes === 1 ? 'Equipe' : 'Equipes' }}</span>
-                  </div>
-                </div>
-                <div class="campo-stat-card">
-                  <div class="campo-stat-icon campo-stat-icon--foto">
-                    <q-icon name="photo_camera" size="20px" />
-                  </div>
-                  <div class="campo-stat-body">
-                    <span class="campo-stat-val">{{ campoStats.comFoto }}/{{ campoStats.total }}</span>
-                    <span class="campo-stat-label">Com foto</span>
-                  </div>
-                </div>
-                <div class="campo-stat-card">
-                  <div class="campo-stat-icon campo-stat-icon--hora">
-                    <q-icon name="schedule" size="20px" />
-                  </div>
-                  <div class="campo-stat-body">
-                    <span class="campo-stat-val campo-stat-val--sm">{{ campoStats.ultimoRegistro }}</span>
-                    <span class="campo-stat-label">Último registro</span>
-                  </div>
-                </div>
+                <q-btn
+                  label="Resolvido" icon="check" no-caps outline dense color="deep-orange"
+                  class="btn-pill" @click="resolverImprevisto(imp)"
+                >
+                  <q-tooltip>Marcar imprevisto como resolvido (remove o selo)</q-tooltip>
+                </q-btn>
               </div>
 
-              <div
-                v-for="grupo in registrosCampoPorEquipe"
-                :key="grupo.equipe"
-                class="campo-equipe-grupo"
-              >
-                <div class="campo-equipe-header">
-                  <div class="campo-equipe-title">
-                    <q-icon name="engineering" size="16px" />
-                    <span>{{ grupo.equipe }}</span>
-                  </div>
-                  <q-chip dense size="sm" color="orange-2" text-color="orange-10">
-                    {{ grupo.registros.length }} PG{{ grupo.registros.length > 1 ? 's' : '' }}
-                  </q-chip>
-                </div>
-
-                <div class="pg-list">
-                  <div v-for="(r, idx) in grupo.registros" :key="r.id" class="pg-item">
-                    <div class="pg-item-num">{{ idx + 1 }}</div>
-
-                    <div
-                      class="pg-item-foto"
-                      :class="{ 'pg-item-foto--clickable': !!r.foto_url }"
-                      @click="r.foto_url && verFotosPoste(r)"
-                    >
-                      <img v-if="r.foto_url" :src="r.foto_url" class="pg-item-img" alt="foto poste" />
-                      <span v-if="r.fotos_extras?.length" class="pg-item-foto-count">+{{ r.fotos_extras.length }}</span>
-                      <div v-else class="pg-item-sem-foto" title="Foto não enviada">
-                        <q-icon name="hide_image" size="20px" />
-                        <span>Sem foto</span>
-                      </div>
-                    </div>
-
-                    <div class="pg-item-info">
-                      <div class="pg-item-pg">
-                        <q-icon name="electrical_services" size="14px" />
-                        PG {{ r.pg_numero }}
-                      </div>
-                      <div class="pg-item-meta">
-                        <span class="pg-item-hora">
-                          <q-icon name="event" size="11px" />
-                          {{ formatarDataCompleta(r.created_at) }}
-                        </span>
-                      </div>
-                    </div>
-
-                    <q-btn
-                      v-if="r.foto_url"
-                      flat dense size="sm"
-                      icon="zoom_in"
-                      :label="r.fotos_extras?.length ? `Ver ${r.fotos_extras.length + 1} fotos` : 'Ver foto'"
-                      color="orange-9"
-                      class="pg-item-ver-foto"
-                      @click="verFotosPoste(r)"
-                    />
-
-                    <q-btn
-                      flat round dense
-                      icon="edit"
-                      color="primary"
-                      size="sm"
-                      @click="abrirEditarRegistro(r)"
-                    >
-                      <q-tooltip>Editar PG e fotos</q-tooltip>
-                    </q-btn>
-
-                    <q-btn
-                      flat round dense
-                      icon="delete"
-                      color="negative"
-                      size="sm"
-                      @click="apagarRegistro(r)"
-                    />
+              <div v-if="notaAtiva && !podeConcluir" class="aviso aviso--info">
+                <q-icon name="info" size="22px" class="aviso-ico" />
+                <div class="aviso-txt">
+                  <div class="aviso-corpo aviso-corpo--forte">
+                    <template v-if="notaAtiva.status === 'em_andamento'">
+                      Nota em <b>Andamento</b>: aguardando a equipe tocar em <b>"Finalizar nota"</b> no app de campo.
+                    </template>
+                    <template v-else>
+                      Nota em <b>{{ labelStatus(notaAtiva.status) }}</b>.
+                    </template>
+                    Você pode preencher e salvar como rascunho; a conclusão é liberada quando a nota estiver em <b>Aguardando Etapa 2</b> ou <b>Auditar</b>.
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <q-separator class="q-my-md" />
-
-          <!-- ── Seção Clientes (Etapa 2) ── -->
-          <div class="etapa-section etapa-section--office">
-            <div class="etapa-label">
-              <q-icon name="people" size="16px" />
-              Etapa 2 — Clientes Atendidos
-              <q-btn
-                label="Adicionar Cliente"
-                icon="add"
-                color="secondary"
-                flat dense size="sm"
-                class="q-ml-auto"
-                @click="adicionarCliente"
-              />
-            </div>
-
-            <div v-if="!clientes.length" class="clientes-vazio">
-              <q-icon name="person_add" size="20px" />
-              Nenhum cliente adicionado. Clique em "Adicionar Cliente".
-            </div>
-
-            <div
-              v-for="(c, i) in clientes"
-              :key="i"
-              class="cliente-row"
-              :class="{ 'cliente-row--nao': !c.atendido }"
-            >
-              <!-- Badge planilha + endereço -->
-              <div v-if="c.origem === 'planilha'" class="cliente-origem-bar">
-                <q-icon name="table_chart" size="11px" />
-                <span>Planilha</span>
-                <span v-if="c._endereco" class="cliente-end">{{ c._endereco }}{{ c._bairro ? ' — ' + c._bairro : '' }}</span>
+                <q-btn
+                  v-if="['pendente', 'em_andamento'].includes(notaAtiva.status)"
+                  label="Enviar para Etapa 2" icon="speed" no-caps outline dense color="primary"
+                  class="btn-pill" @click="alterarStatus('aguardando_etapa2')"
+                >
+                  <q-tooltip>Use quando a equipe concluiu o campo mas não finalizou pelo app</q-tooltip>
+                </q-btn>
               </div>
 
-              <div class="row q-col-gutter-sm items-start">
-                <div class="col-12 col-sm-4">
-                  <q-input v-model="c.nome" label="Nome do Cliente" outlined dense />
-                </div>
-                <div class="col-6 col-sm-2">
-                  <q-select v-model="c.padrao" :options="padraoOptions" label="Padrão" outlined dense emit-value map-options clearable />
-                </div>
-                <div class="col-6 col-sm-3">
-                  <q-input v-model="c.conta_contrato" label="Conta / CPF" outlined dense />
-                </div>
-                <div class="col-auto row items-center" style="gap:4px;padding-top:4px">
-                  <!-- Toggle atendido -->
-                  <q-btn
-                    :icon="c.atendido ? 'check_circle' : 'cancel'"
-                    :color="c.atendido ? 'positive' : 'negative'"
-                    flat round dense size="md"
-                    @click="c.atendido = !c.atendido"
-                  >
-                    <q-tooltip>{{ c.atendido ? 'Atendido — clique para marcar como não atendido' : 'Não atendido' }}</q-tooltip>
-                  </q-btn>
-                  <q-btn icon="delete" color="grey-5" flat round dense @click="removerCliente(i)" />
-                </div>
+              <div v-if="notaAtiva?.status === 'baixar_medidor'" class="aviso aviso--info">
+                <q-icon name="speed" size="22px" class="aviso-ico" />
+                <div class="aviso-txt"><div class="aviso-corpo aviso-corpo--forte">Preencha o <b>Nº do medidor</b> e a <b>foto</b> de cada cliente para concluir.</div></div>
               </div>
 
-              <!-- Medidor + Foto -->
-              <div class="row q-col-gutter-sm items-center q-mt-xs">
-                <div class="col-12 col-sm-4">
+              <!-- Serviço registrado pela Equipe 2 -->
+              <section v-if="temServicoEquipe2" class="bloco">
+                <div class="bloco-cab">
+                  <span class="bloco-titulo"><q-icon name="build" size="18px" /> Serviço registrado pela Equipe 2</span>
+                </div>
+                <div class="bloco-corpo">
                   <q-input
-                    v-model="c.num_medidor"
-                    label="Nº do Medidor *"
-                    outlined dense
-                    :error="tentouSalvar && !c.num_medidor?.trim()"
-                    error-message="Obrigatório"
-                    hide-bottom-space
-                  >
-                    <template #prepend><q-icon name="speed" size="15px" /></template>
-                  </q-input>
-                </div>
-                <div class="col-auto">
-                  <q-btn
-                    flat dense size="sm"
-                    icon="add_a_photo"
-                    :color="(tentouSalvar && !c.fotos.length) ? 'negative' : (c.fotos.length ? 'blue-7' : 'grey-6')"
-                    :label="c.fotos.length ? 'Adicionar foto' : 'Foto do medidor *'"
-                    @click="selecionarFoto(i)"
+                    v-model="servicoEquipe2.descricao"
+                    type="textarea" autogrow outlined dense
+                    label="Descrição do serviço"
                   />
-                  <div v-if="tentouSalvar && !c.fotos.length" class="text-negative" style="font-size:11px;margin-top:2px">
-                    Foto obrigatória
+                  <div class="fotos-linha">
+                    <div v-for="(url, i) in servicoEquipe2.fotos" :key="url" class="foto-quadro">
+                      <img :src="url" alt="Foto do serviço" />
+                      <q-btn round dense size="xs" icon="close" color="negative" class="foto-quadro-x" aria-label="Remover foto" @click="removerFotoServico(i)" />
+                    </div>
+                    <button type="button" class="foto-add foto-add--grande" :disabled="servicoSalvando" @click="fotoServicoInput?.click()">
+                      <q-icon name="add_a_photo" size="24px" />
+                      <span>Adicionar foto</span>
+                    </button>
+                    <input ref="fotoServicoInput" type="file" accept="image/*" hidden @change="e => { adicionarFotoServico(e.target.files?.[0]); e.target.value = '' }" />
+                  </div>
+                  <div>
+                    <q-btn unelevated color="primary" label="Salvar serviço" icon="save" no-caps class="btn-pill" :loading="servicoSalvando" @click="salvarServico" />
                   </div>
                 </div>
-                <div v-for="(f, fi) in c.fotos" :key="f.preview" class="col-auto medidor-thumb-wrap">
-                  <img
-                    :src="f.preview"
-                    class="medidor-thumb"
-                    title="Ver foto ampliada"
-                    @click="verFoto(f.preview)"
-                  />
+              </section>
+
+              <!-- Clientes -->
+              <section class="bloco">
+                <div class="bloco-cab">
+                  <span class="bloco-titulo"><q-icon name="people" size="18px" /> Clientes atendidos</span>
+                  <q-btn label="Adicionar cliente" icon="add" no-caps outline dense color="primary" class="btn-pill" @click="adicionarCliente" />
+                </div>
+
+                <div v-if="!clientes.length" class="vazio-bloco">
+                  <q-icon name="person_add" size="34px" />
+                  <div class="vazio-bloco-titulo">Nenhum cliente adicionado</div>
+                  <div class="vazio-bloco-sub">Use "Adicionar cliente" para começar.</div>
+                </div>
+
+                <div class="cli-lista">
+                  <div v-for="(c, i) in clientes" :key="i" class="cli" :class="{ 'cli--nao': !c.atendido }">
+                    <div class="cli-topo">
+                      <span class="cli-n">{{ i + 1 }}</span>
+                      <div v-if="c.origem === 'planilha'" class="cli-origem">
+                        <q-icon name="table_chart" size="14px" />
+                        <span class="cli-origem-lbl">Planilha</span>
+                        <span v-if="c._endereco" class="cli-end">{{ c._endereco }}{{ c._bairro ? ' — ' + c._bairro : '' }}</span>
+                      </div>
+                      <q-space />
+                      <div class="seg" role="group" aria-label="Situação do cliente">
+                        <button type="button" class="seg-op seg-op--ok" :class="{ 'seg-op--on': c.atendido }" :aria-pressed="c.atendido" @click="c.atendido = true">
+                          <q-icon name="check_circle" size="16px" /> Atendido
+                        </button>
+                        <button type="button" class="seg-op seg-op--nao" :class="{ 'seg-op--on': !c.atendido }" :aria-pressed="!c.atendido" @click="c.atendido = false">
+                          <q-icon name="cancel" size="16px" /> Não atendido
+                        </button>
+                      </div>
+                      <q-btn icon="delete_outline" flat round dense color="grey-7" aria-label="Remover cliente" @click="removerCliente(i)">
+                        <q-tooltip>Remover cliente</q-tooltip>
+                      </q-btn>
+                    </div>
+
+                    <div class="cli-campos">
+                      <q-input v-model="c.nome" label="Nome do cliente" outlined dense class="cli-c-nome" />
+                      <q-select v-model="c.padrao" :options="padraoOptions" label="Padrão" outlined dense emit-value map-options clearable class="cli-c-padrao" />
+                      <q-input v-model="c.conta_contrato" label="Conta / CPF" outlined dense class="cli-c-conta" />
+
+                      <q-input
+                        v-model="c.num_medidor"
+                        label="Nº do medidor *"
+                        outlined dense
+                        class="cli-c-medidor"
+                        :error="tentouSalvar && !c.num_medidor?.trim()"
+                        error-message="Obrigatório"
+                        hide-bottom-space
+                      >
+                        <template #prepend><q-icon name="speed" size="16px" /></template>
+                      </q-input>
+
+                      <div class="cli-c-fotos">
+                        <div class="fotos-linha">
+                          <button
+                            type="button" class="foto-add"
+                            :class="{ 'foto-add--erro': tentouSalvar && !c.fotos.length, 'foto-add--ok': c.fotos.length }"
+                            @click="selecionarFoto(i)"
+                          >
+                            <q-icon name="add_a_photo" size="20px" />
+                            <span>{{ c.fotos.length ? 'Adicionar foto' : 'Foto do medidor *' }}</span>
+                          </button>
+                          <div v-for="(f, fi) in c.fotos" :key="f.preview" class="medidor-thumb-wrap">
+                            <img :src="f.preview" class="medidor-thumb" title="Ver foto ampliada" alt="Foto do medidor" @click="verFoto(f.preview)" />
+                            <q-btn
+                              icon="close" round dense unelevated size="6px"
+                              color="negative" class="medidor-thumb-remove" aria-label="Remover foto"
+                              @click="removerFoto(c, fi)"
+                            >
+                              <q-tooltip>Remover foto</q-tooltip>
+                            </q-btn>
+                          </div>
+                        </div>
+                        <div v-if="tentouSalvar && !c.fotos.length" class="cli-erro">Foto obrigatória</div>
+                      </div>
+
+                      <q-input
+                        v-if="!c.atendido"
+                        v-model="c.motivo"
+                        label="Motivo do não atendimento *"
+                        outlined dense class="cli-c-motivo"
+                        :rules="[v => !!v || 'Informe o motivo']"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </main>
+
+            <!-- ── Coluna lateral: Etapa 1 (campo) ── -->
+            <aside class="dlg-lateral">
+              <section class="bloco bloco--lateral">
+                <div class="bloco-cab">
+                  <span class="bloco-titulo"><q-icon name="construction" size="18px" /> Etapa 1 · Registro de campo</span>
                   <q-btn
-                    icon="close" round dense unelevated size="6px"
-                    color="negative" class="medidor-thumb-remove"
-                    @click="removerFoto(c, fi)"
-                  >
-                    <q-tooltip>Remover foto</q-tooltip>
-                  </q-btn>
+                    v-if="registrosCampo.length"
+                    label="Apagar tudo" icon="delete_sweep" no-caps flat dense size="sm" color="negative"
+                    @click="apagarRegistrosCampo"
+                  />
                 </div>
-              </div>
 
-              <!-- Motivo se não atendido -->
-              <div v-if="!c.atendido" class="row q-mt-xs q-pl-sm">
-                <div class="col-12 col-sm-9">
-                  <q-input v-model="c.motivo" label="Motivo do não atendimento *" outlined dense :rules="[v => !!v || 'Informe o motivo']" />
+                <div v-if="carregandoCampo" class="vazio-bloco">
+                  <q-spinner size="26px" color="primary" />
+                  <div class="vazio-bloco-sub">Buscando registros do campo…</div>
                 </div>
-              </div>
-            </div>
 
-            <!-- Resumo -->
-            <div v-if="clientes.length" class="resumo-bar q-mt-md">
-              <div class="resumo-item resumo-item--ok">
-                <q-icon name="check_circle" /> {{ totalAtendidos }} atendidos
-              </div>
-              <div v-if="totalNaoAtendidos" class="resumo-item resumo-item--nao">
-                <q-icon name="cancel" /> {{ totalNaoAtendidos }} não atendidos
-              </div>
-              <div class="resumo-item resumo-item--total">
-                <q-icon name="people" /> {{ clientes.length }} total
-              </div>
-            </div>
+                <div v-else-if="!registrosCampo.length" class="vazio-bloco">
+                  <q-icon name="engineering" size="34px" />
+                  <div class="vazio-bloco-titulo">Nenhum registro do campo ainda</div>
+                  <div class="vazio-bloco-sub">A equipe ainda não enviou os postes.</div>
+                </div>
+
+                <div v-else class="cmp">
+                  <div class="cmp-stats">
+                    <div class="cmp-stat">
+                      <span class="cmp-stat-val">{{ campoStats.total }}</span>
+                      <span class="cmp-stat-lbl">Postes</span>
+                    </div>
+                    <div class="cmp-stat">
+                      <span class="cmp-stat-val">{{ campoStats.equipes }}</span>
+                      <span class="cmp-stat-lbl">{{ campoStats.equipes === 1 ? 'Equipe' : 'Equipes' }}</span>
+                    </div>
+                    <div class="cmp-stat">
+                      <span class="cmp-stat-val">{{ campoStats.comFoto }}<small>/{{ campoStats.total }}</small></span>
+                      <span class="cmp-stat-lbl">Com foto</span>
+                    </div>
+                    <div class="cmp-stat">
+                      <span class="cmp-stat-val cmp-stat-val--sm">{{ campoStats.ultimoRegistro }}</span>
+                      <span class="cmp-stat-lbl">Último registro</span>
+                    </div>
+                  </div>
+
+                  <div v-for="grupo in registrosCampoPorEquipe" :key="grupo.equipe" class="cmp-equipe">
+                    <div class="cmp-equipe-cab">
+                      <span class="cmp-equipe-nome"><q-icon name="groups" size="16px" /> {{ grupo.equipe }}</span>
+                      <span class="pill pill--ambar">{{ grupo.registros.length }} PG{{ grupo.registros.length > 1 ? 's' : '' }}</span>
+                    </div>
+
+                    <div class="cmp-pgs">
+                      <div v-for="r in grupo.registros" :key="r.id" class="cmp-pg">
+                        <button
+                          type="button" class="cmp-pg-foto" :class="{ 'cmp-pg-foto--vazia': !r.foto_url }"
+                          :disabled="!r.foto_url" :aria-label="r.foto_url ? 'Ver fotos do poste' : 'Foto não enviada'"
+                          @click="r.foto_url && verFotosPoste(r)"
+                        >
+                          <img v-if="r.foto_url" :src="r.foto_url" alt="Foto do poste" />
+                          <q-icon v-else name="hide_image" size="20px" />
+                          <span v-if="r.fotos_extras?.length" class="cmp-pg-mais">+{{ r.fotos_extras.length }}</span>
+                        </button>
+                        <div class="cmp-pg-info">
+                          <div class="cmp-pg-num">PG {{ r.pg_numero }}</div>
+                          <div class="cmp-pg-hora">{{ formatarDataCompleta(r.created_at) }}</div>
+                        </div>
+                        <q-btn flat round dense size="sm" icon="edit" color="primary" aria-label="Editar PG e fotos" @click="abrirEditarRegistro(r)">
+                          <q-tooltip>Editar PG e fotos</q-tooltip>
+                        </q-btn>
+                        <q-btn flat round dense size="sm" icon="delete_outline" color="negative" aria-label="Apagar registro" @click="apagarRegistro(r)">
+                          <q-tooltip>Apagar registro</q-tooltip>
+                        </q-btn>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </aside>
+
           </div>
+        </div>
 
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-actions align="right" class="q-pa-md">
-          <div v-if="rascunhoEm" class="rascunho-info q-mr-auto">
-            <q-icon name="edit_note" size="16px" />
-            Rascunho salvo em {{ formatarDataCompleta(rascunhoEm) }}
+        <!-- Rodapé fixo: resumo + ações -->
+        <footer class="dlg-rodape">
+          <div class="dlg-rodape-info">
+            <template v-if="clientes.length">
+              <span class="resumo resumo--ok"><q-icon name="check_circle" size="16px" /> {{ totalAtendidos }} atendido{{ totalAtendidos === 1 ? '' : 's' }}</span>
+              <span v-if="totalNaoAtendidos" class="resumo resumo--nao"><q-icon name="cancel" size="16px" /> {{ totalNaoAtendidos }} não atendido{{ totalNaoAtendidos === 1 ? '' : 's' }}</span>
+              <span class="resumo"><q-icon name="people" size="16px" /> {{ clientes.length }} no total</span>
+            </template>
+            <span v-if="rascunhoEm" class="resumo resumo--rascunho"><q-icon name="edit_note" size="16px" /> Rascunho salvo em {{ formatarDataCompleta(rascunhoEm) }}</span>
           </div>
-          <q-btn label="Cancelar" flat color="grey-7" @click="dialog = false" />
+          <q-btn label="Cancelar" flat no-caps color="grey-7" class="btn-pill" @click="dialog = false" />
           <q-btn
             v-if="notaAtiva?.status !== 'concluido'"
             label="Salvar e continuar depois"
-            icon="save"
-            color="primary"
-            outline
+            icon="save" no-caps outline color="primary" class="btn-pill"
             :loading="salvando === 'rascunho'"
             :disable="!clientes.length || !!salvando"
             @click="salvar(true)"
@@ -1025,10 +943,8 @@
           </q-btn>
           <div>
             <q-btn
-              label="Salvar e Concluir"
-              icon="check_circle"
-              color="positive"
-              unelevated
+              label="Salvar e concluir"
+              icon="check_circle" no-caps unelevated color="positive" class="btn-pill btn-concluir"
               :loading="salvando === 'concluir'"
               :disable="!clientes.length || !!salvando || !podeConcluir"
               @click="salvar(false)"
@@ -1037,7 +953,7 @@
               Só notas em "Aguardando Etapa 2" ou "Auditar" podem ser concluídas. Esta nota está em "{{ labelStatus(notaAtiva?.status) }}".
             </q-tooltip>
           </div>
-        </q-card-actions>
+        </footer>
 
       </q-card>
     </q-dialog>
@@ -1905,26 +1821,6 @@ notasStore.fetchNotas()
   cursor: default;
 }
 .lista-status .badge-imprevisto { margin-left: 0; }
-.fluxo-banner {
-  display: flex; align-items: center; gap: 12px;
-  background: #fff8e1; border: 1px solid #ffe082;
-  border-radius: 12px; padding: 10px 14px; margin-bottom: 12px;
-}
-.fluxo-banner-txt { flex: 1; font-size: 13px; color: #5d4037; line-height: 1.45; }
-.imprevisto-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: #fbe9e7;
-  border: 1px solid #ffab91;
-  border-radius: 12px;
-  padding: 10px 14px;
-  margin-bottom: 12px;
-}
-.imprevisto-banner-txt { flex: 1; min-width: 0; }
-.imprevisto-banner-title { font-weight: 700; color: #bf360c; font-size: 13px; }
-.imprevisto-banner-obs { font-size: 12px; color: #4e342e; margin-top: 2px; }
-.imprevisto-banner-meta { font-size: 11px; color: #8d6e63; margin-top: 2px; }
 
 /* ── Marca de rascunho (Etapa 2 para continuar depois) ── */
 .badge-rascunho {
@@ -1941,13 +1837,6 @@ notasStore.fetchNotas()
   white-space: nowrap;
 }
 .lista-status .badge-rascunho { margin-left: 0; }
-.rascunho-info {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #e65100;
-}
 
 /* ── Marca de nota apagada ── */
 .badge-apagada {
@@ -2244,80 +2133,187 @@ notasStore.fetchNotas()
   .lista-info { grid-column: 1 / -1; }
 }
 
-/* ── Dialog ── */
-.dialog-card { display: flex; flex-direction: column; max-height: 100dvh; }
-.dialog-bar { background: #0a1628; color: #fff; min-height: 50px; flex-shrink: 0; }
-.dialog-bar-title { font-size: 15px; font-weight: 700; }
-.dialog-nota-header {
-  display: flex; flex-wrap: wrap; gap: 6px;
-  background: var(--bg-main, #f4f6f9); padding: 10px 16px; flex-shrink: 0;
-}
-.dialog-scroll { flex: 1; overflow-y: auto; }
+/* ══════════ Etapa 2 — tela de registro de clientes ══════════ */
+.dlg { display: flex; flex-direction: column; max-height: 100dvh; background: var(--bg-page); color: var(--text-primary); }
+.body--dark .q-dialog .q-card.dlg { background: var(--bg-page) !important; }
 
-/* ── Seções etapas ── */
-.etapa-section { border-radius: 12px; padding: 16px; }
-.etapa-section--campo  { background: #fffde7; border: 1px solid #ffe082; }
-.etapa-section--office { background: var(--bg-card, #fff); border: 1px solid var(--border-color, #e0e0e0); }
+/* Topo */
+.dlg-topo {
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  padding: 14px 24px; color: #fff;
+  background: linear-gradient(180deg, #0d1c34 0%, #0a1628 100%);
+  box-shadow: 0 1px 0 rgba(255,202,40,0.12);
+}
+.dlg-passo { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #ffca28; }
+.dlg-titulo { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; }
+.dlg-status { color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 0 10px; }
+.dlg-status:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.dlg-fechar { color: rgba(255,255,255,0.8); }
+.dlg-fechar:hover { color: #fff; background: rgba(255,255,255,0.1); }
 
-.etapa-label {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--text-secondary, #546e7a); margin-bottom: 14px;
+/* Dados da nota */
+.dlg-meta {
+  display: flex; flex-wrap: wrap; gap: 8px 36px; flex-shrink: 0;
+  padding: 14px 24px; background: var(--bg-card); border-bottom: 1px solid var(--border);
 }
-.etapa-section--campo .etapa-label { color: #e65100; }
+.meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.meta-lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.meta-val { font-size: 14px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
+.meta-val--destaque { color: var(--accent); }
+.meta-val--mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; }
+.meta-ico--ambar { color: #d97706; }
+.meta-ico--verde { color: #16a34a; }
 
-/* ── Campo resumo ── */
-.campo-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
+/* Corpo: coluna principal (Etapa 2) + lateral (Etapa 1) */
+.dlg-corpo { flex: 1; overflow-y: auto; padding: 22px 24px 28px; }
+.dlg-grade {
+  display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px;
+  max-width: 1480px; margin: 0 auto; align-items: start;
 }
-@media (min-width: 640px) {
-  .campo-stats-grid { grid-template-columns: repeat(4, 1fr); }
-}
-.campo-stat-card {
-  display: flex; align-items: center; gap: 10px;
-  background: #fff; border: 1px solid #ffe082;
-  border-radius: 12px; padding: 10px 12px;
-  min-width: 0;
-}
-.campo-stat-icon {
-  width: 38px; height: 38px; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.campo-stat-icon--total  { background: #fff3e0; color: #e65100; }
-.campo-stat-icon--equipe { background: #e3f2fd; color: #1565c0; }
-.campo-stat-icon--foto   { background: #e8f5e9; color: #2e7d32; }
-.campo-stat-icon--hora   { background: #f3e5f5; color: #7b1fa2; }
-.campo-stat-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.campo-stat-val { font-size: 18px; font-weight: 800; color: #1a1a1a; line-height: 1.1; }
-.campo-stat-val--sm { font-size: 13px; font-weight: 700; }
-.campo-stat-label {
-  font-size: 9px; font-weight: 700; color: #888;
-  text-transform: uppercase; letter-spacing: 0.06em;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.dlg-principal { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.dlg-lateral { position: sticky; top: 0; max-height: calc(100dvh - 250px); display: flex; }
+@media (max-width: 1100px) {
+  .dlg-grade { grid-template-columns: minmax(0, 1fr); }
+  .dlg-lateral { position: static; max-height: none; order: 2; }
 }
 
-.campo-equipe-grupo { margin-bottom: 14px; }
-.campo-equipe-grupo:last-child { margin-bottom: 0; }
-.campo-equipe-header {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 8px; margin-bottom: 8px;
-  padding: 6px 10px; background: rgba(255,255,255,0.65);
-  border-radius: 8px; border: 1px solid #ffe082;
+/* Avisos */
+.aviso {
+  --c: #2563eb; display: flex; align-items: center; gap: 14px;
+  padding: 12px 16px; border-radius: 14px;
+  background: color-mix(in srgb, var(--c) 9%, var(--bg-card)); border: 1px solid color-mix(in srgb, var(--c) 24%, transparent);
 }
-.campo-equipe-title {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 13px; font-weight: 800; color: #bf360c;
-  text-transform: uppercase; letter-spacing: 0.04em;
+.aviso--alerta { --c: #ea580c; }
+.aviso-ico { color: var(--c); flex-shrink: 0; }
+.aviso-txt { flex: 1; min-width: 0; }
+.aviso-titulo { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+.aviso-corpo { font-size: 13px; color: var(--text-secondary); margin-top: 2px; line-height: 1.5; }
+.aviso-corpo--forte { color: var(--text-primary); margin-top: 0; }
+.aviso-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+
+/* Blocos (seções) */
+.bloco { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow-sm); min-width: 0; }
+.bloco-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.bloco-titulo { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; letter-spacing: -0.005em; color: var(--text-primary); }
+.bloco-titulo .q-icon { color: var(--accent); }
+.bloco-corpo { display: flex; flex-direction: column; gap: 14px; padding: 18px; }
+.bloco--lateral { width: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.bloco--lateral .bloco-cab { flex-shrink: 0; }
+.bloco--lateral .cmp { overflow-y: auto; }
+
+.vazio-bloco { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 34px 16px; color: var(--text-muted); text-align: center; }
+.vazio-bloco-titulo { font-size: 14px; font-weight: 700; color: var(--text-secondary); margin-top: 6px; }
+.vazio-bloco-sub { font-size: 12.5px; }
+
+/* Campos do diálogo */
+.dlg :deep(.q-field--outlined .q-field__control) { background: var(--bg-card-alt); border-radius: 10px !important; }
+.dlg :deep(.q-field--outlined .q-field__control:before) { border-color: var(--border) !important; }
+.dlg :deep(.q-field--outlined:hover .q-field__control:before) { border-color: rgba(100,116,139,0.45) !important; }
+.dlg :deep(.q-field--outlined.q-field--focused .q-field__control) { box-shadow: 0 0 0 3px var(--accent-light); }
+.dlg :deep(.q-field__label) { color: var(--text-secondary); }
+.dlg :deep(.q-field__prepend .q-icon) { color: var(--text-muted); }
+
+/* Fotos */
+.fotos-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.foto-add {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px;
+  border: 1.5px dashed color-mix(in srgb, var(--text-muted) 55%, transparent); border-radius: 12px; background: transparent;
+  color: var(--text-secondary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.foto-add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.foto-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.foto-add--ok { border-style: solid; border-color: color-mix(in srgb, var(--accent) 40%, transparent); color: var(--accent); }
+.foto-add--erro { border-color: #dc2626; color: #dc2626; background: rgba(220,38,38,0.06); }
+.foto-add--grande { flex-direction: column; width: 140px; height: 100px; text-align: center; }
+.foto-add:disabled { opacity: 0.55; cursor: not-allowed; }
+.foto-quadro { position: relative; width: 100px; height: 100px; }
+.foto-quadro img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; border: 1px solid var(--border); }
+.foto-quadro-x { position: absolute; top: 4px; right: 4px; }
+.cli-erro { margin-top: 4px; font-size: 11.5px; color: #dc2626; }
+
+/* Cartão de cliente */
+.cli-lista { display: flex; flex-direction: column; gap: 14px; padding: 18px; }
+.cli-lista:empty { display: none; }
+.cli { border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); transition: border-color 0.2s, box-shadow 0.2s; }
+.cli:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); box-shadow: 0 0 0 3px var(--accent-light); }
+.cli--nao { border-color: color-mix(in srgb, #dc2626 35%, var(--border)); background: color-mix(in srgb, #dc2626 4%, var(--bg-card)); }
+.cli-topo { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.cli-n {
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; font-weight: 800; color: var(--accent); background: var(--accent-light); font-variant-numeric: tabular-nums;
+}
+.cli-origem { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--text-muted); }
+.cli-origem-lbl { font-weight: 700; color: var(--accent); }
+.cli-end { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 12px; background: var(--bg-card-alt); border: 1px solid var(--border); }
+.seg-op {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 0; border-radius: 9px; background: transparent;
+  color: var(--text-secondary); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: background 0.2s, color 0.2s;
+}
+.seg-op:hover { color: var(--text-primary); }
+.seg-op:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.seg-op--ok.seg-op--on { background: #16a34a; color: #fff; }
+.seg-op--nao.seg-op--on { background: #dc2626; color: #fff; }
+
+.cli-campos { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; padding: 14px; align-items: start; }
+.cli-c-nome { grid-column: span 6; }
+.cli-c-padrao { grid-column: span 2; }
+.cli-c-conta { grid-column: span 4; }
+.cli-c-medidor { grid-column: span 4; }
+.cli-c-fotos { grid-column: span 8; display: flex; flex-direction: column; justify-content: center; min-height: 40px; }
+.cli-c-motivo { grid-column: span 12; }
+@media (max-width: 900px) {
+  .cli-c-nome, .cli-c-padrao, .cli-c-conta, .cli-c-medidor, .cli-c-fotos { grid-column: span 12; }
 }
 
-.campo-vazio, .clientes-vazio {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 13px; color: #9e9e9e; padding: 8px 0;
+/* Etapa 1 (lateral) */
+.cmp { display: flex; flex-direction: column; gap: 16px; padding: 16px 18px 18px; }
+.cmp-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.cmp-stat { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: var(--bg-card-alt); min-width: 0; }
+.cmp-stat-val { font-size: 18px; font-weight: 800; line-height: 1.1; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.cmp-stat-val small { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.cmp-stat-val--sm { font-size: 12.5px; font-weight: 700; line-height: 1.35; }
+.cmp-stat-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmp-equipe-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.cmp-equipe-nome { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }
+.cmp-pgs { display: flex; flex-direction: column; gap: 6px; }
+.cmp-pg { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); }
+.cmp-pg:hover { background: var(--bg-card-alt); }
+.cmp-pg-foto {
+  position: relative; flex-shrink: 0; width: 48px; height: 48px; padding: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  background: var(--bg-card-alt); display: grid; place-items: center; cursor: zoom-in; color: var(--text-muted);
 }
+.cmp-pg-foto--vazia { cursor: default; }
+.cmp-pg-foto img { width: 100%; height: 100%; object-fit: cover; }
+.cmp-pg-foto:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cmp-pg-mais { position: absolute; right: 2px; bottom: 2px; padding: 0 5px; border-radius: 8px; background: rgba(0,0,0,0.68); color: #fff; font-size: 10px; font-weight: 800; }
+.cmp-pg-info { flex: 1; min-width: 0; }
+.cmp-pg-num { font-size: 13.5px; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-pg-hora { font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Rodapé */
+.dlg-rodape {
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; flex-wrap: wrap;
+  padding: 12px 24px; background: var(--bg-card); border-top: 1px solid var(--border); box-shadow: 0 -8px 24px -16px rgba(15,23,42,0.25);
+}
+.dlg-rodape-info { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 18px; margin-right: auto; min-width: 0; }
+.resumo { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.resumo--ok { color: #16a34a; }
+.resumo--nao { color: #dc2626; }
+.resumo--rascunho { font-weight: 600; color: #d97706; }
+.btn-concluir { min-width: 170px; }
+@media (max-width: 700px) {
+  .dlg-topo, .dlg-meta, .dlg-corpo, .dlg-rodape { padding-left: 14px; padding-right: 14px; }
+  .dlg-rodape-info { flex-basis: 100%; }
+}
+
+
+
+
+
+
 
 /* ── Badge SAP no card ── */
 .nc-projeto-sap {
@@ -2392,81 +2388,12 @@ notasStore.fetchNotas()
   white-space: nowrap;
 }
 
-.pg-list { display: flex; flex-direction: column; gap: 8px; }
 
-.pg-item {
-  display: flex; align-items: center; gap: 10px;
-  background: #fff; border: 1px solid #ffe082; border-radius: 12px;
-  padding: 8px 10px 8px 8px;
-  box-shadow: 0 1px 4px rgba(230, 81, 0, 0.06);
-}
-.pg-item-num {
-  width: 22px; height: 22px; border-radius: 50%;
-  background: #ffe082; color: #e65100;
-  font-size: 11px; font-weight: 800;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
 
-.pg-item-foto {
-  width: 64px; height: 64px; border-radius: 10px;
-  overflow: hidden; flex-shrink: 0; position: relative;
-  background: #fff8e1; border: 1px solid #ffe082;
-}
-.pg-item-foto-count {
-  position: absolute; right: 3px; bottom: 3px;
-  background: rgba(0,0,0,0.65); color: #fff;
-  font-size: 10px; font-weight: 800;
-  border-radius: 8px; padding: 1px 5px;
-}
-.pg-item-foto--clickable { cursor: zoom-in; }
-.pg-item-foto--clickable:hover .pg-item-img { opacity: 0.85; }
-.pg-item-img {
-  width: 100%; height: 100%; object-fit: cover;
-  transition: opacity 0.2s;
-}
-.pg-item-img:hover { opacity: 0.85; }
-.pg-item-sem-foto {
-  width: 100%; height: 100%;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 2px; color: #e65100; opacity: 0.65; font-size: 8px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.04em;
-}
 
-.pg-item-info { flex: 1; min-width: 0; }
-.pg-item-pg {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 15px; font-weight: 800; color: #e65100;
-}
-.pg-item-meta { margin-top: 3px; }
-.pg-item-hora {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11px; color: #888; font-weight: 500;
-}
-.pg-item-ver-foto { flex-shrink: 0; font-size: 11px !important; }
 
-/* ── Clientes ── */
-.cliente-row {
-  border-radius: 10px; padding: 10px 12px 8px; margin-bottom: 8px;
-  border: 1.5px solid var(--border-color, #e8ecf0);
-  background: var(--bg-card, #fff);
-  transition: border-color 0.2s;
-}
-.cliente-row--nao { border-color: #ef9a9a; background: #fff8f8; }
 
-.cliente-origem-bar {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 10px; font-weight: 700; color: #1565c0;
-  margin-bottom: 8px; letter-spacing: 0.04em;
-}
-.cliente-end { font-weight: 400; color: #78909c; margin-left: 4px; }
 
-/* ── Resumo ── */
-.resumo-bar { display: flex; gap: 16px; padding: 10px 14px; background: var(--bg-main, #f4f6f9); border-radius: 10px; }
-.resumo-item { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; }
-.resumo-item--ok    { color: #2e7d32; }
-.resumo-item--nao   { color: #c62828; }
-.resumo-item--total { color: #455a64; }
 
 /* ── Foto medidor ── */
 .medidor-thumb {
