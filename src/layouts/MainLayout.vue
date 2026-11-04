@@ -6,7 +6,7 @@
       <q-toolbar class="header-toolbar">
 
         <!-- Logo -->
-        <div class="header-brand row items-center no-wrap">
+        <div class="header-brand row items-center no-wrap" :class="{ 'brand--on': marcaPronta }">
           <span class="brand-logo-wrap q-mr-md">
             <img src="/logo.ico" class="brand-logo" alt="CGB Energia" />
           </span>
@@ -98,7 +98,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from 'stores/auth'
@@ -108,6 +108,21 @@ const router = useRouter()
 const auth = useAuthStore()
 const isDark = computed(() => $q.dark.isActive)
 const drawer = ref(false)
+
+// A animação da marca só começa quando a fonte já carregou e a página terminou de montar:
+// assim não há troca de fonte no meio do movimento nem disputa com o carregamento dos dados
+const marcaPronta = ref(false)
+onMounted(() => {
+  const iniciar = () => { marcaPronta.value = true }
+  const fontes = document.fonts
+    ? Promise.all([fontes_('800 19px Unbounded'), fontes_('300 19px Unbounded')])
+    : Promise.resolve()
+  // Fonte carregada + dois quadros de folga; o relógio garante que a marca nunca fique invisível
+  Promise.race([fontes, new Promise(r => setTimeout(r, 1500))])
+    .then(() => requestAnimationFrame(() => requestAnimationFrame(iniciar)))
+  setTimeout(iniciar, 2500)
+})
+function fontes_ (descricao) { return document.fonts.load(descricao).catch(() => {}) }
 
 const userInitial = computed(() => {
   const e = auth.user?.email ?? ''
@@ -166,8 +181,9 @@ const navVisiveis = computed(() => navItems.filter(i => !i.admin || auth.isAdmin
 .brand-logo-wrap::after {
   content: ''; position: absolute; inset: -6px; border-radius: 50%; pointer-events: none;
   background: radial-gradient(circle, rgba(255,202,40,0.38) 0%, rgba(255,202,40,0) 68%);
-  opacity: 0; animation: brand-halo 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s 1 both;
+  opacity: 0; will-change: transform, opacity;
 }
+.brand--on .brand-logo-wrap::after { animation: brand-halo 1.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 .brand-word { display: flex; flex-direction: column; gap: 6px; }
 .brand-letras {
@@ -178,43 +194,46 @@ const navVisiveis = computed(() => navItems.filter(i => !i.admin || auth.isAdmin
 .brand-cgb { font-weight: 800; color: #fff; letter-spacing: 0.04em; }
 .brand-energia { font-weight: 300; color: #ffca28; letter-spacing: 0.2em; }
 .brand-letras span > span {
-  display: inline-block;
-  animation: brand-letra 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(var(--i) * 60ms + 120ms);
+  display: inline-block; opacity: 0; transform: translate3d(0, 40%, 0);
+  will-change: transform, opacity;
+}
+.brand--on .brand-letras span > span {
+  animation: brand-letra 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i) * 45ms);
 }
 
 /* Fio de energia: uma faísca atravessa a linha de tempos em tempos */
 .brand-line {
-  position: relative; display: block; height: 2px; border-radius: 2px; overflow: hidden;
+  position: relative; display: block; height: 2px; overflow: hidden; contain: paint;
   background: rgba(255,202,40,0.16);
 }
+/* Só transform é animado (roda na GPU); o brilho é um degradê estático, sem sombra recalculada a cada quadro */
 .brand-spark {
   position: absolute; top: 0; left: 0; width: 34%; height: 100%;
-  background: linear-gradient(90deg, rgba(255,202,40,0), #ffca28 60%, #fff4c7);
-  box-shadow: 0 0 10px 1px rgba(255,202,40,0.75);
-  transform: translateX(-110%);
-  animation: brand-faisca 4.2s cubic-bezier(0.65, 0, 0.35, 1) 1.2s infinite;
+  background: linear-gradient(90deg, rgba(255,202,40,0), rgba(255,202,40,0.9) 62%, #fff4c7);
+  transform: translate3d(-110%, 0, 0); will-change: transform;
 }
-.header-brand:hover .brand-spark { animation-duration: 1.6s; }
+.brand--on .brand-spark { animation: brand-faisca 4.2s linear 0.9s infinite; }
+.brand--on:hover .brand-spark { animation-duration: 1.8s; }
 
 @keyframes brand-letra {
-  from { opacity: 0; transform: translateY(45%); filter: blur(6px); }
-  to   { opacity: 1; transform: none; filter: blur(0); }
+  from { opacity: 0; transform: translate3d(0, 40%, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 @keyframes brand-faisca {
-  0%   { transform: translateX(-110%); }
-  45%  { transform: translateX(300%); }
-  100% { transform: translateX(300%); }
+  0%   { transform: translate3d(-110%, 0, 0); animation-timing-function: cubic-bezier(0.55, 0, 0.25, 1); }
+  42%  { transform: translate3d(300%, 0, 0); }
+  100% { transform: translate3d(300%, 0, 0); }
 }
 @keyframes brand-halo {
-  0%   { opacity: 0; transform: scale(0.6); }
-  35%  { opacity: 1; transform: scale(1.15); }
-  100% { opacity: 0.0; transform: scale(1.4); }
+  0%   { opacity: 0; transform: scale(0.7); }
+  35%  { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.3); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .brand-letras span > span { animation: none; }
-  .brand-spark { animation: none; transform: translateX(0); width: 100%; opacity: 0.55; }
-  .brand-logo-wrap::after { animation: none; }
+  .brand-letras span > span { animation: none !important; opacity: 1; transform: none; will-change: auto; }
+  .brand-spark { animation: none !important; transform: none; width: 100%; opacity: 0.55; will-change: auto; }
+  .brand-logo-wrap::after { animation: none !important; }
 }
 
 /* ── Nav desktop ── */
