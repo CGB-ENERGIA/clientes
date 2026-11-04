@@ -108,6 +108,13 @@ body.body--dark {
 
 // ── Scrollbar ─────────────────────────────────────────────────────
 * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-::-webkit-scrollbar { width: 4px; height: 4px; }
+* { scrollbar-color: rgba(100,116,139,0.4) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.35); border-radius: 99px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,0.6); background-clip: content-box; }
+
+// ── Seleção de texto e números ─────────────────────────────────────
+::selection { background: rgba(25,118,210,0.22); color: inherit; }
+body.body--dark ::selection { background: rgba(88,166,255,0.32); }
+.q-table, .q-field__native, .q-field__input { font-variant-numeric: tabular-nums; }

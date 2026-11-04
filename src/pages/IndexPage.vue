@@ -155,47 +155,38 @@
           <template #prepend><q-icon name="event" size="16px" /></template>
         </q-input>
 
-        <q-btn
+        <div class="filtros-rodape">
+        <button
           v-if="filtro || filtroBase || filtroPostes || filtroClientes || filtroStatus || ordemInicio || dataInicio"
-          flat dense icon="filter_alt_off"
-          color="grey-6" size="sm"
-          @click="limparFiltros"
+          type="button" class="btn-limpar" aria-label="Limpar filtros" @click="limparFiltros"
         >
+          <q-icon name="filter_alt_off" size="18px" />
           <q-tooltip>Limpar filtros</q-tooltip>
-        </q-btn>
+        </button>
 
-        <q-btn
-          :outline="somenteValidadas"
-          :flat="!somenteValidadas"
-          dense
-          :color="somenteValidadas ? 'positive' : 'grey-6'"
-          size="sm"
-          class="q-px-sm"
-          @click="somenteValidadas = !somenteValidadas"
+        <button
+          type="button" class="chip-toggle chip-toggle--ok" :class="{ 'chip-toggle--on': somenteValidadas }"
+          :aria-pressed="somenteValidadas" @click="somenteValidadas = !somenteValidadas"
         >
-          <q-icon name="verified" size="14px" class="q-mr-xs" />
-          VALIDADAS
+          <q-icon name="verified" size="15px" />
+          Validadas
           <q-tooltip>Exibir apenas notas validadas (oculta Expurgo e Sem Acesso)</q-tooltip>
-        </q-btn>
+        </button>
 
-        <q-btn
-          :outline="somenteImprevistos"
-          :flat="!somenteImprevistos"
-          dense
-          :color="somenteImprevistos ? 'deep-orange' : 'grey-6'"
-          size="sm"
-          class="q-px-sm"
-          @click="somenteImprevistos = !somenteImprevistos"
+        <button
+          type="button" class="chip-toggle chip-toggle--warn" :class="{ 'chip-toggle--on': somenteImprevistos }"
+          :aria-pressed="somenteImprevistos" @click="somenteImprevistos = !somenteImprevistos"
         >
-          <q-icon name="report_problem" size="14px" class="q-mr-xs" />
-          IMPREVISTOS
-          <span v-if="totalImprevistos" class="q-ml-xs">({{ totalImprevistos }})</span>
+          <q-icon name="report_problem" size="15px" />
+          Imprevistos
+          <span v-if="totalImprevistos" class="chip-toggle-n">({{ totalImprevistos }})</span>
           <q-tooltip>Exibir apenas notas com imprevisto reportado pelo campo</q-tooltip>
-        </q-btn>
+        </button>
 
-        <div class="filtros-count text-grey-6 text-caption self-center q-ml-auto">
-          {{ notasFiltradas.length }} de {{ notasStore.notas.length }}
+        <div class="filtros-count self-center q-ml-auto">
+          <strong>{{ notasFiltradas.length }}</strong> de {{ notasStore.notas.length }}
           <ProgInfo titulo="Contagem da lista" texto="Cada linha é um projeto SAP. Notas que dividem o mesmo PROJETO SAP aparecem juntas em uma linha. O número depois de de é o total de notas carregadas." />
+        </div>
         </div>
       </div>
 
@@ -1822,38 +1813,61 @@ notasStore.fetchNotas()
 /* ── Tabs de status ── */
 .status-tabs {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 .stab {
-  display: flex;
+  --c: #64748b; --c-ink: #475569; --c-ring: rgba(100,116,139,0.18);
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 10px;
-  border: 1.5px solid var(--border-color, #e0e0e0);
-  background: var(--bg-card, #fff);
-  color: var(--text-secondary, #546e7a);
+  gap: 8px;
+  padding: 9px 12px 9px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s, box-shadow 0.2s, color 0.2s, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.stab-icon { display: flex; align-items: center; }
+.stab:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); color: var(--text-primary); }
+.stab:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+.stab-icon { display: flex; align-items: center; color: var(--c); }
 .stab-count {
-  margin-left: 4px;
-  background: rgba(0,0,0,0.08);
-  border-radius: 20px;
-  padding: 1px 8px;
-  font-size: 11px;
+  min-width: 28px;
+  text-align: center;
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+  color: var(--c-ink);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11.5px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.2s, color 0.2s;
 }
-.stab--active.stab--todas          { border-color: #1976d2; background: #e3f2fd; color: #1565c0; }
-.stab--active.stab--pendente       { border-color: #9e9e9e; background: #f5f5f5; color: #424242; }
-.stab--active.stab--em_andamento   { border-color: #f57c00; background: #fff3e0; color: #e65100; }
-.stab--active.stab--baixar_medidor { border-color: #1565c0; background: #e3f2fd; color: #0d47a1; }
-.stab--active.stab--concluido      { border-color: #388e3c; background: #e8f5e9; color: #1b5e20; }
+.stab--active {
+  border-color: var(--c);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 3px var(--c-ring), var(--shadow-sm);
+}
+.stab--active .stab-count { background: var(--c-ink); color: #fff; }
+.stab--todas             { --c: #1976d2; --c-ink: #1565c0; --c-ring: rgba(25,118,210,0.16); }
+.stab--pendente          { --c: #78909c; --c-ink: #546e7a; --c-ring: rgba(120,144,156,0.20); }
+.stab--em_andamento      { --c: #f59e0b; --c-ink: #b45309; --c-ring: rgba(245,158,11,0.20); }
+.stab--aguardando_etapa2 { --c: #8b5cf6; --c-ink: #6d28d9; --c-ring: rgba(139,92,246,0.18); }
+.stab--baixar_medidor    { --c: #2563eb; --c-ink: #1d4ed8; --c-ring: rgba(37,99,235,0.16); }
+.stab--concluido         { --c: #16a34a; --c-ink: #15803d; --c-ring: rgba(22,163,74,0.18); }
+.body--dark .stab--todas             { --c-ink: #7db8ff; }
+.body--dark .stab--pendente          { --c-ink: #b0bec5; }
+.body--dark .stab--em_andamento      { --c-ink: #fbbf24; }
+.body--dark .stab--aguardando_etapa2 { --c-ink: #c4b5fd; }
+.body--dark .stab--baixar_medidor    { --c-ink: #93c5fd; }
+.body--dark .stab--concluido         { --c-ink: #86efac; }
+.body--dark .stab--active .stab-count { color: #0d1117; }
+@media (prefers-reduced-motion: reduce) { .stab, .stab-count { transition: none; } .stab:hover { transform: none; } }
 
 /* ── Imprevistos reportados pelo campo ── */
 .badge-imprevisto {
@@ -1985,20 +1999,17 @@ notasStore.fetchNotas()
 
 .nota-card {
   background: var(--bg-card, #fff);
-  border: 2px solid var(--border-color, #e8ecf0);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 16px;
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
-  transition: box-shadow 0.2s, transform 0.15s, border-color 0.2s;
+  transition: box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.nota-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
-.nota-card--pendente       { border-left: 4px solid #bdbdbd; }
-.nota-card--em_andamento   { border-left: 4px solid #f57c00; box-shadow: 0 2px 12px rgba(245,124,0,0.1); }
-.nota-card--baixar_medidor { border-left: 4px solid #1976d2; box-shadow: 0 2px 12px rgba(25,118,210,0.1); }
-.nota-card--concluido      { border-left: 4px solid #43a047; }
+.nota-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
 
 .nc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .nc-num { font-size: 20px; font-weight: 800; color: var(--text-primary, #0d1b2a); }
@@ -2007,7 +2018,7 @@ notasStore.fetchNotas()
 .nc-badge-base {
   font-size: 10px; font-weight: 700;
   background: #e3f2fd; color: #1565c0;
-  border-radius: 6px; padding: 2px 8px;
+  border-radius: 999px; padding: 3px 10px; letter-spacing: 0.02em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   display: inline-block; max-width: 100%;
 }
@@ -2019,6 +2030,14 @@ notasStore.fetchNotas()
   letter-spacing: 0.04em;
 }
 .nc-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.body--dark .nc-badge-base { background: rgba(88,166,255,0.14); color: #7db8ff; }
+.body--dark .nc-status { background: rgba(255,255,255,0.07) !important; }
+.body--dark .nc-status--pendente { color: #b0bec5; }
+.body--dark .nc-status--em_andamento { color: #fbbf24; }
+.body--dark .nc-status--baixar_medidor { color: #93c5fd; }
+.body--dark .nc-status--aguardando_etapa2, .body--dark .nc-status--sem_acesso { color: #c4b5fd; }
+.body--dark .nc-status--concluido { color: #86efac; }
+.body--dark .nc-status--expurgo { color: #fca5a5; }
 .nc-status--pendente       { background: #f5f5f5;  color: #757575; }
 .nc-status--em_andamento   { background: #fff3e0;  color: #e65100; }
 .nc-status--baixar_medidor { background: #e3f2fd;  color: #1565c0; }
@@ -2052,33 +2071,82 @@ notasStore.fetchNotas()
 .filtros-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  padding: 10px 14px;
-  background: var(--bg-card, #fff);
-  border: 1.5px solid var(--border-color, #e8ecf0);
-  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
 }
-.filtros-count { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.filtros-bar :deep(.q-field--outlined .q-field__control) {
+  background: var(--bg-card-alt);
+  border-radius: 10px !important;
+  transition: box-shadow 0.2s;
+}
+.filtros-bar :deep(.q-field--outlined .q-field__control:before) { border-color: var(--border) !important; }
+.filtros-bar :deep(.q-field--outlined:hover .q-field__control:before) { border-color: rgba(100,116,139,0.45) !important; }
+.filtros-bar :deep(.q-field--outlined.q-field--focused .q-field__control) { box-shadow: 0 0 0 3px var(--accent-light); }
+.filtros-bar :deep(.q-field__prepend .q-icon) { color: var(--text-muted); }
+.filtros-bar :deep(.q-field__label) { color: var(--text-secondary); }
+.filtros-count {
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+  font-variant-numeric: tabular-nums; color: var(--text-muted);
+}
+.filtros-count strong { color: var(--text-primary); font-weight: 700; }
+
+.chip-toggle {
+  --c: #64748b;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text-secondary);
+  font-family: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.chip-toggle:hover { background: var(--bg-card-alt); color: var(--text-primary); }
+.chip-toggle:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+.chip-toggle--ok   { --c: #16a34a; }
+.chip-toggle--warn { --c: #ea580c; }
+.chip-toggle--on {
+  color: var(--c);
+  border-color: color-mix(in srgb, var(--c) 55%, transparent);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+}
+.chip-toggle-n { font-variant-numeric: tabular-nums; }
+.filtros-rodape {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%;
+  padding-top: 12px; margin-top: 2px; border-top: 1px solid var(--border);
+}
+.btn-limpar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 10px;
+  border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-limpar:hover { background: var(--bg-card-alt); color: var(--text-primary); }
+.btn-limpar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ── Vista lista ── */
 .lista-notas {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
 }
 .lista-header {
   display: grid;
   grid-template-columns: 130px 110px 220px 150px 1fr 90px 130px 110px;
   gap: 12px;
-  padding: 6px 16px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  padding: 10px 16px 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #37474f;
-  border-bottom: 2px solid #b0bec5;
-  margin-bottom: 2px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
   text-align: center;
 }
 .lista-header > div { text-align: center; }
@@ -2089,35 +2157,50 @@ notasStore.fetchNotas()
 .status-legenda-item { display: flex; align-items: flex-start; gap: 10px; }
 .status-legenda-label { font-size: 13px; font-weight: 700; }
 .status-legenda-desc { font-size: 12px; color: #78909c; line-height: 1.35; }
-.body--dark .lista-header { color: #b0bec5; border-bottom-color: rgba(255,255,255,0.15); }
 .lista-row {
+  --st: #94a3b8;
   display: grid;
   grid-template-columns: 130px 110px 220px 150px 1fr 90px 130px 110px;
   align-items: center;
   gap: 12px;
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: 1.5px solid var(--border-color, #e8ecf0);
-  background: var(--bg-card, #fff);
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
-  transition: box-shadow 0.15s, border-color 0.15s;
+  transition: box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.lista-row:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); border-color: #b0bec5; }
-.lista-row--pendente       { border-left: 4px solid #bdbdbd; }
-.lista-row--em_andamento   { border-left: 4px solid #f57c00; }
-.lista-row--baixar_medidor { border-left: 4px solid #1976d2; }
-.lista-row--concluido      { border-left: 4px solid #43a047; }
+.lista-row:hover { box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--st) 45%, var(--border)); transform: translateY(-1px); }
+.lista-row--pendente          { --st: #94a3b8; }
+.lista-row--em_andamento      { --st: #f59e0b; }
+.lista-row--aguardando_etapa2 { --st: #8b5cf6; }
+.lista-row--baixar_medidor    { --st: #2563eb; }
+.lista-row--concluido         { --st: #16a34a; }
+.lista-row--expurgo           { --st: #dc2626; }
+.lista-row--sem_acesso        { --st: #ea580c; }
+@media (prefers-reduced-motion: reduce) { .lista-row { transition: none; } .lista-row:hover { transform: none; } }
 
-.lista-num  { font-size: 15px; font-weight: 800; color: var(--text-primary, #0d1b2a); text-align: center; }
+.lista-num {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+  color: var(--text-primary, #0d1b2a);
+}
+.lista-num::before {
+  content: ''; flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--st); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st) 20%, transparent);
+}
 .lista-base { text-align: center; }
-.lista-pep  { text-align: center; font-size: 12px; font-weight: 600; color: #7b1fa2; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lista-pep  { text-align: center; font-size: 12px; font-weight: 600; color: #7b1fa2; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :root[data-theme="dark"] .lista-pep,
 .body--dark .lista-pep  { color: #ce93d8; }
 .lista-info { display: flex; gap: 10px; font-size: 12px; color: var(--text-muted, #607d8b); justify-content: center; }
 .lista-info span { display: flex; align-items: center; gap: 3px; border-radius: 8px; padding: 2px 7px; }
-.info-destaque { font-weight: 800; }
-.info-destaque--poste  { background: #fff3e0; color: #e65100; box-shadow: 0 0 6px rgba(230,81,0,0.35); }
-.info-destaque--cliente { background: #e8f5e9; color: #2e7d32; box-shadow: 0 0 6px rgba(46,125,50,0.3); }
+.info-destaque { font-weight: 700; }
+.info-destaque--poste  { background: rgba(245,158,11,0.14); color: #b45309; }
+.info-destaque--cliente { background: rgba(22,163,74,0.13); color: #15803d; }
+.body--dark .info-destaque--poste  { color: #fbbf24; }
+.body--dark .info-destaque--cliente { color: #86efac; }
 .lista-status { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; }
 .lista-status .badge-apagada { margin-left: 0; }
 .lista-equipe { display: inline-flex; align-items: center; gap: 3px; width: 100%; justify-content: center; font-size: 11px; font-weight: 700; color: #5d4037; background: #fff8e1; border-radius: 8px; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2256,10 +2339,6 @@ notasStore.fetchNotas()
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .grupo-item:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.08); border-color: #b39ddb; }
-.grupo-item--em_andamento   { border-left: 4px solid #f57c00; }
-.grupo-item--baixar_medidor { border-left: 4px solid #1976d2; }
-.grupo-item--concluido      { border-left: 4px solid #43a047; }
-.grupo-item--pendente       { border-left: 4px solid #bdbdbd; }
 .grupo-item-left { flex: 1; min-width: 0; }
 .grupo-item-nota { font-size: 16px; font-weight: 800; color: #0d1b2a; }
 .grupo-item-info {

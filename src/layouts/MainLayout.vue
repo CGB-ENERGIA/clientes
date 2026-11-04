@@ -143,9 +143,9 @@ const navVisiveis = computed(() => navItems.filter(i => !i.admin || auth.isAdmin
 <style scoped>
 /* ── Header ── */
 .header-modern {
-  background: #0a1628;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  box-shadow: 0 2px 20px rgba(0,0,0,0.4);
+  background: linear-gradient(180deg, #0d1c34 0%, #0a1628 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  box-shadow: 0 1px 0 rgba(255,202,40,0.10), 0 8px 28px rgba(5,12,26,0.35);
 }
 .header-toolbar {
   padding: 0 16px;
